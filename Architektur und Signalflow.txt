@@ -1,0 +1,139 @@
+Signal Flow & Architektur des Spectral Storyteller (rein DSP-basiert)
+
+Hier eine klare, praxisnahe Beschreibung der internen Architektur. Sie ist so gestaltet, dass sie mit JUCE gut umsetzbar ist, niedrige Latenz ermöglicht (durch Overlap-Add) und modular erweiterbar bleibt. Alles basiert auf klassischer Spectral Processing (STFT = Short-Time Fourier Transform).
+
+1. High-Level Signal Flow (Übersicht)
+
+text
+
+Input Audio (Stereo)
+    ↓ (Blockweise Verarbeitung)
+Audio Buffer (Ring-Buffer oder JUCE AudioBuffer)
+    ↓
+Windowing + STFT (FFT) → Frequency Domain (Magnitude + Phase pro Bin)
+    ↓
+Object Segmentation & Labeling (DSP-Analyse)
+    ↓
+Per-Object Processing + Narrative Morphing (Timeline/Keyframes)
+    ↓
+Spectral Modification (Filter, Morph, Pitch/Formant etc.)
+    ↓
+iFFT (Inverse FFT) + Overlap-Add/Resynthesis
+    ↓
+Output Audio + Optional Dry/Wet Mix
+
+Der Flow läuft blockweise (z. B. 2048 oder 4096 Samples pro Frame, mit 75–87.5% Overlap für gute Qualität und Latenz).
+
+2. Detaillierte Architektur-Komponenten
+
+A. Input & STFT Stage (Analysis)
+
+Eingehendes Audio wird in überlappende Fenster (Hann- oder Blackman-Harris-Window) geschnitten.
+
+Für jeden Frame: Forward FFT (z. B. via FFTW, JUCE’s FFT oder Apple Accelerate).
+
+Ausgabe: Komplexe Werte pro Frequency Bin → getrennt in Magnitude (Amplitude) und Phase.
+
+Phase-Vocoder-Technik: Du trackst Phasen-Differenzen zwischen Frames für stabile Pitch/Time-Manipulationen.
+
+B. Object Segmentation Layer (das „Intelligente“ ohne AI)
+
+Auf Basis der Spectral Features pro Frame oder über mehrere Frames:
+
+Transient Detection (hoher Spectral Flux).
+
+Tonale Komponenten (Peak-Picking + Harmonic Tracking).
+
+Noise/Texture (flache Spektren, niedrige Tonality).
+
+Formanten (bei Vocals).
+
+Clustering-Algorithmen (einfache K-Means-ähnliche oder regelbasierte Thresholds auf Centroid, Spread, Flatness etc.).
+
+Ergebnis: Liste von Objekten mit Masken (welche Bins gehören zu welchem Objekt). Diese Masken können weich (blended) sein.
+
+User kann manuell korrigieren/zeichnen im Spectral View.
+
+C. Narrative / Story Engine (State Machine + Parameter Automation)
+
+Eine interne Timeline (nicht die DAW-Timeline, sondern Plugin-intern) mit Keyframes.
+
+Jeder Keyframe speichert Parameter-Sets pro Objekt (z. B. Target Magnitude Curve, Pitch Shift, Density, Brightness).
+
+Interpolation zwischen Keyframes:
+
+Verschiedene Kurven-Typen (Linear, Exp, S-Curve).
+
+Zeitbasierte Morphing-Regeln (z. B. „Transform Object A into characteristics of Object B“ via Cross-Synthesis: Amplituden von B auf Frequenzen von A übertragen).
+
+Modulation-Matrix: MIDI/OSC/Host-Automation kann Keyframes oder einzelne Parameter beeinflussen.
+
+D. Processing Stage (pro Objekt oder global)
+
+Spectral Filter / EQ pro Objekt.
+
+Pitch / Formant Shifting (Phase-Vocoder-basiert).
+
+Density / Granular-ähnliche Manipulation (Bins verstärken/abschwächen, Freeze).
+
+Interaction zwischen Objekten (z. B. Sidechain-ähnlich: Objekt A moduliert Objekt B).
+
+Preserve-Logik: Masken schützen bestimmte Bins (z. B. fundamentale Frequenzen für Tonality).
+
+E. Resynthesis (iFFT + Overlap-Add)
+
+Modifizierte Magnitude + Phase zurück zu komplexen Werten.
+
+Inverse FFT pro Frame.
+
+Overlap-Add: Fenster überlappen und addieren → glatter Output.
+
+Optional: Phase-Unwrapping oder Advanced Phase-Vocoding für bessere Qualität bei starken Morphs.
+
+F. Output Stage
+
+Dry/Wet Mix.
+
+Global FX (z. B. leichte Reverb oder Limiter).
+
+Latency Compensation (automatisch via JUCE).
+
+3. Datenstrukturen (wichtig für die Implementierung)
+
+Spectral Frame Buffer: Ring-Buffer mit mehreren FFT-Frames für Analyse über Zeit.
+
+Object Database: Vector/Array von Objekten, jedes mit:
+
+Bin-Mask (Array von Weights 0.0–1.0 pro Frequency Bin).
+
+Aktuellen und Ziel-Parametern.
+
+Timeline Data: Sequence von Keyframes (Time + Parameter Snapshot).
+
+Parameter State: ValueTree (JUCE) für Automation und Presets.
+
+4. Performance & Real-Time Aspekte
+
+Latenz: Typisch 20–100 ms (abhängig von FFT-Größe und Overlap). Gut für die meisten Sound-Design-Anwendungen; für Live ggf. kleinere FFTs.
+
+CPU: FFT/iFFT sind teuer → optimiere mit SIMD, Threading (z. B. separate Analyse-Threads) oder kleineren Blöcken.
+
+Memory: Spektrogramm für Visualisierung separat halten (nicht jeden Frame neu berechnen).
+
+Starte mit mono, dann stereo erweitern (Mid-Side oder per Channel).
+
+5. JUCE-spezifische Umsetzungstipps
+
+Erbe von AudioProcessor.
+
+Verwende juce::dsp::FFT oder integriere FFTW.
+
+Für den Editor: Custom Component mit OpenGL oder juce::Graphics für Spectral View (zeichne Spektrogramm mit getMagnitude).
+
+Parameter mit AudioParameterFloat etc. + ValueTreeState.
+
+Für die Timeline: Eigene Klasse mit Keyframe-Interpolation (ähnlich wie in Animations-Libraries).
+
+Diese Architektur ist modular: Du kannst erst einen einfachen Spectral Morpher bauen (STFT → einfaches Morph → iFFT) und dann schrittweise Objekt-Segmentation + Timeline hinzufügen.
+
+Vergleich zu existierenden Plugins: Ähnlich wie SpecOps oder Spectral Suite (FFT → per-Bin Processing), aber mit stärkerer zeitlicher Narrative-Schicht und Objekt-Grouping.

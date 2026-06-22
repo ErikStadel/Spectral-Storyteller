@@ -1,0 +1,63 @@
+Modulation im Spectral Storyteller – So wird der Sound lebendig
+
+Modulation ist entscheidend, damit das Plugin nicht nur statische Morphs macht, sondern organisch, rhythmisch und expressiv klingt. Im Kontext deines Plugins sollten alle Modulatoren nahtlos mit der Story Timeline und den einzelnen Objekten zusammenarbeiten. Das heißt: Du kannst Modulatoren pro Objekt oder global einsetzen und sie über Keyframes automatisieren.
+
+1. Grundprinzip der Modulation-Architektur
+
+Ziele (Targets): Fast alles kann moduliert werden – Pitch Shift, Formant, Density, Brightness, Stereo Width, Filter Cutoff pro Objekt, Morph-Geschwindigkeit, Objekt-Interaktion etc.
+
+Quellen (Sources): Kombination aus klassischen und spektral-spezifischen Modulatoren.
+
+Integration: Jeder Modulator kann in der Timeline Keyframes haben oder per MIDI/OSC/Host-Automation gesteuert werden.
+
+2. Empfohlene Modulationseffekte / Modulatoren
+
+Klassische, aber stark erweiterte Modulatoren
+
+Multi-Stage Envelope (ADSR / AHDSR + Loop) Besonders nützlich: „Audio Follower“-Modus, der die Hüllkurve aus dem Eingangssignal oder aus einzelnen Objekten (z. B. Transienten) extrahiert. → Perfekt zum „Atmen“ von Atmosphären oder zum rhythmischen Pulsieren von Texturen.
+
+LFOs (Low Frequency Oscillators) 4–8 LFOs pro Instanz, mit folgenden Formen:
+
+Sine, Triangle, Saw, Square, Random, S&H (Sample & Hold)
+
+Tempo-sync (1/4, 1/8, dotted etc.) oder freie Rate
+
+Phase-Offset und Retrigger (per Note oder per Transient) Spectral Twist: Ein „Spectral LFO“ der nicht nur einen Parameter, sondern Bins-Gruppen (z. B. hohe Frequenzen) wellenförmig moduliert.
+
+Random / Chaos Modulatoren
+
+Perlin Noise oder Smoothed Random für organische, nie wiederholbare Bewegung (sehr wichtig für „lebendige“ Sound-Designs).
+
+„Brownian Motion“-Modus für langsame, driftende Veränderungen.
+
+Spectral-spezifische Modulation (das macht es einzigartig)
+
+Spectral Flux / Transient Modulator Die Stärke der Transienten oder die Veränderung im Spektrum steuert andere Parameter (z. B. je mehr Flux, desto heller wird das Objekt).
+
+Centroid / Brightness Follower Die „Helligkeit“ eines Objekts moduliert z. B. Density oder Pitch eines anderen Objekts (Cross-Modulation).
+
+Density / Activity Modulator Wie „voll“ ein Frequenzbereich ist, wird als Modulationsquelle genutzt.
+
+Formant / Pitch Tracker Erkannte Tonhöhe oder Formanten eines Objekts können andere Objekte modulieren (z. B. Vocals steuern einen Drone).
+
+Weitere starke Modulationsquellen
+
+MIDI / OSC / Host Automation Vollständige Unterstützung – jeder Parameter kann gelernt oder direkt zugewiesen werden. Ideal für Live-Performance.
+
+Sidechain Modulator Externes Audio-Signal (z. B. Kick) moduliert Parameter der Objekte (klassischer Sidechain, aber spektral präzise).
+
+Macro Controls 8–12 Makros, die mehrere Parameter gleichzeitig steuern – mit eigenen Kurven in der Timeline. Super für dramatische „One-Knob“-Story-Moves.
+
+3. Wie das in der Praxis funktioniert (Beispiele)
+
+AnwendungsfallModulatorZiel-ParameterEffektEvolvierender DroneLangsamer LFO + Perlin NoiseBrightness + DensityOrganisches Wabern und AtmenFootstep → MonsterTransient Follower + EnvelopePitch + RoughnessMit jedem Schritt wird es bedrohlicherRhythmischer PadTempo-sync LFO + Spectral FluxFilter + Stereo WidthPulsierend und lebendigField Recording TransformationCentroid FollowerMorph-Mix zu Ziel-ObjektNatürliche, inhaltgetriebene EntwicklungLive PerformanceMIDI CC + MacroMehrere Objekte gleichzeitigDirekte Kontrolle während des Spielens
+
+4. UI & Bedienung
+
+Mod Matrix: Übersichtliche Matrix, in der du Sources → Targets zuweist (wie in Serum oder Phase Plant).
+
+Visualisierung: Jeder Modulator zeigt eine kleine Kurve/Animation im Spectral View.
+
+Pro Objekt: Jede Objekt-Gruppe kann eigene Modulatoren haben (z. B. nur die „Atmosphäre“ wird stark moduliert).
+
+Mod-Depth & Smoothing: Immer mit einstellbarer Intensität und Glättung, damit nichts zu chaotisch wird.

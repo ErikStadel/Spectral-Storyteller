@@ -1,0 +1,93 @@
+1. Standard-Anwendung: Als Insert-Effekt auf einer Audiospur (empfohlen)
+
+Das ist der klassische und mächtigste Workflow:
+
+Du legst das Plugin als Insert auf eine beliebige Audio- oder Instrument-Spur in deiner DAW (Ableton, Logic, Reaper, Cubase, Studio One etc.).
+
+Das Plugin verarbeitet das eingehende Signal in Echtzeit.
+
+Die interne Story Timeline läuft synchron zur DAW-Transportzeit (Playhead).
+
+Typischer Workflow:
+
+Audiospur mit Material laden (z. B. Field Recording, Vocal, Drum Loop, Foley-Sound, Synth-Pad).
+
+Spectral Storyteller als Insert hinzufügen.
+
+Im Plugin:
+
+Das Spektrogramm analysiert automatisch das Material.
+
+Du markierst oder lässt Objekte automatisch erkennen („Kick“, „Atmosphäre“, „Vocal Formant“ etc.).
+
+Du öffnest die Story Timeline und setzt Keyframes an bestimmten Zeitpunkten deines Tracks (z. B. bei 0:15, 0:45, 1:30).
+
+Du definierst, wie sich die Objekte entwickeln sollen (z. B. „Atmosphäre wird heller und breiter“, „Transient wird zu einem metallischen Drone“).
+
+Beim Abspielen der DAW entwickelt sich der Sound genau nach deiner „Geschichte“.
+
+Vorteile dieses Modus:
+
+Funktioniert live und in Echtzeit.
+
+Automatisierung von DAW-Parametern (z. B. Wet/Dry, einzelne Objekt-Parameter) ist möglich.
+
+Perfekt für längere Passagen, in denen sich ein Sound dramatisch verändert.
+
+2. Standalone / Offline Sound Design Modus
+
+Viele Sound Designer bevorzugen das für präzises Arbeiten:
+
+Du kannst das Plugin auch als Standalone-Anwendung starten (JUCE unterstützt das sehr gut).
+
+Oder du lädst einen Sound direkt ins Plugin (File Import Button).
+
+Dann arbeitest du offline: Bearbeitest die Story Timeline in Ruhe, hörst dir Abschnitte an, exportierst das Ergebnis als neue Audio-Datei (Bounce/Export-Funktion).
+
+Dieser Modus eignet sich besonders gut für:
+
+Erstellen von Sound Libraries
+
+Komplexe Sound-Design-Sessions (z. B. einen einzelnen Footstep in ein 30-Sekunden-Evolving-Monster verwandeln)
+
+Wenn du sehr CPU-intensive Einstellungen nutzt
+
+3. Fortgeschrittene Anwendungen
+
+Sidechain / Morphing von externem Material: Du kannst eine zweite Audiospur als Sidechain-Input routen. Das Plugin verwendet dann Elemente aus dem Sidechain-Signal als „Zielcharakter“ für Morphs (z. B. ein Drum-Loop morpht in Eigenschaften eines Pad-Sounds).
+
+Mehrere Instanzen: Eine Instanz für globale Atmosphäre + eine weitere nur für einzelne Elemente (z. B. nur auf den Vocal-Bus).
+
+Live Performance: Mit MIDI-Controller oder OSC kannst du während des Spielens Keyframes triggern oder Morph-Geschwindigkeit steuern – ideal für improvisierte Sets.
+
+Praktisches Beispiel
+
+Szenario: Evolving Cinematic Sound
+
+Du hast eine 2-Minuten Field-Recording-Spur (Waldgeräusche).
+
+Plugin als Insert.
+
+Objekte: „Wind“, „Blätter“, „Vögel“, „Boden“.
+
+Story Timeline:
+
+0–30 Sek: Alles normal.
+
+30–80 Sek: Wind wird tiefer und bedrohlich (Pitch down + Density hoch).
+
+80–120 Sek: Blätter verwandeln sich in metallische, klirrende Texturen.
+
+Ab 120 Sek: Alles kollabiert in einen dunklen Drone.
+
+Beim Abspielen der Spur passiert genau diese Entwicklung automatisch.
+
+Wichtige Hinweise zur Nutzung
+
+Latenz: Es gibt unvermeidbare FFT-Latenz (typisch 50–150 ms). Für Mixing ist das meist unproblematisch, für extrem präzises Live-Tracking ggf. weniger geeignet.
+
+CPU: Spectral Processing ist rechenintensiv → gute Freeze-/Render-Optionen im Plugin sind wichtig.
+
+Non-Destructive: Du kannst immer den Dry-Signal-Mix behalten und später rendern.
+
+Zusammengefasst: Die Haupt-Nutzung ist als Insert auf einer Spur – genau wie andere Effekte. Die Besonderheit ist die interne Story Timeline, die die zeitliche Entwicklung steuert, unabhängig davon, ob du den Sound in Echtzeit durch die DAW laufen lässt oder offline bearbeitest.

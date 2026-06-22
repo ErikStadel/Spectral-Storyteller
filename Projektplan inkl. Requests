@@ -1,0 +1,207 @@
+Hier ist eine strategische Aufteilung deines Projekts Spectral Storyteller in klar abgegrenzte, inkrementelle Pull Requests (PRs). Da du lokal mit VS Code und einem Entwickler-Agenten arbeitest, ist diese Roadmap so aufgebaut, dass nach den ersten PRs sofort ein lauffähiges, testbares Framework existiert, das danach Schritt für Schritt funktional erweitert wird.
+
+Phase 1: Das funktionale Fundament (Der Signalweg)
+
+PR 1: JUCE-Projekt-Setup & STFT/iFFT Passthrough Engine
+
+
+
+Ziel: Aufbau des grundlegenden Plugin-Skeletts mit einem funktionierenden, artefaktfreien Audio-Passthrough in der Spektraldomäne.
+
+DSP / Logik:
+
+Einrichtung eines JUCE-AudioProcessor-Projekts (Mono/Stereo-Unterstützung).
+
+Implementierung einer STFT- (Short-Time Fourier Transform) und iFFT-Stufe mit Overlap-Add.
+
+Konfiguration fester Blockgrößen (z. B. 2048 Samples) mit einem Fenster-Overlap von 75 % bis 87.5 %.
+
+Anwendung von Hann- oder Blackman-Harris-Fensterfunktionen.
+
+Direkte Rücksynthese (Forward FFT $\rightarrow$ Inverse FFT) ohne Modifikation.
+
+
+
+UI / Steuerung: Minimales Standard-JUCE-UI mit einem Dry/Wet-Regler.
+
+
+
+Test-Kriterium für den Agenten: Das Plugin kompiliert lokal. Audio wird durchgeschleift und klingt bei 100 % Wet identisch zum Eingangssignal (keine Phasenfehler oder Klicks).
+
+PR 2: Core-Datenstrukturen & Basis-Spektrogramm-Visualisierung
+
+
+
+Ziel: Einführung der Datenpuffer für spektrale Daten und Darstellung des Live-Audiosignals.
+
+DSP / Logik:
+
+Implementierung des SpectralFrameBuffer (Ringpuffer für FFT-Frames über Zeit).
+
+Berechnung von Magnitude und Phase aus den komplexen FFT-Werten.
+
+Strukturierung einer leeren ObjectDatabase (Vektor für Masken-Arrays).
+
+UI / Steuerung:
+
+Zentraler Hauptbereich: Einbindung einer Custom Component für den Spectral View.
+
+Effizientes Zeichnen des rollenden Spektrogramms auf Basis der Amplitudenwerte (Farbverlauf: Dunkelblau zu Gelb).
+
+
+
+Test-Kriterium für den Agenten: Beim Abspielen von Audio im Plugin wird das Spektrogramm flüssig und ohne spürbare CPU-Einbrüche visuell dargestellt.
+
+Phase 2: Manuelle Kontrolle & Struktur
+
+PR 3: Manuelles Maskierungs-System & Objekt-Layer (UI-Kopplung)
+
+
+
+Ziel: Erste funktionale Trennung von Audio-Inhalten durch manuelle Frequenz-Auswahlen und Stummschaltung.
+
+DSP / Logik:
+
+Erweiterung der ObjectDatabase: Jedes Objekt erhält ein Bin-Masken-Array (Weights von 0.0 bis 1.0 pro Frequenz-Bin).
+
+Verarbeitung der Masken in der Processing-Stage: Multiplikation der Bins mit den Maskengewichten vor der iFFT.
+
+UI / Steuerung:
+
+Linke Sidebar: Implementierung der Objekt-Liste (Layer) mit Steuerelementen für Solo, Mute und Farbcodierung.
+
+Spectral View: Integration einfacher Maus-Interaktionen (z. B. ein Lasso- oder Rechteck-Auswahlwerkzeug) zur Zuweisung von Bins an ein manuelles Objekt.
+
+
+
+Test-Kriterium für den Agenten: Wenn ein Frequenzbereich im Spektrogramm ausgewählt und einem Objekt zugewiesen wird, lässt sich dieser Bereich über den Mute-Button in der Sidebar hörbar stummschalten.
+
+PR 4: Interne Story-Timeline & Parameter-State (ValueTree)
+
+
+
+Ziel: Aufbau der zeitsynchronen Automationsebene für die spätere narrative Steuerung.
+
+DSP / Logik:
+
+Integration des JUCE ValueTreeState für die Thread-sichere Parameter-Verwaltung und DAW-Automation.
+
+Aufbau der TimelineData-Struktur zur Speicherung von Keyframes (Zeitstempel + Parameter-Snapshots).
+
+Synchronisation des internen Abspielkopfs mit der DAW-Transportzeit.
+
+UI / Steuerung:
+
+Unterer Bereich: Einbindung der horizontalen Story Timeline mit einer Zeitleiste.
+
+Erstellung von Automationsspuren pro Objekt, auf denen Keyframes per Doppelklick erzeugt werden können.
+
+Implementierung einer einfachen linearen Interpolation der Parameter zwischen den Keyframes.
+
+
+
+Test-Kriterium für den Agenten: Keyframes auf der Timeline verändern beim Abspielen der DAW einen Standard-Parameter (z. B. die Lautstärke eines spektralen Objekts) synchron über die Zeit.
+
+Phase 3: Die "Smart" DSP-Ebene
+
+PR 5: Regelbasierte Objekt-Segmentierung (Automatisches Clustering)
+
+
+
+Ziel: Automatisches Erkennen von klanglichen Bausteinen ohne künstliche Intelligenz.
+
+DSP / Logik:
+
+Implementierung klassischer mathematischer Feature-Extraktionen pro Frame: Spectral Flux, Tonality, Spectral Centroid, Spread und Flatness.
+
+Entwicklung von regelbasierten Threshold- und einfachen Clustering-Algorithmen (z. B. K-Means-basiert).
+
+Automatische Generierung weicher Bin-Masken für die Kategorien: Transienten (hoher Flux), Tonale Komponenten (Peak-Picking) und Noise (flache Spektren).
+
+UI / Steuerung:
+
+Hinzufügen des Buttons „Auto-Detect Objects“ in der linken Sidebar.
+
+Automatische farbliche Einfärbung der erkannten spektralen Elemente im Spektrogramm nach der Analyse.
+
+
+
+Test-Kriterium für den Agenten: Nach Klick auf den Button wird ein Drum-Loop sauber in "Transienten" (Kicks/Snares) und "Noise/Tonal" (Becken/Raum) zerlegt und getrennt in der Objekt-Liste aufgeführt.
+
+PR 6: Erweiterte Morphing-Regeln & Phase-Vocoder-Werkzeuge
+
+
+
+Ziel: Integration hochwertiger algorithmischer Manipulationen und den Kern-Morphing-Modi.
+
+DSP / Logik:
+
+Erweiterung der Timeline-Interpolation um exponentielle und S-Kurven-Typen.
+
+Implementierung der Phase-Vocoder-Technik zur präzisen Berechnung von Phasen-Differenzen (für sauberes Pitch- und Formant-Shifting pro Objekt).
+
+Programmierung der Morphing-Regel „Transform“ via Cross-Synthesis (Amplituden-Übertragung von Objekt B auf Frequenzen von A).
+
+Einbau der „Preserve & Protect“-Logik zum Schutz fundamentaler Frequenzen oder Transienten bei extremen Transformationen.
+
+
+
+Test-Kriterium für den Agenten: Ein Objekt lässt sich ohne metallische Artefakte pitchen oder graduell über eine S-Kurve auf der Timeline in die Amplitudenstruktur eines anderen Objekts überführen.
+
+Phase 4: Dynamik, Modulation & Feinschliff
+
+PR 7: Modulations-Matrix & Spektrale Quellen
+
+
+
+Ziel: Dynamisierung der Parameter durch LFOs, Envelopes und spektrale Tracker.
+
+DSP / Logik:
+
+Erstellung einer Modulations-Matrix, die Modulationsquellen flexibel den Objekt-Parametern zuordnet.
+
+Entwicklung von LFOs (inkl. Tempo-Sync und Perlin-Noise für organische Bewegungen).
+
+Entwicklung eines Multi-Stage Envelopes mit „Audio Follower“-Modus (extrahiert aus der Amplitude spezifischer Objekte, z. B. Transient Follower).
+
+UI / Steuerung:
+
+Kompaktes Matrix-Fenster im UI. Anlegen von kleinen Modulations-Animationen direkt im Parameter-Bereich.
+
+
+
+Test-Kriterium für den Agenten: Der spektrale Flux oder ein LFO moduliert die Brightness oder Density eines ausgewählten Objekts hör- und sichtbar im zugewiesenen Takt.
+
+PR 8: UI-Inspektor, Sidechain & Preset-System (Release-Ready)
+
+
+
+Ziel: Fertigstellung des 4-Spalten-Layouts, Einbindung externer Signale und Bereitstellung von Templates.
+
+DSP / Logik:
+
+Aktivierung des Sidechain-Inputs als externe Morph-Zielquelle.
+
+Integration von globalen Effekten in der Output-Stage (Limiter/Reverb-Ansatz).
+
+UI / Steuerung:
+
+Rechte Sidebar: Finalisierung des kontextuellen Inspektors (Transformationen, Morph-Ziele, Macro-Regler).
+
+Obere Toolbar: Preset-Browser mit Kategorien für Story-Templates und Global Controls.
+
+Optimierung des Resizing-Verhaltens (Einklappen der Sidebar bei kleinen Fenstern).
+
+
+
+Test-Kriterium für den Agenten: Das vollständige Interface skaliert sauber. Presets lassen sich laden/speichern , und ein externes Sidechain-Signal steuert die spektralen Parameter wie gewünscht an.
+
+Tipps für die Arbeit mit dem Entwickler-Agenten in VS Code
+
+Scope einhalten: Erlaube dem Agenten pro PR ausschließlich die Bearbeitung der dafür vorgesehenen Komponenten. Lass ihn beispielsweise in PR 1 nicht anfangen, über die UI-Gestaltung nachzudenken.
+
+Mocking nutzen: In PR 3 und 4 kannst du komplexe DSP-Funktionen (wie den Phase-Vocoder) noch durch einfache Pegel- oder EQ-Manipulationen "mocken", um die Timeline- und Maskierungs-Logik vorab fehlerfrei zu testen.
+
+
+
+JUCE-Module: Weise den Agenten an, für die mathematischen Operationen (FFT, Fensterfunktionen) konsequent auf juce::dsp::FFT und SIMD-Architekturen zurückzugreifen, um von Beginn an lokalen Kompilierungsaufwand durch externe Bibliotheken zu vermeiden.

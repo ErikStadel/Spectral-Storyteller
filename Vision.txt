@@ -1,0 +1,53 @@
+Spectral Storyteller (rein DSP + intelligente, aber deterministische Algorithmen)
+Das Plugin behandelt Audio wie eine erzählbare Szene. Es zerlegt den eingehenden Sound in spektrale „Elemente“ oder „Objekte“ (Transienten, tonale Schichten, Noise-Texturen, Formanten etc.) und lässt dich diese wie Charaktere in einer Geschichte steuern – mit Keyframes, Kurven und klaren Regeln. Alles bleibt vorhersehbar, editierbar und 100 % reproduzierbar, keine zufälligen ML-Ergebnisse.
+Der große Unterschied zu bestehenden Spectral-Tools (z. B. RX, Portal, Morph):
+Es geht nicht primär um chirurgische Reparatur oder simples Crossfading, sondern um kontrollierte dramatische Entwicklung über Zeit – wie ein Sound-Designer, der eine Szene komponiert.
+Core Features (MVP-fokussiert)
+Spectral Object Detector & Editor
+Automatische Segmentierung des Spektrums in sinnvolle Objekte (basierend auf Transient-Detection, Tonality, Spectral Flux, Centroid etc. – alles klassische DSP-Methoden).
+Visueller Editor: Du siehst das Spektrogramm, kannst mit Lasso, Pinsel oder automatischer „Select Similar“ einzelne Elemente auswählen und ihnen Namen und Rollen geben (z. B. „Kick“, „Vocal Formant“, „Atmosphäre“, „Noise Floor“).
+Jedes Objekt bekommt eigene Parameter-Gruppen (z. B. Pitch-Shift, Formant, Density, Brightness, Stereo-Width, Motion).
+Story Timeline & Narrative Curves (das Herzstück)
+Eine separate Zeitleiste (wie in einem DAW-Clip), auf der du Keyframes für einzelne Objekte oder Gruppen setzt.
+Kurven-Typen definieren die Art der Veränderung:
+Linear
+Exponential (z. B. langsam starten, dann explosiv)
+S-Curve (natürliche, organische Übergänge)
+Custom drawable
+Beispiele für Morphing-Regeln:
+„Transform“: Ein Objekt wandelt sich schrittweise in die Charakteristika eines anderen (z. B. Kick → tiefer Drone, während Rhythmus erhalten bleibt).
+„Evolve“: Parameter wie Brightness, Density oder Roughness verändern sich kontrolliert über Zeit.
+„Interact“: Objekte beeinflussen sich gegenseitig (z. B. Atmosphäre wird lauter, wenn der Transient schwächer wird).
+Preserve & Protect Modi
+„Keep Tonality“, „Protect Transients“, „Formant Lock“, „Rhythm Preserve“ – damit Morphs musikalisch bleiben und nicht zu Brei werden.
+High-Quality FFT/iFFT mit Overlap-Add und optionalem Phase-Vocoding für saubere Ergebnisse.
+Creative DSP-Werkzeuge pro Objekt
+Spectral Filter, Resonator-Bank, Granular-Freeze per Objekt
+Pitch/Formant Shifting mit hoher Qualität
+Dynamic Spectral Shaping (ähnlich Dynamic EQ, aber pro Objekt)
+Convolution-Option (kurze IRs für „Raumcharakter“-Morphing)
+Weitere praktische Features
+Sidechain-Input: Zweites Audio-Signal als „Ziel-Charakter“ für Morphs verwenden.
+MIDI/OSC-Automation für alle wichtigen Parameter (perfekt für Live).
+Snapshot-System: Speichere aktuelle Objekt-Zustände und morph dazwischen.
+Preset-Browser mit fertigen „Story-Templates“ (Horror Build-up, Ambient Awakening, Instrument Hybrid etc.).
+UI-Vision (sehr wichtig für den Erfolg):
+Großer zentraler Spektral-View (zoombar, mit Zeitachse).
+Links: Objekt-Liste (wie Layers).
+Unten: Story-Timeline mit Keyframes.
+Rechts: Parameter-Panels, die sich je nach ausgewähltem Objekt ändern.
+Farbcodierung der Objekte macht es intuitiv und schön.
+Anwendungsmöglichkeiten (konkret)
+Film / Trailer / Game Audio
+Nimm einen simplen Footstep → im Verlauf der Timeline wird er nass, hallig, dann bedrohlich verzerrt und schließlich zu einem Monster-Grollen. Perfekt für evolving Sound Effects.
+Field Recording Transformation
+Ein normaler Wald-Sound wird zu einem surrealen, sich langsam verändernden Traumlandschaft (Blätter werden zu metallischen Klängen, Wind wird tiefer Drone).
+Musikproduktion
+Drums in melodische Elemente verwandeln (Snare wird zu einem tonalem Pad).
+Vocals oder Loops in ständig evolvierende Texturen für Cinematic, Ambient, IDM oder Experimental.
+Bestehende Loops „umgeschichten“ – z. B. ein 8-Bar-Loop entwickelt sich über 2 Minuten dramatisch.
+Sound Design für Musik & Live
+Ein statischer Synth wird zu einem lebendigen, sich entwickelnden Instrument.
+Perfekt für Soundtrack-Arbeit oder generative Live-Sets.
+Foley & Hybrid Instrument Creation
+Kombiniere reale Aufnahmen mit synthetischen Elementen auf narrative Weise.

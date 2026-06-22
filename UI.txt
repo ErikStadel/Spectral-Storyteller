@@ -1,0 +1,137 @@
+Klare & detaillierte UI-Vision für den Spectral Storyteller
+
+Gesamteindruck: Modern, professionell, aber kreativ und „cinematisch“. Dunkles Theme (wie bei vielen High-End Sound-Design-Tools: Ableton, Phase Plant, RX), mit starkem Fokus auf Visuelles – das Spektrogramm ist der Star. Die Bedienung fühlt sich wie eine Mischung aus Photoshop (Layers + Editor) und einer DAW-Timeline an. Alles ist skalierbar und responsive.
+
+Haupt-Layout (bei typischer Fenstergröße 1200–1600 × 800–1000 px)
+
+Das Fenster ist in vier Hauptbereiche geteilt (Resizable mit Splittern):
+
+Linke Sidebar (ca. 220–280 px breit) – Objekt-Management
+
+Zentraler Hauptbereich (flexibel, ~60 %) – Spectral View + Story Timeline
+
+Rechte Sidebar (ca. 260–320 px breit) – Parameter & Modulatoren
+
+Obere Toolbar – Global Controls
+
+Untere Statusbar – Info & Transport
+
+1. Linke Sidebar: Objekt-Browser & Layers
+
+Oben: Button „Analyse starten“ + „Auto-Detect Objects“ + „Load Preset Objects“
+
+Darunter eine vertikale Liste der erkannten/manuellen Objekte (wie Photoshop Layers):
+
+Jedes Objekt hat:
+
+Farbigen Kreis (z. B. Rot = Transient, Blau = Tonale Schicht, Grün = Noise)
+
+Namen (editierbar: „Kick Transient“, „Wind Atmosphere“)
+
+Eye-Icon (Solo/Mute/Visibility im Spektrum)
+
+Small Thumbnail: Mini-Spektrogramm-Slice des Objekts
+
+Drag & Drop zum Umordnen oder Gruppieren
+
+Buttons: „Merge“, „Split“, „Duplicate“, „Lasso Select“
+
+Unten: „Add Manual Object“ (Pinsel-Modus aktivieren)
+
+2. Zentraler Bereich – Das Herz des Plugins
+
+Oben: Spectral View (ca. 60–70 % der Höhe)
+
+Großes, zoombares Spektrogramm (Zeit horizontal, Frequenz vertikal).
+
+Farbverlauf: Dunkelblau/Schwarz (leise) → Türkis/Gelb (laut) – anpassbar.
+
+Jedes Objekt wird farbig hervorgehoben (weiche Masken mit Transparenz).
+
+Tools oben im View:
+
+Lasso, Freehand Brush, Magic Wand („Select Similar“)
+
+Zoom In/Out, Hand Tool, Measure Tool (Frequenz/Pitch)
+
+Toggle: Full Spectrum / Only selected Objects
+
+Echtzeit-Animation: Während Playback leuchten aktive Objekte und zeigen ihre aktuelle Veränderung (z. B. Helligkeit pulsiert).
+
+Unten: Story Timeline (ca. 25–35 % der Höhe)
+
+Horizontale Zeitleiste, synchron zur DAW-Transportzeit.
+
+Vertikale Spuren pro Objekt (oder Gruppen) – ähnlich wie Automation Lanes.
+
+Keyframes als farbige Punkte/Diamanten (farbcodiert nach Objekt).
+
+Kurven-Typen auswählbar (Linear, Exp, S-Curve) direkt an den Keyframes.
+
+Ruler oben mit Timecode + Beat-Grid (wenn Tempo-Sync aktiv).
+
+Transport Controls (Play/Pause/Loop/Go to Start) direkt integriert.
+
+Mini-Preview-Waveform unter dem Spektrogramm.
+
+3. Rechte Sidebar: Inspektor (kontextuell)
+
+Ändert sich je nach Auswahl:
+
+Bei Objekt-Auswahl:
+
+Section „Transformation“: Pitch Shift, Formant, Brightness, Density, Roughness, Stereo Width (Slider + Numeric)
+
+Section „Morph Target“: Dropdown oder Drag & Drop eines anderen Objekts als Ziel
+
+Section „Preserve“: Checkboxes (Tonality, Transients, Rhythm)
+
+Modulations-Matrix (Tab oder eigener Bereich):
+
+Übersichtliche Tabelle: Source (LFO 1, Envelope, Flux etc.) → Target → Depth
+
+Schnellzugriff auf alle Modulatoren (LFOs, Envelopes, Random)
+
+Macro Controls (8 große Drehregler oben in der Sidebar)
+
+Obere Toolbar (Global)
+
+Preset Browser (mit Kategorien: Horror, Ambient Evolution, Foley Hybrid…)
+
+Dry/Wet Mix (großer Slider)
+
+Global Output Gain + Limiter
+
+„Freeze Current State“ + „Render to File“
+
+Settings (FFT Size, Quality, Latency)
+
+Help / Quick Tips
+
+Farbschema & Stil
+
+Hintergrund: #1A1A1F (sehr dunkles Grau/Blau)
+
+Akzentfarbe: Elektrisches Cyan/Türkis (#00F5FF) für aktive Elemente
+
+Objekt-Farben: Gut unterscheidbar (Rot, Orange, Gelb, Grün, Cyan, Lila)
+
+Text: Hellgrau auf dunkel, klare Sans-Serif (z. B. Inter oder Roboto)
+
+Hover-Effekte + sanfte Glows bei aktiven Modulatoren
+
+Minimalistische Icons (ähnlich wie bei Waves oder FabFilter)
+
+Interaktionen & UX-Highlights
+
+Alles ist drag-and-drop fähig (Objekte zwischen Listen und Timeline, Parameter auf Keyframes).
+
+Rechtsklick-Kontextmenüs überall.
+
+Undo/Redo (sehr wichtig bei komplexen Edits).
+
+Keyboard Shortcuts (Space = Play, Ctrl+Click = Add Keyframe etc.).
+
+Tooltips + kleine Info-Popups bei Hover auf fortgeschrittenen Parametern.
+
+Responsive: Bei kleinerem Fenster klappt die rechte Sidebar ein, Spectral View bleibt priorisiert.
