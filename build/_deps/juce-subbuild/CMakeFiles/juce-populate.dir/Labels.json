@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/juce-populate"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/d7345362249b181dbe5cb13c83634f2d/juce-populate.rule"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/48fbb567264b55b03376579919eb1e93/juce-populate-complete.rule"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/f75f0ca52d4ba68b1dc321fe28f10faa/juce-populate-build.rule"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/f75f0ca52d4ba68b1dc321fe28f10faa/juce-populate-configure.rule"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/f75f0ca52d4ba68b1dc321fe28f10faa/juce-populate-download.rule"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/f75f0ca52d4ba68b1dc321fe28f10faa/juce-populate-install.rule"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/f75f0ca52d4ba68b1dc321fe28f10faa/juce-populate-mkdir.rule"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/f75f0ca52d4ba68b1dc321fe28f10faa/juce-populate-patch.rule"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/f75f0ca52d4ba68b1dc321fe28f10faa/juce-populate-test.rule"
+		},
+		{
+			"file" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/f75f0ca52d4ba68b1dc321fe28f10faa/juce-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"juce-populate"
+		],
+		"name" : "juce-populate"
+	}
+}

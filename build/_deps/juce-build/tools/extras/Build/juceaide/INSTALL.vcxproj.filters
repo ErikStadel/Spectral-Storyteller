@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-build\tools\CMakeFiles\73e6932782995d064c37f2dc2aeea59e\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{B44920E4-6FC7-319C-BF43-92824BB3681F}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

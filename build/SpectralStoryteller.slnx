@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Solution>
+	<Configurations>
+		<BuildType Name="Debug"/>
+		<BuildType Name="Release"/>
+		<BuildType Name="MinSizeRel"/>
+		<BuildType Name="RelWithDebInfo"/>
+		<Platform Name="win32"/>
+	</Configurations>
+	<Project Path="SpectralStoryteller_rc_lib.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="8171e04b-e93b-38da-a9ae-085eca07f326">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="juce_vst3_helper.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="4f074acd-9f72-3b5a-91f7-a4e2cc6e3bc7">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Folder Name="/CMakePredefinedTargets/">
+		<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="44ae4043-5f84-3879-a650-aa3f1e0fb0df" DefaultStartup="true">
+			<BuildDependency Project="SpectralStoryteller.vcxproj"/>
+			<BuildDependency Project="SpectralStoryteller_Standalone.vcxproj"/>
+			<BuildDependency Project="SpectralStoryteller_VST3.vcxproj"/>
+			<BuildDependency Project="SpectralStoryteller_rc_lib.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+			<BuildDependency Project="juce_vst3_helper.vcxproj"/>
+		</Project>
+		<Project Path="INSTALL.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="1108024a-81d4-39a1-bd6a-96c1aa22b481">
+			<BuildDependency Project="ALL_BUILD.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+			<Build Solution="Debug|*" Project="false"/>
+			<Build Solution="Release|*" Project="false"/>
+			<Build Solution="MinSizeRel|*" Project="false"/>
+			<Build Solution="RelWithDebInfo|*" Project="false"/>
+		</Project>
+		<Project Path="ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="918a8d36-0c2b-393e-a4e4-a5b89d52dccd"/>
+	</Folder>
+	<Folder Name="/SpectralStoryteller/">
+		<Project Path="SpectralStoryteller.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="499e1114-2e8c-3873-bfaa-59b3f4dbd6ef">
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="SpectralStoryteller_All.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="558b1e91-4748-3be5-aa13-b7f3b975323d">
+			<BuildDependency Project="SpectralStoryteller_Standalone.vcxproj"/>
+			<BuildDependency Project="SpectralStoryteller_VST3.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+			<Build Solution="Debug|*" Project="false"/>
+			<Build Solution="Release|*" Project="false"/>
+			<Build Solution="MinSizeRel|*" Project="false"/>
+			<Build Solution="RelWithDebInfo|*" Project="false"/>
+		</Project>
+		<Project Path="SpectralStoryteller_Standalone.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="18360074-c6ae-3ae7-a375-3e6d72f56f9e">
+			<BuildDependency Project="SpectralStoryteller.vcxproj"/>
+			<BuildDependency Project="SpectralStoryteller_rc_lib.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="SpectralStoryteller_VST3.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="ab227d27-d2d6-393a-9082-a7086d0fdca3">
+			<BuildDependency Project="SpectralStoryteller.vcxproj"/>
+			<BuildDependency Project="SpectralStoryteller_rc_lib.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+			<BuildDependency Project="juce_vst3_helper.vcxproj"/>
+		</Project>
+	</Folder>
+</Solution>

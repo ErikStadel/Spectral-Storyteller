@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-mkdir.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-download.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-update.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-patch.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-configure.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-build.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-install.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-test.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\48fbb567264b55b03376579919eb1e93\juce-populate-complete.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\d7345362249b181dbe5cb13c83634f2d\juce-populate.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\juce-populate" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{7D72961E-84F2-3F1E-9623-206A3785702E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
