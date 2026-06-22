@@ -1,0 +1,65 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"build/_deps/juce-src/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 146,
+				"parent" : 0
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 11
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "lib/cmake/JUCE-7.0.12",
+			"paths" : 
+			[
+				"build/_deps/juce-build/JUCEConfigVersion.cmake",
+				"build/_deps/juce-build/JUCEConfig.cmake",
+				"build/_deps/juce-src/extras/Build/CMake/JUCECheckAtomic.cmake",
+				"build/_deps/juce-src/extras/Build/CMake/JUCEHelperTargets.cmake",
+				"build/_deps/juce-src/extras/Build/CMake/JUCEModuleSupport.cmake",
+				"build/_deps/juce-src/extras/Build/CMake/JUCEUtils.cmake",
+				"build/_deps/juce-src/extras/Build/CMake/JuceLV2Defines.h.in",
+				"build/_deps/juce-src/extras/Build/CMake/LaunchScreen.storyboard",
+				"build/_deps/juce-src/extras/Build/CMake/PIPAudioProcessor.cpp.in",
+				"build/_deps/juce-src/extras/Build/CMake/PIPAudioProcessorWithARA.cpp.in",
+				"build/_deps/juce-src/extras/Build/CMake/PIPComponent.cpp.in",
+				"build/_deps/juce-src/extras/Build/CMake/PIPConsole.cpp.in",
+				"build/_deps/juce-src/extras/Build/CMake/RecentFilesMenuTemplate.nib",
+				"build/_deps/juce-src/extras/Build/CMake/UnityPluginGUIScript.cs.in",
+				"build/_deps/juce-src/extras/Build/CMake/checkBundleSigning.cmake",
+				"build/_deps/juce-src/extras/Build/CMake/copyDir.cmake",
+				"build/_deps/juce-src/extras/Build/CMake/juce_runtime_arch_detection.cpp",
+				"build/_deps/juce-src/extras/Build/CMake/juce_LinuxSubprocessHelper.cpp"
+			],
+			"type" : "file"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "_deps/juce-build",
+		"source" : "build/_deps/juce-src"
+	}
+}

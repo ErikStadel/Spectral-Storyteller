@@ -1,6 +1,6 @@
 ^C:\USERS\HELMS\SPECTRAL STORYTELLER\BUILD\_DEPS\JUCE-BUILD\TOOLS\CMAKEFILES\FD960B5BECFBE06E8B0D06008FD64EF3\GENERATE.STAMP.RULE
 setlocal
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller/build/_deps/juce-src" "-BC:/Users/helms/Spectral Storyteller/build/_deps/juce-build/tools" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/_deps/juce-build/tools/JUCE.slnx"
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller/build/_deps/juce-src" "-BC:/Users/helms/Spectral Storyteller/build/_deps/juce-build/tools" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/_deps/juce-build/tools/JUCE.slnx"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone

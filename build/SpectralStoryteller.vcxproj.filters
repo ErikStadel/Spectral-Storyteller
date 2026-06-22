@@ -37,13 +37,13 @@
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_basics\juce_audio_basics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_utils\juce_audio_utils.cpp">
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_devices\juce_audio_devices.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_formats\juce_audio_formats.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_devices\juce_audio_devices.cpp">
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_utils\juce_audio_utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_dsp\juce_dsp.cpp">

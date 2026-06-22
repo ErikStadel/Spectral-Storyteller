@@ -1,0 +1,64 @@
+{
+	"abstract" : true,
+	"backtrace" : 5,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"include"
+		],
+		"files" : 
+		[
+			"build/_deps/juce-src/extras/Build/CMake/JUCEHelperTargets.cmake",
+			"build/_deps/juce-src/extras/Build/CMake/JUCEModuleSupport.cmake",
+			"build/_deps/juce-src/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 2
+			},
+			{
+				"command" : 1,
+				"file" : 2,
+				"line" : 41,
+				"parent" : 0
+			},
+			{
+				"file" : 1,
+				"parent" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 1,
+				"line" : 43,
+				"parent" : 2
+			},
+			{
+				"file" : 0,
+				"parent" : 3
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 24,
+				"parent" : 4
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 11
+	},
+	"id" : "juce_recommended_warning_flags::@9a0e04308f0a6b7f32df",
+	"name" : "juce_recommended_warning_flags",
+	"paths" : 
+	{
+		"build" : "_deps/juce-build",
+		"source" : "build/_deps/juce-src"
+	},
+	"sources" : [],
+	"type" : "INTERFACE_LIBRARY"
+}

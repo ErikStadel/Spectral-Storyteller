@@ -1,0 +1,267 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "Debug/juce_vst3_helper.exe"
+		},
+		{
+			"path" : "Debug/juce_vst3_helper.pdb"
+		}
+	],
+	"backtrace" : 7,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_executable",
+			"_juce_add_vst3_manifest_helper_target",
+			"juce_enable_vst3_manifest_step",
+			"_juce_set_plugin_target_properties",
+			"_juce_link_plugin_wrapper",
+			"_juce_configure_plugin_targets",
+			"juce_add_plugin",
+			"target_link_libraries",
+			"target_include_directories",
+			"target_compile_features"
+		],
+		"files" : 
+		[
+			"build/_deps/juce-src/extras/Build/CMake/JUCEUtils.cmake",
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 1
+			},
+			{
+				"command" : 6,
+				"file" : 1,
+				"line" : 23,
+				"parent" : 0
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 2031,
+				"parent" : 1
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 1472,
+				"parent" : 2
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 1333,
+				"parent" : 3
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 1132,
+				"parent" : 4
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 1061,
+				"parent" : 5
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 1001,
+				"parent" : 6
+			},
+			{
+				"command" : 7,
+				"file" : 0,
+				"line" : 1008,
+				"parent" : 6
+			},
+			{
+				"command" : 7,
+				"file" : 0,
+				"line" : 1023,
+				"parent" : 6
+			},
+			{
+				"command" : 8,
+				"file" : 0,
+				"line" : 1004,
+				"parent" : 6
+			},
+			{
+				"command" : 9,
+				"file" : 0,
+				"line" : 1009,
+				"parent" : 6
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 11
+	},
+	"compileDependencies" : 
+	[
+		{
+			"backtrace" : 8,
+			"id" : "juce_interface_definitions::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 9,
+			"id" : "Threads::Threads::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 9,
+			"id" : "juce_recommended_config_flags::@9a0e04308f0a6b7f32df"
+		}
+	],
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "/DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd"
+				},
+				{
+					"backtrace" : 9,
+					"fragment" : "/Od"
+				},
+				{
+					"backtrace" : 9,
+					"fragment" : "/Zi"
+				},
+				{
+					"backtrace" : 9,
+					"fragment" : "/MP"
+				},
+				{
+					"backtrace" : 9,
+					"fragment" : "/EHsc"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 8,
+					"define" : "DEBUG=1"
+				},
+				{
+					"backtrace" : 8,
+					"define" : "JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1"
+				},
+				{
+					"backtrace" : 8,
+					"define" : "_DEBUG=1"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 10,
+					"path" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-src/modules/juce_audio_processors/format_types/VST3_SDK"
+				},
+				{
+					"backtrace" : 10,
+					"path" : "C:/Users/helms/Spectral Storyteller/build/_deps/juce-src/modules"
+				}
+			],
+			"language" : "CXX",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					11
+				],
+				"standard" : "17"
+			},
+			"sourceIndexes" : 
+			[
+				0
+			]
+		}
+	],
+	"dependencies" : 
+	[
+		{
+			"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df"
+		}
+	],
+	"id" : "juce_vst3_helper::@6890427a1f51a3e7e1df",
+	"link" : 
+	{
+		"commandFragments" : 
+		[
+			{
+				"fragment" : "/DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -MDd",
+				"role" : "flags"
+			},
+			{
+				"fragment" : "/machine:X86 /debug /INCREMENTAL",
+				"role" : "flags"
+			},
+			{
+				"fragment" : "/subsystem:console",
+				"role" : "flags"
+			},
+			{
+				"fragment" : "kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib",
+				"role" : "libraries"
+			}
+		],
+		"language" : "CXX"
+	},
+	"linkLibraries" : 
+	[
+		{
+			"backtrace" : 8,
+			"id" : "juce_interface_definitions::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 9,
+			"id" : "Threads::Threads::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 9,
+			"id" : "juce_recommended_config_flags::@9a0e04308f0a6b7f32df"
+		}
+	],
+	"name" : "juce_vst3_helper",
+	"nameOnDisk" : "juce_vst3_helper.exe",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 7,
+			"backtraces" : 
+			[
+				7
+			],
+			"compileGroupIndex" : 0,
+			"path" : "build/_deps/juce-src/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "EXECUTABLE"
+}

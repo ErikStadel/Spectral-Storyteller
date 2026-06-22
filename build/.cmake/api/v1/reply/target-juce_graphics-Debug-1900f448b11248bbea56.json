@@ -1,0 +1,102 @@
+{
+	"abstract" : true,
+	"backtrace" : 4,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"_juce_add_interface_library",
+			"juce_add_module",
+			"juce_add_modules",
+			"target_link_libraries"
+		],
+		"files" : 
+		[
+			"build/_deps/juce-src/extras/Build/CMake/JUCEModuleSupport.cmake",
+			"build/_deps/juce-src/modules/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 1
+			},
+			{
+				"command" : 3,
+				"file" : 1,
+				"line" : 24,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 654,
+				"parent" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 467,
+				"parent" : 2
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 69,
+				"parent" : 3
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 627,
+				"parent" : 2
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 11
+	},
+	"id" : "juce_graphics::@d258f3a116863e478940",
+	"interfaceCompileDependencies" : 
+	[
+		{
+			"backtrace" : 5,
+			"id" : "juce_events::@d258f3a116863e478940"
+		}
+	],
+	"interfaceLinkLibraries" : 
+	[
+		{
+			"backtrace" : 5,
+			"id" : "juce_events::@d258f3a116863e478940"
+		}
+	],
+	"interfaceSources" : 
+	[
+		{
+			"path" : "build/_deps/juce-src/modules/juce_graphics/juce_graphics.cpp",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"name" : "juce_graphics",
+	"paths" : 
+	{
+		"build" : "_deps/juce-build/modules",
+		"source" : "build/_deps/juce-src/modules"
+	},
+	"sourceGroups" : 
+	[
+		{
+			"interfaceSourceIndexes" : 
+			[
+				0
+			],
+			"name" : "Source Files",
+			"sourceIndexes" : []
+		}
+	],
+	"sources" : [],
+	"type" : "INTERFACE_LIBRARY"
+}

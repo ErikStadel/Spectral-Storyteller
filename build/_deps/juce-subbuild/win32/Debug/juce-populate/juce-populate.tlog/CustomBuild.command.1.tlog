@@ -1,8 +1,8 @@
 ^C:\USERS\HELMS\SPECTRAL STORYTELLER\BUILD\_DEPS\JUCE-SUBBUILD\CMAKEFILES\F75F0CA52D4BA68B1DC321FE28F10FAA\JUCE-POPULATE-MKDIR.RULE
 setlocal
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -Dcfgdir=/Debug -P "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/tmp/juce-populate-mkdirs.cmake"
+"C:\Program Files\CMake\bin\cmake.exe" -Dcfgdir=/Debug -P "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/tmp/juce-populate-mkdirs.cmake"
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-mkdir"
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-mkdir"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -16,9 +16,9 @@ cd "C:\Users\helms\Spectral Storyteller\build\_deps"
 if %errorlevel% neq 0 goto :cmEnd
 C:
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/tmp/juce-populate-gitclone.cmake"
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/tmp/juce-populate-gitclone.cmake"
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-download"
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-download"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -32,7 +32,7 @@ cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-src"
 if %errorlevel% neq 0 goto :cmEnd
 C:
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -Dcan_fetch=YES -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/tmp/juce-populate-gitupdate.cmake"
+"C:\Program Files\CMake\bin\cmake.exe" -Dcan_fetch=YES -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/tmp/juce-populate-gitupdate.cmake"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -42,9 +42,9 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd
 ^C:\USERS\HELMS\SPECTRAL STORYTELLER\BUILD\_DEPS\JUCE-SUBBUILD\CMAKEFILES\F75F0CA52D4BA68B1DC321FE28F10FAA\JUCE-POPULATE-PATCH.RULE
 setlocal
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E echo_append
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-patch"
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-patch"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -58,9 +58,9 @@ cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-build"
 if %errorlevel% neq 0 goto :cmEnd
 C:
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E echo_append
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-configure"
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-configure"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -74,9 +74,9 @@ cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-build"
 if %errorlevel% neq 0 goto :cmEnd
 C:
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E echo_append
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-build"
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-build"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -90,9 +90,9 @@ cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-build"
 if %errorlevel% neq 0 goto :cmEnd
 C:
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E echo_append
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-install"
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-install"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -106,9 +106,9 @@ cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-build"
 if %errorlevel% neq 0 goto :cmEnd
 C:
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E echo_append
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-test"
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-test"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -118,11 +118,11 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd
 ^C:\USERS\HELMS\SPECTRAL STORYTELLER\BUILD\_DEPS\JUCE-SUBBUILD\CMAKEFILES\48FBB567264B55B03376579919EB1E93\JUCE-POPULATE-COMPLETE.RULE
 setlocal
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/Debug"
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/Debug"
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/Debug/juce-populate-complete"
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/Debug/juce-populate-complete"
 if %errorlevel% neq 0 goto :cmEnd
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-done"
+"C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-done"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
@@ -140,7 +140,7 @@ exit /b %1
 if %errorlevel% neq 0 goto :VCEnd
 ^C:\USERS\HELMS\SPECTRAL STORYTELLER\BUILD\_DEPS\JUCE-SUBBUILD\CMAKELISTS.TXT
 setlocal
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild" "-BC:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild" --check-stamp-file "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/generate.stamp"
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild" "-BC:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild" --check-stamp-file "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/generate.stamp"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone

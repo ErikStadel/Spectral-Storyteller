@@ -16,6 +16,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+# Exportiere die JUCE binary_dir für späteren Zugriff
+get_target_property(JUCE_INCLUDE_DIR juce_core INTERFACE_INCLUDE_DIRECTORIES)
+
 # Hier aktivieren wir die Standard-Audio-Formate für Windows
 juce_add_plugin(SpectralStoryteller
     COMPANY_NAME "SignalFlow"
@@ -26,13 +29,34 @@ juce_add_plugin(SpectralStoryteller
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     PLUGIN_MANUFACTURER_CODE Mnam
     PLUGIN_CODE Spec
-    FORMATS VST3 Standalone # AU entfernt, da wir lokal auf Windows arbeiten
+    FORMATS VST3 Standalone
 )
 
 # NEU: Kopiert die fertige VST3 nach dem Build automatisch in deinen System-Ordner
-# (Unter Windows: C:\Program Files\Common Files\VST3)
 set_target_properties(SpectralStoryteller PROPERTIES
     JUCE_COPY_PLUGIN_AFTER_BUILD ON
+)
+
+# JUCE-Module mit PUBLIC-Scope verlinken (damit includes propagiert werden)
+target_link_libraries(SpectralStoryteller 
+    PUBLIC
+        juce::juce_core
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        juce::juce_audio_basics
+        juce::juce_audio_devices
+        juce::juce_audio_formats
+        juce::juce_audio_processors
+        juce::juce_audio_utils
+        juce::juce_dsp
+)
+
+# Include Verzeichnis für lokale Source-Dateien
+target_include_directories(SpectralStoryteller PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source
 )
 
 # Die Quellcodedateien (C++ Quelltexte und Header)
@@ -41,22 +65,4 @@ target_sources(SpectralStoryteller PRIVATE
     Source/PluginProcessor.h
     Source/PluginEditor.cpp
     Source/PluginEditor.h
-)
-
-target_include_directories(SpectralStoryteller PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/Source
-)
-
-# NEU & LEBENSWICHTIG: Hier verknüpfen wir die JUCE-Bibliotheken.
-# Das dsp-Modul ist essenziell für die spätere FFT-Berechnung des Agenten!
-target_link_libraries(SpectralStoryteller PRIVATE
-    juce::juce_audio_utils
-    juce::juce_audio_processors
-    juce::juce_dsp               # <--- Wichtig für juce::dsp::FFT (PR 1)
-    juce::juce_gui_basics
-    juce::juce_gui_extra
-    juce::juce_graphics
-    juce::juce_data_structures
-    juce::juce_events
-    juce::juce_core
 )
