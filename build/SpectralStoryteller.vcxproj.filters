@@ -37,11 +37,34 @@
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_basics\juce_audio_basics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_utils\juce_audio_utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_formats\juce_audio_formats.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_devices\juce_audio_devices.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_dsp\juce_dsp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\PluginProcessor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\PluginEditor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{AFD782D6-483B-3B02-ACC5-38F9181BBE0F}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files">
       <UniqueIdentifier>{54C2D591-4150-3796-9975-F26E9ECC53DB}</UniqueIdentifier>
     </Filter>

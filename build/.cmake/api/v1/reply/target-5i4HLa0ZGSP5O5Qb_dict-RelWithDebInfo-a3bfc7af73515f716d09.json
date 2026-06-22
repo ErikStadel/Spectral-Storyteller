@@ -1,0 +1,58 @@
+{
+	"abstract" : true,
+	"backtrace" : 3,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"_juce_extract_metadata_block",
+			"juce_add_module"
+		],
+		"files" : 
+		[
+			"build/_deps/juce-src/extras/Build/CMake/JUCEModuleSupport.cmake",
+			"build/_deps/juce-src/extras/Build/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 1
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 24,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 559,
+				"parent" : 1
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 113,
+				"parent" : 2
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 10
+	},
+	"id" : "5i4HLa0ZGSP5O5Qb_dict::@b17b3e1e09fe040c08a3",
+	"imported" : true,
+	"local" : true,
+	"name" : "5i4HLa0ZGSP5O5Qb_dict",
+	"paths" : 
+	{
+		"build" : "_deps/juce-build/extras/Build",
+		"source" : "build/_deps/juce-src/extras/Build"
+	},
+	"sources" : [],
+	"type" : "INTERFACE_LIBRARY"
+}
