@@ -360,8 +360,16 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\SpectralFrameBuffer.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\ObjectDatabase.cpp" />
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\ObjectDatabase.h" />
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\TimelineData.cpp" />
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\TimelineData.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.cpp" />
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.h" />
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralSelector.cpp" />
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralSelector.h" />
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\ObjectSidebar.cpp" />
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\ObjectSidebar.h" />
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.cpp" />
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors.cpp" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors_ara.cpp" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors_lv2_libs.cpp" />

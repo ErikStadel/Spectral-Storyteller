@@ -44,6 +44,7 @@ public:
      */
     ObjectMask* getObject(int objectIndex);
     const ObjectMask* getObject(int objectIndex) const;
+    bool getObjectCopy(int objectIndex, ObjectMask& outObject) const;
 
     /**
      * Get total number of objects.
@@ -59,9 +60,18 @@ public:
      * Set bin mask for an object (1 = include bin, 0 = exclude).
      */
     void setObjectMask(int objectIndex, const std::array<bool, NUM_BINS>& mask);
+    void setObjectColor(int objectIndex, int argbColour);
 
     /**
-     * Get combined mask for all active (non-muted) objects.
+     * Get combined mask for audio DSP:
+     * - If any object is solo: return ONLY soloed object bins (OR'd together)
+     * - Otherwise: return all non-muted object bins (OR'd together)
+     * - Empty result if all muted and no solo
+     */
+    std::array<bool, NUM_BINS> getAudioMask() const;
+
+    /**
+     * Get visual mask for UI rendering (all non-muted objects).
      */
     std::array<bool, NUM_BINS> getCombinedMask() const;
 
@@ -75,7 +85,20 @@ public:
      */
     void setObjectMute(int objectIndex, bool mute);
 
+    /**
+     * Set custom name for an object (for timeline track display).
+     */
+    void setObjectName(int objectIndex, const std::string& newName);
+    uint64_t getRevision() const;
+
+    /**
+     * Returns true if any object has solo or mute active.
+     * Used in DSP to decide whether to use STFT output or bypass.
+     */
+    bool isAnyMaskingActive() const;
+
 private:
     std::vector<ObjectMask> objects;
     mutable juce::CriticalSection lock;
+    uint64_t revision = 0;
 };

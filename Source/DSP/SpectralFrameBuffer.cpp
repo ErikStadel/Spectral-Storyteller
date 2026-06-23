@@ -12,28 +12,32 @@ void SpectralFrameBuffer::writeFrame(const float* fftData, int64_t sampleIndex)
     Frame& frame = frames[writePos];
     frame.sampleIndex = sampleIndex;
 
-    // Convert real-only FFT format to magnitude and phase.
-    // Real-only format: [re0, re1, ..., reN, im1, ..., imN]
-    // Bins: 0 (DC), 1..N-1 (positive freqs), N (Nyquist)
+    // JUCE real-only FFT output is interleaved complex values:
+    //   re(k) = fftData[2*k], im(k) = fftData[2*k+1]
+    // For real input, positive bins are k = 0..N/2.
     
     const float fftScale = 1.0f / static_cast<float>(FFT_SIZE);
 
-    // DC component (always real, no 2x single-sided scaling)
+    // DC component
     frame.magnitude[0] = std::abs(fftData[0]) * fftScale;
-    frame.phase[0] = 0.0f;
+    frame.phase[0] = std::atan2(fftData[1], fftData[0]);
 
     // Positive frequency bins
     for (int k = 1; k < NUM_BINS - 1; ++k)
     {
-        float re = fftData[k];
-        float im = fftData[FFT_SIZE - k];
+        const int reIdx = 2 * k;
+        const int imIdx = reIdx + 1;
+        const float re = fftData[reIdx];
+        const float im = fftData[imIdx];
         frame.magnitude[k] = std::sqrt(re * re + im * im) * (2.0f * fftScale);
         frame.phase[k] = std::atan2(im, re);
     }
 
-    // Nyquist component (always real, no 2x single-sided scaling)
-    frame.magnitude[NUM_BINS - 1] = std::abs(fftData[FFT_SIZE / 2]) * fftScale;
-    frame.phase[NUM_BINS - 1] = 0.0f;
+    // Nyquist component
+    const int nyquistReIdx = FFT_SIZE;
+    const int nyquistImIdx = FFT_SIZE + 1;
+    frame.magnitude[NUM_BINS - 1] = std::abs(fftData[nyquistReIdx]) * fftScale;
+    frame.phase[NUM_BINS - 1] = std::atan2(fftData[nyquistImIdx], fftData[nyquistReIdx]);
 
     // Convert to dB scale (with floor to avoid very negative values)
     for (int k = 0; k < NUM_BINS; ++k)

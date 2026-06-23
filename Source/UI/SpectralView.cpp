@@ -53,6 +53,36 @@ void SpectralView::setFrequencyCurve(float curveAmount)
     rebuildLookupTables();
 }
 
+void SpectralView::setPaused(bool shouldPause)
+{
+    isPaused = shouldPause;
+}
+
+void SpectralView::setSegmentationOverlayProvider(std::function<bool(std::array<float, SpectralFrameBuffer::NUM_BINS>&,
+                                                                     std::array<float, SpectralFrameBuffer::NUM_BINS>&,
+                                                                     std::array<float, SpectralFrameBuffer::NUM_BINS>&)> provider)
+{
+    overlayProvider = std::move(provider);
+}
+
+int SpectralView::getBinForY(int y) const
+{
+    if (yToBinF.empty())
+    {
+        const int h = juce::jmax(1, getHeight());
+        const float normY = static_cast<float>(juce::jlimit(0, h - 1, y))
+            / static_cast<float>(h - 1);
+        const float fallbackBin = (1.0f - normY) * static_cast<float>(SpectralFrameBuffer::NUM_BINS - 1);
+        return juce::jlimit(0, SpectralFrameBuffer::NUM_BINS - 1,
+            static_cast<int>(std::round(fallbackBin)));
+    }
+
+    const int clampedY = juce::jlimit(0, static_cast<int>(yToBinF.size()) - 1, y);
+    const float binF = yToBinF[static_cast<size_t>(clampedY)];
+    return juce::jlimit(0, SpectralFrameBuffer::NUM_BINS - 1,
+        static_cast<int>(std::round(binF)));
+}
+
 // =============================================================================
 // rebuildLookupTables
 // =============================================================================
@@ -242,7 +272,31 @@ void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
         smooth = smooth + temporalSmoothing * (emphasizedDb - smooth);
 
         const float clippedDb = juce::jlimit(magnitudeMin, magnitudeMax, smooth);
-        bmpData.setPixelColour(0, y, magnitudeToColour(clippedDb));
+        auto pixel = magnitudeToColour(clippedDb);
+
+        if (hasOverlay)
+        {
+            const int binLo = juce::jlimit(0, SpectralFrameBuffer::NUM_BINS - 1, static_cast<int>(binF));
+            const int binHi = juce::jmin(SpectralFrameBuffer::NUM_BINS - 1, binLo + 1);
+            const float frac = binF - static_cast<float>(binLo);
+
+            const float t = overlayTransient[static_cast<size_t>(binLo)]
+                          + frac * (overlayTransient[static_cast<size_t>(binHi)] - overlayTransient[static_cast<size_t>(binLo)]);
+            const float tn = overlayTonal[static_cast<size_t>(binLo)]
+                           + frac * (overlayTonal[static_cast<size_t>(binHi)] - overlayTonal[static_cast<size_t>(binLo)]);
+            const float n = overlayNoise[static_cast<size_t>(binLo)]
+                          + frac * (overlayNoise[static_cast<size_t>(binHi)] - overlayNoise[static_cast<size_t>(binLo)]);
+
+            const float alphaT = juce::jlimit(0.0f, 0.55f, t * 0.55f);
+            const float alphaTN = juce::jlimit(0.0f, 0.50f, tn * 0.50f);
+            const float alphaN = juce::jlimit(0.0f, 0.45f, n * 0.45f);
+
+            pixel = pixel.interpolatedWith(juce::Colour(0xFFFF5252), alphaT);
+            pixel = pixel.interpolatedWith(juce::Colour(0xFF4AA3FF), alphaTN);
+            pixel = pixel.interpolatedWith(juce::Colour(0xFF4FD16A), alphaN);
+        }
+
+        bmpData.setPixelColour(0, y, pixel);
     }
 }
 
@@ -333,6 +387,9 @@ void SpectralView::resized()
 
 void SpectralView::timerCallback()
 {
+    if (isPaused)
+        return;
+
     if (frameBuffer == nullptr)
         return;
 
@@ -346,6 +403,11 @@ void SpectralView::timerCallback()
 
     if (tmp.sampleIndex == lastRenderedSampleIndex)
         return;
+
+    if (overlayProvider)
+        hasOverlay = overlayProvider(overlayTransient, overlayTonal, overlayNoise);
+    else
+        hasOverlay = false;
 
     // Multi-Frame-Drain: alle neuen Frames konsumieren, max. 8 pro Tick
     static constexpr int kMaxFramesPerTick = 8;

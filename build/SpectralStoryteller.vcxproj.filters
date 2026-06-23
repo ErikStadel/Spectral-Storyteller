@@ -13,7 +13,19 @@
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\ObjectDatabase.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\TimelineData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralSelector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\ObjectSidebar.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors.cpp">
@@ -72,7 +84,19 @@
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\ObjectDatabase.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\TimelineData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralSelector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\ObjectSidebar.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -4,6 +4,7 @@
 #include "../DSP/SpectralFrameBuffer.h"
 #include <array>
 #include <vector>
+#include <functional>
 
 /**
  * SpectralView – Live-Wasserfall-Spektrogramm für Spectral Storyteller.
@@ -35,6 +36,11 @@ public:
     void setShowGrid(bool shouldShow);
     void setGateDb(float gateDbValue);
     void setFrequencyCurve(float curveAmount);
+    void setPaused(bool shouldPause);
+    void setSegmentationOverlayProvider(std::function<bool(std::array<float, SpectralFrameBuffer::NUM_BINS>&,
+                                                            std::array<float, SpectralFrameBuffer::NUM_BINS>&,
+                                                            std::array<float, SpectralFrameBuffer::NUM_BINS>&)> provider);
+    int getBinForY(int y) const;
 
 private:
     // -------------------------------------------------------------------------
@@ -47,6 +53,7 @@ private:
     float gateDb               =  -96.0f;
     float frequencyCurveAmount =    2.0f;
     bool  showGrid             = true;
+    bool  isPaused             = false;
 
     juce::Image spectrogramImage;
 
@@ -57,6 +64,14 @@ private:
 
     std::vector<float> rowGainDb;       // Low-Freq-Emphasis [dB] pro Zeile
     std::vector<float> smoothedRowDb;   // Temporales Glättungs-State pro Zeile
+
+    std::function<bool(std::array<float, SpectralFrameBuffer::NUM_BINS>&,
+                       std::array<float, SpectralFrameBuffer::NUM_BINS>&,
+                       std::array<float, SpectralFrameBuffer::NUM_BINS>&)> overlayProvider;
+    std::array<float, SpectralFrameBuffer::NUM_BINS> overlayTransient{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> overlayTonal{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> overlayNoise{};
+    bool hasOverlay = false;
 
     // 512-Einträge Farb-LUT
     static constexpr int LUT_SIZE = 512;

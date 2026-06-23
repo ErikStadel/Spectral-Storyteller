@@ -83,6 +83,14 @@ target_sources(SpectralStoryteller PRIVATE
     Source/DSP/SpectralFrameBuffer.h
     Source/DSP/ObjectDatabase.cpp
     Source/DSP/ObjectDatabase.h
+    Source/DSP/TimelineData.cpp
+    Source/DSP/TimelineData.h
     Source/UI/SpectralView.cpp
     Source/UI/SpectralView.h
+    Source/UI/SpectralSelector.cpp
+    Source/UI/SpectralSelector.h
+    Source/UI/ObjectSidebar.cpp
+    Source/UI/ObjectSidebar.h
+    Source/UI/StoryTimelineComponent.cpp
+    Source/UI/StoryTimelineComponent.h
 )
