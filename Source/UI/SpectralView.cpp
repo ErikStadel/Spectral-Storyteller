@@ -1,7 +1,11 @@
 #include "SpectralView.h"
 
-SpectralView::SpectralView(SpectralFrameBuffer* frameBuffer)
-    : frameBuffer(frameBuffer), magnitudeMin(-120.0f), magnitudeMax(0.0f), showGrid(true)
+// =============================================================================
+// Konstruktor / Destruktor
+// =============================================================================
+
+SpectralView::SpectralView(SpectralFrameBuffer* fb)
+    : frameBuffer(fb)
 {
     setOpaque(true);
     rebuildLookupTables();
@@ -12,6 +16,10 @@ SpectralView::~SpectralView()
 {
     stopTimer();
 }
+
+// =============================================================================
+// Public API
+// =============================================================================
 
 void SpectralView::setFrameBuffer(SpectralFrameBuffer* buffer)
 {
@@ -29,11 +37,12 @@ void SpectralView::setMagnitudeRange(float minDb, float maxDb)
 void SpectralView::setShowGrid(bool shouldShow)
 {
     showGrid = shouldShow;
+    repaint();
 }
 
 void SpectralView::setGateDb(float gateDbValue)
 {
-    gateDb = juce::jlimit(-180.0f, 6.0f, gateDbValue);
+    gateDb       = juce::jlimit(-180.0f, 6.0f, gateDbValue);
     magnitudeMin = gateDb;
     rebuildLookupTables();
 }
@@ -44,82 +53,162 @@ void SpectralView::setFrequencyCurve(float curveAmount)
     rebuildLookupTables();
 }
 
+// =============================================================================
+// rebuildLookupTables
+// =============================================================================
+
 void SpectralView::rebuildLookupTables()
 {
-    for (int i = 0; i < static_cast<int>(colourLut.size()); ++i)
-    {
-        const float t = static_cast<float>(i) / static_cast<float>(colourLut.size() - 1);
+    // -------------------------------------------------------------------------
+    // 1. Cockos-thermische Farbpalette (8 Ankerpunkte, linear interpoliert)
+    //
+    //  t=0.00  Schwarz     (  0,   0,   0)  Stille / unterhalb Gate
+    //  t=0.14  Navy        (  0,   0,  80)
+    //  t=0.28  Blau        (  0,   0, 220)
+    //  t=0.42  Cyan        (  0, 210, 210)
+    //  t=0.57  Grün        (  0, 210,   0)
+    //  t=0.71  Gelb        (220, 220,   0)
+    //  t=0.85  Orange      (255, 120,   0)
+    //  t=1.00  Weiß        (255, 255, 255)  Vollpegel
+    // -------------------------------------------------------------------------
+    struct Anchor { float t; uint8_t r, g, b; };
+    static constexpr std::array<Anchor, 8> anchors = {{
+        { 0.00f,   0,   0,   0 },
+        { 0.14f,   0,   0,  80 },
+        { 0.28f,   0,   0, 220 },
+        { 0.42f,   0, 210, 210 },
+        { 0.57f,   0, 210,   0 },
+        { 0.71f, 220, 220,   0 },
+        { 0.85f, 255, 120,   0 },
+        { 1.00f, 255, 255, 255 },
+    }};
 
-        if (t < 0.33f)
+    for (int i = 0; i < LUT_SIZE; ++i)
+    {
+        const float t = static_cast<float>(i) / static_cast<float>(LUT_SIZE - 1);
+
+        int seg = static_cast<int>(anchors.size()) - 2;
+        for (int s = 0; s < static_cast<int>(anchors.size()) - 1; ++s)
         {
-            const float u = t / 0.33f;
-            colourLut[static_cast<size_t>(i)] = juce::Colour::fromRGB(
-                static_cast<juce::uint8>(u * 100.0f),
-                static_cast<juce::uint8>(40.0f + u * 160.0f),
-                static_cast<juce::uint8>(100));
+            if (t <= anchors[static_cast<size_t>(s + 1)].t)
+            {
+                seg = s;
+                break;
+            }
         }
-        else if (t < 0.66f)
-        {
-            const float u = (t - 0.33f) / 0.33f;
-            colourLut[static_cast<size_t>(i)] = juce::Colour::fromRGB(
-                static_cast<juce::uint8>(100.0f - u * 100.0f),
-                static_cast<juce::uint8>(200.0f + u * 55.0f),
-                static_cast<juce::uint8>(100.0f - u * 100.0f));
-        }
-        else
-        {
-            const float u = (t - 0.66f) / 0.34f;
-            colourLut[static_cast<size_t>(i)] = juce::Colour::fromRGB(
-                static_cast<juce::uint8>(u * 255.0f),
-                static_cast<juce::uint8>(255),
-                static_cast<juce::uint8>(0));
-        }
+
+        const auto& lo = anchors[static_cast<size_t>(seg)];
+        const auto& hi = anchors[static_cast<size_t>(seg + 1)];
+        const float span = hi.t - lo.t;
+        const float u    = (span > 0.0f) ? juce::jlimit(0.0f, 1.0f, (t - lo.t) / span) : 0.0f;
+
+        colourLut[static_cast<size_t>(i)] = juce::Colour::fromRGB(
+            static_cast<uint8_t>(lo.r + u * static_cast<float>(static_cast<int>(hi.r) - static_cast<int>(lo.r))),
+            static_cast<uint8_t>(lo.g + u * static_cast<float>(static_cast<int>(hi.g) - static_cast<int>(lo.g))),
+            static_cast<uint8_t>(lo.b + u * static_cast<float>(static_cast<int>(hi.b) - static_cast<int>(lo.b))));
     }
 
+    // -------------------------------------------------------------------------
+    // 2. Pro-Zeile-Tabellen: kontinuierliche Bin-Position (float!) statt int
+    //
+    // Kernfix: statt yToBin[y] = int(bin) speichern wir yToBinF[y] = float(bin).
+    // Das erlaubt in appendFrameColumn() eine lineare Interpolation ZWISCHEN
+    // benachbarten Bins, was sowohl das "Blocking" als auch das schwarze Loch heilt:
+    //
+    //   - Blocking: mehrere Pixel auf demselben int-Bin hatten identische Farbe.
+    //     Mit float-Position interpolieren wir die Farbe kontinuierlich.
+    //
+    //   - Schwarzes Loch 30–55 Hz: Bin 1 (23–47 Hz) ist ein einziger FFT-Bin
+    //     der auf ~80 Pixel gestreckt wird. Bin 2 (47–70 Hz) auf ~40 Pixel.
+    //     Mit bilinearer Interpolation zwischen Bin 1 und Bin 2 bekommt jede
+    //     Zeile einen kontinuierlichen Pegel statt eines harten Sprungs auf 0.
+    // -------------------------------------------------------------------------
+
     const int h = juce::jmax(1, getHeight());
-    yToBinMap.resize(static_cast<size_t>(h));
-    yBandStart.resize(static_cast<size_t>(h));
-    yBandEnd.resize(static_cast<size_t>(h));
+
+    yToBinF.resize(static_cast<size_t>(h));
     rowGainDb.resize(static_cast<size_t>(h));
     smoothedRowDb.assign(static_cast<size_t>(h), magnitudeMin);
 
-    const float maxBin = static_cast<float>(SpectralFrameBuffer::NUM_BINS - 1);
-    const float logMax = std::log(maxBin + 1.0f);
-    const float mappingCurve = 1.0f + (frequencyCurveAmount * 0.20f);
+    const float nyquist  = kSampleRate * 0.5f;
+    const float logRange = std::log(nyquist / kMinFreq);
+    const float numBinsF = static_cast<float>(SpectralFrameBuffer::NUM_BINS - 1);
 
     for (int y = 0; y < h; ++y)
     {
-        const float normY = 1.0f - (static_cast<float>(y) / static_cast<float>(h - 1));
-        const float curved = std::pow(normY, mappingCurve);
-        const float bin = std::exp(curved * logMax) - 1.0f;
-        yToBinMap[static_cast<size_t>(y)] = juce::jlimit(0, SpectralFrameBuffer::NUM_BINS - 1,
-            static_cast<int>(bin));
+        // normY: 0 = oben (Nyquist), 1 = unten (kMinFreq)
+        const float normY = static_cast<float>(y) / static_cast<float>(h - 1);
 
-        const int lowNeighbor = juce::jlimit(0, SpectralFrameBuffer::NUM_BINS - 1,
-            yToBinMap[static_cast<size_t>(juce::jmin(h - 1, y + 1))]);
-        const int highNeighbor = juce::jlimit(0, SpectralFrameBuffer::NUM_BINS - 1,
-            yToBinMap[static_cast<size_t>(juce::jmax(0, y - 1))]);
+        // Log-Mapping mit optionaler Tiefen-Betonung via frequencyCurveAmount
+        const float exponent = std::pow(1.0f - normY, 1.0f + frequencyCurveAmount * 0.12f);
+        const float freq     = kMinFreq * std::exp(exponent * logRange);
 
-        const int bandStart = juce::jmax(0, juce::jmin(lowNeighbor, highNeighbor));
-        const int bandEnd = juce::jmin(SpectralFrameBuffer::NUM_BINS - 1,
-            juce::jmax(lowNeighbor, highNeighbor) + 1);
+        // Kontinuierliche (float!) Bin-Position
+        const float binF = freq / nyquist * numBinsF;
+        yToBinF[static_cast<size_t>(y)] = juce::jlimit(0.0f, numBinsF, binF);
 
-        yBandStart[static_cast<size_t>(y)] = bandStart;
-        yBandEnd[static_cast<size_t>(y)] = juce::jmax(bandStart, bandEnd);
-
-        const float binNorm = static_cast<float>(yToBinMap[static_cast<size_t>(y)]) / maxBin;
+        // Low-Freq-Emphasis
+        const float binNorm = binF / numBinsF;
         rowGainDb[static_cast<size_t>(y)] = lowFreqEmphasisDb * (1.0f - std::sqrt(binNorm));
     }
 }
 
-juce::Colour SpectralView::magnitudeToColour(float magDb) const
+// =============================================================================
+// freqToY  –  Einheitliche Frequenz → Y-Pixel-Funktion (für Grid)
+// =============================================================================
+
+int SpectralView::freqToY(float freq, int height) const
 {
-    const float normalized = juce::jlimit(0.0f, 1.0f,
-        (magDb - magnitudeMin) / (magnitudeMax - magnitudeMin));
-    const int idx = juce::jlimit(0, static_cast<int>(colourLut.size()) - 1,
-        static_cast<int>(normalized * static_cast<float>(colourLut.size() - 1)));
+    if (height <= 1) return 0;
+
+    const float nyquist  = kSampleRate * 0.5f;
+    const float logRange = std::log(nyquist / kMinFreq);
+    const float logFreq  = std::log(juce::jlimit(kMinFreq, nyquist, freq) / kMinFreq);
+
+    // Gleiche Formel wie in rebuildLookupTables() (ohne CurveAmount, der gilt nur
+    // fürs Pixel-Mapping, nicht für Grid-Label-Positionen)
+    const float normY = 1.0f - (logFreq / logRange);
+    return juce::jlimit(0, height - 1,
+        static_cast<int>(normY * static_cast<float>(height - 1)));
+}
+
+// =============================================================================
+// magnitudeToColour
+// =============================================================================
+
+juce::Colour SpectralView::magnitudeToColour(float magDb) const noexcept
+{
+    const float normalized = (magDb - magnitudeMin) / (magnitudeMax - magnitudeMin);
+    const int idx = juce::jlimit(0, LUT_SIZE - 1,
+        static_cast<int>(normalized * static_cast<float>(LUT_SIZE - 1)));
     return colourLut[static_cast<size_t>(idx)];
 }
+
+// =============================================================================
+// interpolateMagnitude  –  Bilineare Bin-Interpolation
+// =============================================================================
+//
+// Liest einen Pegel (dB) an einer kontinuierlichen Bin-Position binF aus dem
+// Frame-Magnitude-Array heraus, indem es zwischen floor(binF) und ceil(binF)
+// linear interpoliert.
+//
+// Das ist der Kernfix für beide Bugs:
+//   - Glättet den Übergang zwischen niedrigen Bins (Bassbereich)
+//   - Verhindert identische Farbe für mehrere Pixel auf dem gleichen int-Bin
+
+static float interpolateMagnitude(const SpectralFrameBuffer::Frame& frame, float binF)
+{
+    const int   binLo   = static_cast<int>(binF);
+    const int   binHi   = juce::jmin(binLo + 1, SpectralFrameBuffer::NUM_BINS - 1);
+    const float frac    = binF - static_cast<float>(binLo);
+    const float magLo   = frame.magnitude[static_cast<size_t>(binLo)];
+    const float magHi   = frame.magnitude[static_cast<size_t>(binHi)];
+    return magLo + frac * (magHi - magLo);
+}
+
+// =============================================================================
+// appendFrameColumn  –  Neue Spalte in spectrogramImage einschreiben
+// =============================================================================
 
 void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
 {
@@ -129,95 +218,102 @@ void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
     if (w <= 1 || h <= 1 || !spectrogramImage.isValid())
         return;
 
+    // Bild um 1 Pixel nach links scrollen
     spectrogramImage.moveImageSection(0, 0, 1, 0, w - 1, h);
 
     const int x = w - 1;
+
+    // BitmapData nach moveImageSection: readWrite nötig, da moveImageSection
+    // intern in-place kopiert hat; writeOnly wäre unsicher auf manchen Backends.
+    juce::Image::BitmapData bmpData(spectrogramImage,
+                                    x, 0, 1, h,
+                                    juce::Image::BitmapData::writeOnly);
+
     for (int y = 0; y < h; ++y)
     {
-        const int startBin = yBandStart[static_cast<size_t>(y)];
-        const int endBin = yBandEnd[static_cast<size_t>(y)];
+        const float binF = yToBinF[static_cast<size_t>(y)];
 
-        float maxDb = gateDb;
-        float avgDb = 0.0f;
-        int bandCount = 0;
-        for (int bin = startBin; bin <= endBin; ++bin)
-        {
-            const float v = frame.magnitude[static_cast<size_t>(bin)];
-            maxDb = juce::jmax(maxDb, v);
-            avgDb += v;
-            ++bandCount;
-        }
+        // Interpolierter Pegel an kontinuierlicher Bin-Position
+        const float rawDb = interpolateMagnitude(frame, binF);
 
-        if (bandCount > 0)
-            avgDb /= static_cast<float>(bandCount);
+        // Low-Freq-Emphasis + temporale Glättung
+        const float emphasizedDb = rawDb + rowGainDb[static_cast<size_t>(y)];
+        float& smooth = smoothedRowDb[static_cast<size_t>(y)];
+        smooth = smooth + temporalSmoothing * (emphasizedDb - smooth);
 
-        const float pooledDb = (0.65f * maxDb) + (0.35f * avgDb);
-
-        const float emphasizedDb = pooledDb + rowGainDb[static_cast<size_t>(y)];
-        const float prev = smoothedRowDb[static_cast<size_t>(y)];
-        const float smoothDb = prev + temporalSmoothing * (emphasizedDb - prev);
-        const float clippedDb = juce::jlimit(gateDb, magnitudeMax, smoothDb);
-        smoothedRowDb[static_cast<size_t>(y)] = clippedDb;
-
-        spectrogramImage.setPixelAt(x, y, magnitudeToColour(clippedDb));
+        const float clippedDb = juce::jlimit(magnitudeMin, magnitudeMax, smooth);
+        bmpData.setPixelColour(0, y, magnitudeToColour(clippedDb));
     }
 }
 
-void SpectralView::drawSpectrumLine(juce::Graphics& g, int x, const SpectralFrameBuffer::Frame* frame)
-{
-    if (!frame)
-        return;
-
-    const int width = getWidth();
-    const int height = getHeight();
-    const int numBins = SpectralFrameBuffer::NUM_BINS;
-
-    // Map frequency bins to vertical positions (logarithmic scale for perceptual accuracy)
-    for (int bin = 1; bin < numBins - 1; ++bin)
-    {
-        float magDb = frame->magnitude[bin];
-        juce::Colour colour = magnitudeToColour(magDb);
-
-        // Map bin index to vertical position (logarithmic frequency scale)
-        float logBin = std::log(bin + 1.0f) / std::log(numBins + 1.0f);
-        int y = static_cast<int>(height * (1.0f - logBin));
-        y = juce::jlimit(0, height - 1, y);
-
-        // Draw a small vertical line segment
-        g.setColour(colour);
-        if (y > 0 && y < height)
-            g.drawLine(static_cast<float>(x), static_cast<float>(y), static_cast<float>(x), static_cast<float>(y + 1), 1.0f);
-    }
-}
+// =============================================================================
+// drawGrid  –  Frequenzachse und Labels
+// =============================================================================
 
 void SpectralView::drawGrid(juce::Graphics& g)
 {
-    const int width = getWidth();
+    const int width  = getWidth();
     const int height = getHeight();
+    if (width < 2 || height < 2) return;
 
-    g.setColour(juce::Colour(0xFF333333));
-    g.setFont(10.0f);
+    g.setFont(juce::Font(9.5f));
 
-    // Horizontal grid lines at 1kHz intervals (approximate)
-    const int numBins = SpectralFrameBuffer::NUM_BINS;
-    for (int freq = 0; freq <= 20000; freq += 2000)
+    for (int freq : kGridFreqs)
     {
-        if (freq == 0)
-            continue;  // Skip DC
-        float logBin = std::log(freq + 1.0f) / std::log(20000.0f + 1.0f);
-        int y = static_cast<int>(height * (1.0f - logBin));
-        if (y > 0 && y < height)
-        {
-            g.drawLine(0.0f, static_cast<float>(y), static_cast<float>(width), static_cast<float>(y), 0.5f);
-            if (freq % 4000 == 0)
-                g.drawText(juce::String(freq / 1000) + "k", 2, y - 8, 30, 16, juce::Justification::topLeft, false);
-        }
+        const int y = freqToY(static_cast<float>(freq), height);
+
+        g.setColour(juce::Colour(0x22FFFFFF));
+        g.drawHorizontalLine(y, 0.0f, static_cast<float>(width));
+
+        juce::String label;
+        if (freq >= 1000)
+            label = (freq % 1000 == 0)
+                    ? (juce::String(freq / 1000) + "k")
+                    : (juce::String(freq / 1000.0f, 1) + "k");
+        else
+            label = juce::String(freq);
+
+        const int labelW = 26;
+        const int labelH = 12;
+        const int labelY = juce::jlimit(0, height - labelH, y - labelH / 2);
+
+        g.setColour(juce::Colour(0x88000000));
+        g.fillRect(2, labelY, labelW, labelH);
+
+        g.setColour(juce::Colour(0xBBCCCCCC));
+        g.drawText(label, 3, labelY, labelW, labelH,
+                   juce::Justification::centredLeft, false);
+    }
+
+    // dB-Skala rechts
+    g.setFont(juce::Font(9.0f));
+    static constexpr int numDbMarks = 5;
+    for (int i = 0; i <= numDbMarks; ++i)
+    {
+        const float db = magnitudeMin + static_cast<float>(i) *
+                         (magnitudeMax - magnitudeMin) / static_cast<float>(numDbMarks);
+        const float normY = 1.0f - juce::jlimit(0.0f, 1.0f,
+            (db - magnitudeMin) / (magnitudeMax - magnitudeMin));
+        const int y = juce::jlimit(0, height - 1,
+            static_cast<int>(normY * static_cast<float>(height - 1)));
+
+        g.setColour(juce::Colour(0x18FFFFFF));
+        g.drawHorizontalLine(y, static_cast<float>(width - 36), static_cast<float>(width));
+
+        g.setColour(juce::Colour(0x99AAAAAA));
+        g.drawText(juce::String(static_cast<int>(db)) + "dB",
+                   width - 35, y - 6, 33, 12,
+                   juce::Justification::centredRight, false);
     }
 }
 
+// =============================================================================
+// paint / resized / timerCallback
+// =============================================================================
+
 void SpectralView::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF1A1A1F));
+    g.fillAll(juce::Colour(0xFF080810));
 
     if (spectrogramImage.isValid())
         g.drawImageAt(spectrogramImage, 0, 0);
@@ -240,14 +336,37 @@ void SpectralView::timerCallback()
     if (frameBuffer == nullptr)
         return;
 
-    SpectralFrameBuffer::Frame newest;
-    if (!frameBuffer->copyNewestFrame(newest))
+    const int totalFrames = frameBuffer->getNumFrames();
+    if (totalFrames == 0)
         return;
 
-    if (newest.sampleIndex == lastRenderedSampleIndex)
+    SpectralFrameBuffer::Frame tmp;
+    if (!frameBuffer->copyNewestFrame(tmp))
         return;
 
-    appendFrameColumn(newest);
-    lastRenderedSampleIndex = newest.sampleIndex;
-    repaint();
+    if (tmp.sampleIndex == lastRenderedSampleIndex)
+        return;
+
+    // Multi-Frame-Drain: alle neuen Frames konsumieren, max. 8 pro Tick
+    static constexpr int kMaxFramesPerTick = 8;
+    int rendered = 0;
+    bool didRender = false;
+
+    for (int fi = 0; fi < totalFrames && rendered < kMaxFramesPerTick; ++fi)
+    {
+        SpectralFrameBuffer::Frame frame;
+        if (!frameBuffer->copyFrame(fi, frame))
+            continue;
+
+        if (frame.sampleIndex <= lastRenderedSampleIndex)
+            continue;
+
+        appendFrameColumn(frame);
+        lastRenderedSampleIndex = frame.sampleIndex;
+        didRender = true;
+        ++rendered;
+    }
+
+    if (didRender)
+        repaint();
 }
