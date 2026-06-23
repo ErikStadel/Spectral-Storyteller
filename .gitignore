@@ -1,0 +1,22 @@
+# ==========================================
+# Spectral Storyteller - Git Ignore
+# ==========================================
+
+# 1. Haupt-Build-Ordner (Hier liegt die Dateiflut!)
+build/
+.cmake/
+
+# 2. Visual Studio & MSBuild temporäre Dateien
+.vs/
+*.sln
+*.vcxproj
+*.filters
+*.user
+
+# 3. VS Code Einstellungen (optional, aber ratsam)
+# Wenn du deine persönlichen VS Code Settings nicht hochladen willst:
+.vscode/cmake-variants.json
+
+# 4. Betriebssystem-Müll
+Thumbs.db
+.DS_Store
