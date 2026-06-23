@@ -5,7 +5,7 @@
 		<BuildType Name="Release"/>
 		<BuildType Name="MinSizeRel"/>
 		<BuildType Name="RelWithDebInfo"/>
-		<Platform Name="win32"/>
+		<Platform Name="x64"/>
 	</Configurations>
 	<Folder Name="/CMakePredefinedTargets/">
 		<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="44ae4043-5f84-3879-a650-aa3f1e0fb0df" DefaultStartup="true">

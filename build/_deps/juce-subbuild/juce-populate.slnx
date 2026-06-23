@@ -2,7 +2,7 @@
 <Solution>
 	<Configurations>
 		<BuildType Name="Debug"/>
-		<Platform Name="win32"/>
+		<Platform Name="x64"/>
 	</Configurations>
 	<Folder Name="/CMakePredefinedTargets/">
 		<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="0893662c-7c6e-3136-aac9-abec5ffddf9c" DefaultStartup="true">

@@ -32,14 +32,22 @@ juce_add_plugin(SpectralStoryteller
     FORMATS VST3 Standalone
 )
 
-# NEU: Kopiert die fertige VST3 nach dem Build automatisch in deinen System-Ordner
-set_target_properties(SpectralStoryteller PROPERTIES
-    JUCE_COPY_PLUGIN_AFTER_BUILD ON
+# Add post-build command to copy VST3 to custom location
+add_custom_command(TARGET SpectralStoryteller POST_BUILD
+    COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "& {"
+        "$src='${CMAKE_CURRENT_BINARY_DIR}/SpectralStoryteller_artefacts/Release/VST3';"
+        "$dst='D:/VST/VST/VST3';"
+        "New-Item -ItemType Directory -Force -Path $dst | Out-Null;"
+        "if (Test-Path $src) { Copy-Item -Path (Join-Path $src '*') -Destination $dst -Recurse -Force -ErrorAction Continue }"
+        "exit 0"
+        "}"
+    COMMENT "Copying VST3 plugin to D:/VST/VST/VST3 (non-fatal on copy errors)"
 )
 
-# JUCE-Module mit PUBLIC-Scope verlinken (damit includes propagiert werden)
+# JUCE-Module verlinken
 target_link_libraries(SpectralStoryteller 
-    PUBLIC
+    PRIVATE
         juce::juce_core
         juce::juce_data_structures
         juce::juce_events
@@ -54,9 +62,15 @@ target_link_libraries(SpectralStoryteller
         juce::juce_dsp
 )
 
-# Include Verzeichnis für lokale Source-Dateien
+# Explizite Include-Verzeichnisse für JUCE
 target_include_directories(SpectralStoryteller PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Source
+    ${JUCE_SOURCE_DIR}/modules
+)
+
+# Disable VST2 compatibility code in JUCE VST3 client
+target_compile_definitions(SpectralStoryteller PRIVATE
+    JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
 # Die Quellcodedateien (C++ Quelltexte und Header)
@@ -65,4 +79,10 @@ target_sources(SpectralStoryteller PRIVATE
     Source/PluginProcessor.h
     Source/PluginEditor.cpp
     Source/PluginEditor.h
+    Source/DSP/SpectralFrameBuffer.cpp
+    Source/DSP/SpectralFrameBuffer.h
+    Source/DSP/ObjectDatabase.cpp
+    Source/DSP/ObjectDatabase.h
+    Source/UI/SpectralView.cpp
+    Source/UI/SpectralView.h
 )

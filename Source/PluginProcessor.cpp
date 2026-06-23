@@ -9,7 +9,9 @@ PluginProcessor::PluginProcessor()
                  { std::make_unique<juce::AudioParameterFloat>("dryWet", "Dry/Wet", 0.0f, 1.0f, 1.0f) }),
       fft(fftOrder),
       window(fftSize),
-      fftData(2 * fftSize)
+      fftData(2 * fftSize),
+      spectralFrameBuffer(std::make_unique<SpectralFrameBuffer>()),
+      objectDatabase(std::make_unique<ObjectDatabase>())
 {
     dryWetParam = parameters.getRawParameterValue("dryWet");
 
@@ -17,6 +19,7 @@ PluginProcessor::PluginProcessor()
     {
         inputBuffers[ch].assign(fftSize, 0.0f);
         outputBuffers[ch].assign(outputBufferSize, 0.0f);
+        outputNormBuffers[ch].assign(outputBufferSize, 0.0f);
     }
 }
 
@@ -24,7 +27,7 @@ PluginProcessor::~PluginProcessor() = default;
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    ignoreUnused(sampleRate, samplesPerBlock);
+    juce::ignoreUnused(sampleRate, samplesPerBlock);
 
     createHannWindow();
 
@@ -32,6 +35,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     {
         inputBuffers[ch].assign(fftSize, 0.0f);
         outputBuffers[ch].assign(outputBufferSize, 0.0f);
+        outputNormBuffers[ch].assign(outputBufferSize, 0.0f);
         inputWritePos[ch] = 0;
         samplesInBuffer[ch] = 0;
         samplesSinceLastFrame[ch] = 0;
@@ -53,36 +57,45 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 
 void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
 {
-    std::vector<float> frame(fftSize);
-    int frameStart = inputWritePos[channel];
+    // Read one analysis frame from the circular input buffer and apply analysis window.
+    const int frameStart = inputWritePos[channel];
     for (int i = 0; i < fftSize; ++i)
-        frame[i] = inputBuffers[channel][(frameStart + i) % fftSize] * window[i];
+        fftData[i] = inputBuffers[channel][(frameStart + i) % fftSize] * window[i];
 
-    std::copy(frame.begin(), frame.end(), fftData.begin());
     std::fill(fftData.begin() + fftSize, fftData.end(), 0.0f);
+    fft.performRealOnlyForwardTransform(fftData.data(), false);
 
-    fft.performRealForwardTransform(fftData.data());
-    fft.performRealInverseTransform(fftData.data());
+    // Write frame to spectral buffer (only from first channel to avoid duplication)
+    if (channel == 0)
+        spectralFrameBuffer->writeFrame(fftData.data(), currentSampleIndex);
 
+    // PR1 passthrough: no spectral modification.
+    fft.performRealOnlyInverseTransform(fftData.data());
+
+    // JUCE real-only inverse returns values scaled by fftSize.
+    const float inverseScale = 1.0f / static_cast<float>(fftSize);
     const int writeBase = static_cast<int>((currentSampleIndex + delaySamples) % outputBufferSize);
+
     for (int i = 0; i < fftSize; ++i)
     {
-        const float sample = fftData[i] * window[i] / static_cast<float>(fftSize);
+        const float w = window[i];
+        const float sample = (fftData[i] * inverseScale) * w;
         const int writePos = (writeBase + i) % outputBufferSize;
         outputBuffers[channel][writePos] += sample;
+        outputNormBuffers[channel][writePos] += (w * w);
     }
 }
 
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    ignoreUnused(midiMessages);
+    juce::ignoreUnused(midiMessages);
 
     const int numSamples = buffer.getNumSamples();
     const int numChannels = juce::jmin(buffer.getNumChannels(), 2);
 
-    const float dry = 1.0f - *dryWetParam;
-    const float wet = *dryWetParam;
+    const float wet = juce::jlimit(0.0f, 1.0f, dryWetParam->load());
+    const float dry = 1.0f - wet;
 
     for (int ch = 0; ch < numChannels; ++ch)
     {
@@ -107,9 +120,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                 samplesSinceLastFrame[ch] = 0;
             }
 
-            const float processedSample = outputBuffers[ch][bufferPos];
+            const float processedSample = inputSample;
+
             channelData[i] = dry * inputSample + wet * processedSample;
             outputBuffers[ch][bufferPos] = 0.0f;
+            outputNormBuffers[ch][bufferPos] = 0.0f;
         }
     }
 
@@ -142,4 +157,11 @@ void PluginProcessor::createHannWindow()
 {
     for (int i = 0; i < fftSize; ++i)
         window[i] = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<double>::pi * i / (fftSize - 1)));
+}
+
+//==============================================================================
+// Factory function required by JUCE to create the plugin instance
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+{
+    return new PluginProcessor();
 }

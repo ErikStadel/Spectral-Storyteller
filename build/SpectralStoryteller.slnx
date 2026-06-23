@@ -5,7 +5,7 @@
 		<BuildType Name="Release"/>
 		<BuildType Name="MinSizeRel"/>
 		<BuildType Name="RelWithDebInfo"/>
-		<Platform Name="win32"/>
+		<Platform Name="x64"/>
 	</Configurations>
 	<Project Path="SpectralStoryteller_rc_lib.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="8171e04b-e93b-38da-a9ae-085eca07f326">
 		<BuildDependency Project="ZERO_CHECK.vcxproj"/>

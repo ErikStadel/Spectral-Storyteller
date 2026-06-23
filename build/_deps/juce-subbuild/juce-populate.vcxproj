@@ -1,24 +1,24 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <PreferredToolArchitecture>x86</PreferredToolArchitecture>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
   </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|win32">
+    <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
-      <Platform>win32</Platform>
+      <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{25B37CF1-EF36-3A80-BBC4-08438717EBD7}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
-    <Platform>win32</Platform>
+    <Platform>x64</Platform>
     <ProjectName>juce-populate</ProjectName>
     <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Utility</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v145</PlatformToolset>
@@ -33,9 +33,9 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Midl>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
@@ -47,9 +47,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-mkdir.rule">
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">true</BuildInParallel>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">Creating directories for 'juce-populate'</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Creating directories for 'juce-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 "C:\Program Files\CMake\bin\cmake.exe" -Dcfgdir=/Debug -P "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/tmp/juce-populate-mkdirs.cmake"
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-mkdir"
@@ -60,15 +60,15 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-mkdir</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-mkdir</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-download.rule">
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">Performing download step (git clone) for 'juce-populate'</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Performing download step (git clone) for 'juce-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 cd "C:\Users\helms\Spectral Storyteller\build\_deps"
 if %errorlevel% neq 0 goto :cmEnd
 C:
@@ -83,15 +83,15 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\juce-populate-gitinfo.txt;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-mkdir;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-download</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\juce-populate-gitinfo.txt;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-mkdir;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-download</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-update.rule">
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">Performing update step for 'juce-populate'</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Performing update step for 'juce-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-src"
 if %errorlevel% neq 0 goto :cmEnd
 C:
@@ -104,16 +104,16 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\tmp\juce-populate-gitupdate.cmake;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\juce-populate-update-info.txt;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-download;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-update</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
-      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</VerifyInputsAndOutputsExist>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\tmp\juce-populate-gitupdate.cmake;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\juce-populate-update-info.txt;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-download;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-update</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-patch.rule">
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">No patch step for 'juce-populate'</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No patch step for 'juce-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 "C:\Program Files\CMake\bin\cmake.exe" -E echo_append
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/juce-populate-prefix/src/juce-populate-stamp/Debug/juce-populate-patch"
@@ -124,17 +124,17 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\juce-populate-patch-info.txt;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-update;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-patch</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
-      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</VerifyInputsAndOutputsExist>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\juce-populate-patch-info.txt;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-update;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-patch</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-configure.rule">
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">true</BuildInParallel>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">No configure step for 'juce-populate'</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No configure step for 'juce-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-build"
 if %errorlevel% neq 0 goto :cmEnd
 C:
@@ -149,16 +149,16 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\tmp\juce-populate-cfgcmd.txt;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-patch;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-configure</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\tmp\juce-populate-cfgcmd.txt;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-patch;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-configure</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-build.rule">
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">true</BuildInParallel>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">No build step for 'juce-populate'</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No build step for 'juce-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-build"
 if %errorlevel% neq 0 goto :cmEnd
 C:
@@ -173,16 +173,16 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-configure;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-build</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-configure;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-build</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-install.rule">
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">true</BuildInParallel>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">No install step for 'juce-populate'</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No install step for 'juce-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-build"
 if %errorlevel% neq 0 goto :cmEnd
 C:
@@ -197,16 +197,16 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-build;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-install</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-build;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-install</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\f75f0ca52d4ba68b1dc321fe28f10faa\juce-populate-test.rule">
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">true</BuildInParallel>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">No test step for 'juce-populate'</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No test step for 'juce-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 cd "C:\Users\helms\Spectral Storyteller\build\_deps\juce-build"
 if %errorlevel% neq 0 goto :cmEnd
 C:
@@ -221,16 +221,16 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-install;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-test</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-install;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-test</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\48fbb567264b55b03376579919eb1e93\juce-populate-complete.rule">
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">true</BuildInParallel>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">Completed 'juce-populate'</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Completed 'juce-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 "C:\Program Files\CMake\bin\cmake.exe" -E make_directory "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/Debug"
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E touch "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/Debug/juce-populate-complete"
@@ -243,34 +243,34 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-install;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-mkdir;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-download;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-update;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-patch;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-configure;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-build;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-test;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\Debug\juce-populate-complete</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
-      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</VerifyInputsAndOutputsExist>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-install;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-mkdir;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-download;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-update;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-patch;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-configure;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-build;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\src\juce-populate-stamp\Debug\juce-populate-test;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\Debug\juce-populate-complete</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\d7345362249b181dbe5cb13c83634f2d\juce-populate.rule">
-      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">true</BuildInParallel>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'"></Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 :cmErrorLevel
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\Debug\juce-populate-complete;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\juce-populate</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
-      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</VerifyInputsAndOutputsExist>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\Debug\juce-populate-complete;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\juce-populate</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeLists.txt">
       <UseUtf8Encoding>Always</UseUtf8Encoding>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">Building Custom Rule C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeLists.txt</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">setlocal
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 "C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild" "-BC:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild" --check-stamp-file "C:/Users/helms/Spectral Storyteller/build/_deps/juce-subbuild/CMakeFiles/generate.stamp"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
@@ -279,9 +279,9 @@ endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
 exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\PatchInfo.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\RepositoryInfo.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\UpdateInfo.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\cfgcmd.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\gitclone.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\gitupdate.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\mkdirs.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\shared_internal_commands.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\Platform\WindowsPaths.cmake;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\4.4.0-rc2\CMakeSystem.cmake;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\tmp\juce-populate-mkdirs.cmake;%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\generate.stamp</Outputs>
-      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|win32'">false</LinkObjects>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\PatchInfo.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\RepositoryInfo.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\UpdateInfo.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\cfgcmd.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\gitclone.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\gitupdate.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\mkdirs.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\shared_internal_commands.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\Platform\WindowsPaths.cmake;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\4.4.0-rc2\CMakeSystem.cmake;C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\juce-populate-prefix\tmp\juce-populate-mkdirs.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\helms\Spectral Storyteller\build\_deps\juce-subbuild\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>

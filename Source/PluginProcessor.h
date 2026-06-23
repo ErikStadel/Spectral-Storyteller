@@ -1,6 +1,16 @@
 #pragma once
 
-#include <JuceHeader.h>
+#include <juce_core/juce_core.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
+#include "DSP/SpectralFrameBuffer.h"
+#include "DSP/ObjectDatabase.h"
+#include <memory>
+
+// Version tracking
+constexpr int VERSION_MAJOR = 0;
+constexpr int VERSION_MINOR = 2;
+constexpr int VERSION_BUILD = 3;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -31,6 +41,27 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    juce::AudioProcessorValueTreeState& getValueTreeState() { return parameters; }
+    
+    juce::String getVersion() const { 
+        return juce::String(VERSION_MAJOR) + "." + juce::String(VERSION_MINOR) + "." + juce::String(VERSION_BUILD);
+    }
+
+    juce::String getBuildInfo() const
+    {
+        return "v" + getVersion() + " (" + juce::String(__DATE__) + " " + juce::String(__TIME__) + ")";
+    }
+
+    /**
+     * Get reference to spectral frame buffer for UI visualization.
+     */
+    SpectralFrameBuffer* getSpectralFrameBuffer() { return spectralFrameBuffer.get(); }
+
+    /**
+     * Get reference to object database.
+     */
+    ObjectDatabase* getObjectDatabase() { return objectDatabase.get(); }
+
 private:
     juce::AudioProcessorValueTreeState parameters;
     std::atomic<float>* dryWetParam = nullptr;
@@ -45,12 +76,16 @@ private:
     std::vector<float> window;
     std::array<std::vector<float>, 2> inputBuffers;
     std::array<std::vector<float>, 2> outputBuffers;
+    std::array<std::vector<float>, 2> outputNormBuffers;
     std::array<int, 2> inputWritePos{ 0, 0 };
     std::array<int, 2> samplesInBuffer{ 0, 0 };
     std::array<int, 2> samplesSinceLastFrame{ 0, 0 };
     std::vector<float> fftData;
 
     int64_t totalSamplesProcessed = 0;
+
+    std::unique_ptr<SpectralFrameBuffer> spectralFrameBuffer;
+    std::unique_ptr<ObjectDatabase> objectDatabase;
 
     void createHannWindow();
     void processStftFrame(int channel, int64_t currentSampleIndex);
