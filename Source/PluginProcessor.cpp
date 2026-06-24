@@ -537,6 +537,7 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         }
     }
 
+    // === ODF & Transient Detection (bestehend, leicht optimiert) ===
     auto calcZScore = [](float v, const std::deque<float>& hist)
     {
         if (hist.size() < 8)
@@ -581,8 +582,7 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         mad = absDev[absDev.size() / 2] * 1.4826f;
     };
 
-    float odfMedian = 0.0f;
-    float odfMad = 0.0f;
+    float odfMedian = 0.0f, odfMad = 0.0f;
     medianMad(odfHistory, odfMedian, odfMad);
 
     bool isTransientFrame = false;
@@ -601,7 +601,7 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
     spectralFluxHistory.push_back(spectralFlux);
     hfcHistory.push_back(hfc);
     odfHistory.push_back(odf);
-    static constexpr size_t histWindow = 96;
+   static constexpr size_t histWindow = 96;
     while (spectralFluxHistory.size() > histWindow)
         spectralFluxHistory.pop_front();
     while (hfcHistory.size() > histWindow)
@@ -609,13 +609,12 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
     while (odfHistory.size() > histWindow)
         odfHistory.pop_front();
 
+    // === Spectral Flatness (bestehend) ===
     for (int k = 0; k < numBins; ++k)
     {
         const int lo = juce::jmax(0, k - 3);
         const int hi = juce::jmin(numBins - 1, k + 3);
-
-        float geoLogSum = 0.0f;
-        float arithSum = 0.0f;
+        float geoLogSum = 0.0f, arithSum = 0.0f;
         int n = 0;
         for (int i = lo; i <= hi; ++i)
         {
@@ -624,38 +623,68 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             arithSum += m;
             ++n;
         }
-
         const float geo = std::exp(geoLogSum / static_cast<float>(juce::jmax(1, n)));
         const float arith = arithSum / static_cast<float>(juce::jmax(1, n));
         lastFlatness[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, geo / (arith + eps));
     }
 
+    // === NEU: Hybrid Features ===
+    if (useHybridMode)
+    {
+        // 1. Harmonic Product Spectrum (HPS) für Tonalität
+        for (int k = 0; k < numBins; ++k)
+        {
+            float hps = magLin[static_cast<size_t>(k)];
+            if (k >= 2) hps *= magLin[static_cast<size_t>(k / 2)];
+            if (k >= 3) hps *= magLin[static_cast<size_t>(k / 3)];
+            if (k >= 4) hps *= magLin[static_cast<size_t>(k / 4)];
+            hpsScore[static_cast<size_t>(k)] = std::pow(hps, 0.25f);   // Normalisierung
+        }
+
+        // 2. Broadband Flux für Transienten
+        float lowFluxSum = 0.0f, highFluxSum = 0.0f;
+        const int lowCut = numBins / 8;
+        const int highCut = numBins * 3 / 4;
+
+        for (int k = 0; k < numBins; ++k)
+        {
+            const float delta = posDeltaLog[static_cast<size_t>(k)];
+            if (k < lowCut) lowFluxSum += delta;
+            if (k > highCut) highFluxSum += delta;
+
+            const bool isBroadband = (lowFluxSum > 0.4f && highFluxSum > 0.25f);
+            broadbandFlux[static_cast<size_t>(k)] = delta * (isBroadband ? 1.8f : 1.0f);
+        }
+    }
+
+    // === Masken-Berechnung ===
     if (isTransientFrame)
     {
         float meanPos = 0.0f;
-        for (const auto d : posDeltaLog)
-            meanPos += d;
+        for (const auto d : posDeltaLog) meanPos += d;
         meanPos /= static_cast<float>(numBins);
 
         const float transientBinThreshold = juce::jmax(0.02f, meanPos * 1.4f);
+
         for (int k = 0; k < numBins; ++k)
         {
-            const float s = (posDeltaLog[static_cast<size_t>(k)] - transientBinThreshold)
-                          / (transientBinThreshold + eps);
-            transientMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, s);
+            float score = (posDeltaLog[static_cast<size_t>(k)] - transientBinThreshold) 
+                        / (transientBinThreshold + eps);
+            if (useHybridMode)
+                score *= (1.0f + broadbandFlux[static_cast<size_t>(k)] * 0.7f);
+
+            transientMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, score);
         }
 
-        for (auto& p : tonalPersistence)
-            p *= 0.90f;
+        for (auto& p : tonalPersistence) p *= 0.88f;   // stärker dämpfen
     }
     else
     {
         for (int k = 2; k < numBins - 2; ++k)
         {
+            // Bestehende Peak-Prominence-Logik
             const float centerLin = magLin[static_cast<size_t>(k)];
-            const float leftLin = magLin[static_cast<size_t>(k - 1)];
-            const float rightLin = magLin[static_cast<size_t>(k + 1)];
-            if (!(centerLin > leftLin && centerLin >= rightLin))
+            if (!(centerLin > magLin[static_cast<size_t>(k-1)] && centerLin >= magLin[static_cast<size_t>(k+1)]))
                 continue;
 
             std::array<float, 4> neighDb = {
@@ -670,27 +699,37 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             const float prominenceDb = centerDb - neighMedianDb;
 
             const float tonalCandidate = prominenceDb > 4.5f ? 1.0f : 0.0f;
+
+            const float prominenceDb = /* ... */;
+            float tonalCandidate = prominenceDb > 4.5f ? 1.0f : 0.0f;
+
+            if (useHybridMode)
+                tonalCandidate *= (hpsScore[static_cast<size_t>(k)] * 2.8f);   // starker HPS-Boost
+
             tonalPersistence[static_cast<size_t>(k)] =
                 0.82f * tonalPersistence[static_cast<size_t>(k)] + 0.18f * tonalCandidate;
 
             tonalMask[static_cast<size_t>(k)] =
                 juce::jlimit(0.0f, 1.0f, (tonalPersistence[static_cast<size_t>(k)] - 0.25f) / 0.75f);
         }
-
-        for (int k = 0; k < numBins; ++k)
-        {
-            const float tonalSuppression = 1.0f - tonalMask[static_cast<size_t>(k)];
-            const float transientSuppression = 1.0f - transientMask[static_cast<size_t>(k)];
-            const float noiseScore = lastFlatness[static_cast<size_t>(k)]
-                                   * tonalSuppression
-                                   * transientSuppression;
-            noiseMask[static_cast<size_t>(k)] = (noiseScore > 0.35f) ? noiseScore : 0.0f;
-        }
     }
 
-    std::array<float, numBins> smoothTransient{};
-    std::array<float, numBins> smoothTonal{};
-    std::array<float, numBins> smoothNoise{};
+    // === Ambient als verbesserte Restklasse ===
+    for (int k = 0; k < numBins; ++k)
+    {
+        const float tSup = 1.0f - tonalMask[static_cast<size_t>(k)];
+        const float trSup = 1.0f - transientMask[static_cast<size_t>(k)];
+        const float sfm = lastFlatness[static_cast<size_t>(k)];
+
+        float noiseScore = sfm * tSup * trSup;
+        if (useHybridMode)
+            noiseScore *= (hpsScore[static_cast<size_t>(k)] < 0.25f ? 1.6f : 1.0f);
+
+        noiseMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, noiseScore * 1.2f);
+    }
+
+    // === Smoothing & Overlay (unverändert) ===
+    std::array<float, numBins> smoothTransient{}, smoothTonal{}, smoothNoise{};
     applyCosineMaskSmoothing(transientMask, smoothTransient);
     applyCosineMaskSmoothing(tonalMask, smoothTonal);
     applyCosineMaskSmoothing(noiseMask, smoothNoise);

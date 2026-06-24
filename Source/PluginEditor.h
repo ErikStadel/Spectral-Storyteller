@@ -25,6 +25,11 @@ private:
     // Spectral visualization
     std::unique_ptr<SpectralView> spectralView;
     std::unique_ptr<SpectralSelector> spectralSelector;
+
+    // Hybrider Segmentation (PR5 Erweiterung)
+    std::array<float, SpectralFrameBuffer::NUM_BINS> hpsScore{};           // Harmonic Product Spectrum
+    std::array<float, SpectralFrameBuffer::NUM_BINS> broadbandFlux{};      // Für Transienten
+    bool useHybridMode = true;  // später als Parameter
     
     // Object management sidebar
     std::unique_ptr<ObjectSidebar> objectSidebar;
