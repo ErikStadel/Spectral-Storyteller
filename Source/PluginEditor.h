@@ -30,6 +30,16 @@ private:
     std::array<float, SpectralFrameBuffer::NUM_BINS> hpsScore{};           // Harmonic Product Spectrum
     std::array<float, SpectralFrameBuffer::NUM_BINS> broadbandFlux{};      // Für Transienten
     bool useHybridMode = true;  // später als Parameter
+
+    // === Hybrid Segmentation + HPSS Pre-Pass (Step 2) ===
+    std::array<float, SpectralFrameBuffer::NUM_BINS> hpHarmonicMask{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> hpPercussiveMask{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> hpsScore{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> broadbandFlux{};
+
+    bool useHybridMode = true;
+    bool useHPSSPrePass = true;           // Neuer Schalter
+    int hpssIterations = 3;               // Für Median-Filter
     
     // Object management sidebar
     std::unique_ptr<ObjectSidebar> objectSidebar;

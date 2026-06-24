@@ -513,6 +513,7 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
     std::array<float, numBins> transientMask{};
     std::array<float, numBins> noiseMask{};
 
+    // === FFT Magnitude berechnen ===
     float hfc = 0.0f;
     for (int k = 0; k < numBins; ++k)
     {
@@ -531,9 +532,8 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         for (int k = 0; k < numBins; ++k)
         {
             const float delta = logMag[static_cast<size_t>(k)] - previousLogMagnitudes[static_cast<size_t>(k)];
-            const float positiveDelta = juce::jmax(0.0f, delta);
-            posDeltaLog[static_cast<size_t>(k)] = positiveDelta;
-            spectralFlux += positiveDelta;
+            posDeltaLog[static_cast<size_t>(k)] = juce::jmax(0.0f, delta);
+            spectralFlux += posDeltaLog[static_cast<size_t>(k)];
         }
     }
 
@@ -628,20 +628,55 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         lastFlatness[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, geo / (arith + eps));
     }
 
+    if (useHPSSPrePass)
+    {
+        hpHarmonicMask.fill(0.5f);
+        hpPercussiveMask.fill(0.5f);
+
+        std::array<float, numBins> tempH{}, tempP{};
+
+        for (int iter = 0; iter < hpssIterations; ++iter)
+        {
+            // Horizontal Median (Harmonic)
+            for (int k = 0; k < numBins; ++k)
+            {
+                float vals[3] = { magLin[static_cast<size_t>(juce::jmax(0, k-1))],
+                                  magLin[static_cast<size_t>(k)],
+                                  magLin[static_cast<size_t>(juce::jmin(numBins-1, k+1))] };
+                std::sort(std::begin(vals), std::end(vals));
+                tempH[static_cast<size_t>(k)] = vals[1];
+            }
+
+            // Vertical Median (Percussive) - vereinfacht über Zeit (hier nur aktueller Frame + vorheriger)
+            for (int k = 0; k < numBins; ++k)
+            {
+                const float prev = hasPreviousMagnitudes ? previousMagnitudes[static_cast<size_t>(k)] : magLin[static_cast<size_t>(k)];
+                float vals[2] = { prev, magLin[static_cast<size_t>(k)] };
+                tempP[static_cast<size_t>(k)] = std::max(vals[0], vals[1]); // einfache Variante
+            }
+
+            for (int k = 0; k < numBins; ++k)
+            {
+                hpHarmonicMask[static_cast<size_t>(k)] = tempH[static_cast<size_t>(k)] / (magLin[static_cast<size_t>(k)] + eps);
+                hpPercussiveMask[static_cast<size_t>(k)] = 1.0f - hpHarmonicMask[static_cast<size_t>(k)];
+            }
+        }
+    }
+
     // === NEU: Hybrid Features ===
     if (useHybridMode)
     {
-        // 1. Harmonic Product Spectrum (HPS) für Tonalität
+        // Harmonic Product Spectrum
         for (int k = 0; k < numBins; ++k)
         {
             float hps = magLin[static_cast<size_t>(k)];
-            if (k >= 2) hps *= magLin[static_cast<size_t>(k / 2)];
-            if (k >= 3) hps *= magLin[static_cast<size_t>(k / 3)];
-            if (k >= 4) hps *= magLin[static_cast<size_t>(k / 4)];
-            hpsScore[static_cast<size_t>(k)] = std::pow(hps, 0.25f);   // Normalisierung
+            if (k >= 2) hps *= magLin[static_cast<size_t>(k/2)];
+            if (k >= 3) hps *= magLin[static_cast<size_t>(k/3)];
+            if (k >= 4) hps *= magLin[static_cast<size_t>(k/4)];
+            hpsScore[static_cast<size_t>(k)] = std::pow(hps, 0.25f);
         }
 
-        // 2. Broadband Flux für Transienten
+        // Broadband Flux
         float lowFluxSum = 0.0f, highFluxSum = 0.0f;
         const int lowCut = numBins / 8;
         const int highCut = numBins * 3 / 4;
@@ -652,8 +687,8 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             if (k < lowCut) lowFluxSum += delta;
             if (k > highCut) highFluxSum += delta;
 
-            const bool isBroadband = (lowFluxSum > 0.4f && highFluxSum > 0.25f);
-            broadbandFlux[static_cast<size_t>(k)] = delta * (isBroadband ? 1.8f : 1.0f);
+            const bool isBroadband = (lowFluxSum > 0.35f && highFluxSum > 0.22f);
+            broadbandFlux[static_cast<size_t>(k)] = delta * (isBroadband ? 1.85f : 1.0f);
         }
     }
 
@@ -661,22 +696,19 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
     if (isTransientFrame)
     {
         float meanPos = 0.0f;
-        for (const auto d : posDeltaLog) meanPos += d;
-        meanPos /= static_cast<float>(numBins);
+        for (auto d : posDeltaLog) meanPos += d;
+        meanPos /= numBins;
 
-        const float transientBinThreshold = juce::jmax(0.02f, meanPos * 1.4f);
+        const float thresh = juce::jmax(0.018f, meanPos * 1.35f);
 
         for (int k = 0; k < numBins; ++k)
         {
-            float score = (posDeltaLog[static_cast<size_t>(k)] - transientBinThreshold) 
-                        / (transientBinThreshold + eps);
-            if (useHybridMode)
-                score *= (1.0f + broadbandFlux[static_cast<size_t>(k)] * 0.7f);
+            float score = (posDeltaLog[static_cast<size_t>(k)] - thresh) / (thresh + eps);
+            if (useHPSSPrePass) score *= hpPercussiveMask[static_cast<size_t>(k)] * 1.4f;
+            if (useHybridMode)  score *= (1.0f + broadbandFlux[static_cast<size_t>(k)] * 0.75f);
 
             transientMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, score);
         }
-
-        for (auto& p : tonalPersistence) p *= 0.88f;   // stärker dämpfen
     }
     else
     {
@@ -698,34 +730,29 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             const float centerDb = 20.0f * std::log10(centerLin + eps);
             const float prominenceDb = centerDb - neighMedianDb;
 
-            const float tonalCandidate = prominenceDb > 4.5f ? 1.0f : 0.0f;
+            float tonalCandidate = (prominenceDb > 4.5f) ? 1.0f : 0.0f;
 
-            const float prominenceDb = /* ... */;
-            float tonalCandidate = prominenceDb > 4.5f ? 1.0f : 0.0f;
+            if (useHPSSPrePass) tonalCandidate *= hpHarmonicMask[static_cast<size_t>(k)];
+            if (useHybridMode)  tonalCandidate *= hpsScore[static_cast<size_t>(k)] * 2.9f;
 
-            if (useHybridMode)
-                tonalCandidate *= (hpsScore[static_cast<size_t>(k)] * 2.8f);   // starker HPS-Boost
+            tonalPersistence[static_cast<size_t>(k)] = 0.81f * tonalPersistence[static_cast<size_t>(k)] + 0.19f * tonalCandidate;
 
-            tonalPersistence[static_cast<size_t>(k)] =
-                0.82f * tonalPersistence[static_cast<size_t>(k)] + 0.18f * tonalCandidate;
-
-            tonalMask[static_cast<size_t>(k)] =
-                juce::jlimit(0.0f, 1.0f, (tonalPersistence[static_cast<size_t>(k)] - 0.25f) / 0.75f);
+            tonalMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, (tonalPersistence[static_cast<size_t>(k)] - 0.22f) / 0.78f);
         }
     }
 
     // === Ambient als verbesserte Restklasse ===
     for (int k = 0; k < numBins; ++k)
     {
-        const float tSup = 1.0f - tonalMask[static_cast<size_t>(k)];
-        const float trSup = 1.0f - transientMask[static_cast<size_t>(k)];
-        const float sfm = lastFlatness[static_cast<size_t>(k)];
+        float tSup = 1.0f - tonalMask[static_cast<size_t>(k)];
+        float trSup = 1.0f - transientMask[static_cast<size_t>(k)];
+        float sfm = lastFlatness[static_cast<size_t>(k)];
 
-        float noiseScore = sfm * tSup * trSup;
-        if (useHybridMode)
-            noiseScore *= (hpsScore[static_cast<size_t>(k)] < 0.25f ? 1.6f : 1.0f);
+        float noiseScore = sfm * tSup * trSup * 1.15f;
+        if (useHPSSPrePass) noiseScore *= (1.0f - hpPercussiveMask[static_cast<size_t>(k)] * 0.6f);
+        if (useHybridMode && hpsScore[static_cast<size_t>(k)] < 0.22f) noiseScore *= 1.65f;
 
-        noiseMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, noiseScore * 1.2f);
+        noiseMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, noiseScore);
     }
 
     // === Smoothing & Overlay (unverändert) ===
