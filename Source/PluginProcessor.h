@@ -116,6 +116,26 @@ private:
     std::unique_ptr<ObjectDatabase> objectDatabase;
     TimelineData timelineData;
 
+        // Hybrider Segmentation (PR5 Erweiterung)
+    std::array<float, SpectralFrameBuffer::NUM_BINS> hpsScore{};           // Harmonic Product Spectrum
+    std::array<float, SpectralFrameBuffer::NUM_BINS> broadbandFlux{};      // Für Transienten
+    bool useHybridMode = true;  // später als Parameter
+
+    // === Hybrid Segmentation + HPSS Pre-Pass (Step 2) ===
+    std::array<float, SpectralFrameBuffer::NUM_BINS> hpHarmonicMask{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> hpPercussiveMask{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> hpsScore{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> broadbandFlux{};
+
+    bool useHybridMode = true;
+    bool useHPSSPrePass = true;           // Neuer Schalter
+    int hpssIterations = 3;               // Für Median-Filter
+    
+    // === Log-Attack-Time für Transienten (Step 3) ===
+    std::array<float, SpectralFrameBuffer::NUM_BINS> attackSlope{};        // aktuelle Steilheit pro Bin
+    std::array<float, SpectralFrameBuffer::NUM_BINS> lastAttackTime{};     // LAT pro Bin
+    float globalAttackSlope = 0.0f;                                        // für Frame-Level Entscheidung
+
     // PR5: rule-based segmentation backend
     mutable juce::CriticalSection segmentationLock;
     std::array<float, SpectralFrameBuffer::NUM_BINS> previousMagnitudes{};
