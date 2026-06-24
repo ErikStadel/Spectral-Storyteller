@@ -41,6 +41,11 @@ private:
     bool useHPSSPrePass = true;           // Neuer Schalter
     int hpssIterations = 3;               // Für Median-Filter
     
+    // === Log-Attack-Time für Transienten (Step 3) ===
+    std::array<float, SpectralFrameBuffer::NUM_BINS> attackSlope{};        // aktuelle Steilheit pro Bin
+    std::array<float, SpectralFrameBuffer::NUM_BINS> lastAttackTime{};     // LAT pro Bin
+    float globalAttackSlope = 0.0f;                                        // für Frame-Level Entscheidung
+
     // Object management sidebar
     std::unique_ptr<ObjectSidebar> objectSidebar;
 

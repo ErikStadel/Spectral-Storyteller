@@ -513,7 +513,7 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
     std::array<float, numBins> transientMask{};
     std::array<float, numBins> noiseMask{};
 
-    // === FFT Magnitude berechnen ===
+    // === FFT + Flux + ODF (unverändert) ===
     float hfc = 0.0f;
     for (int k = 0; k < numBins; ++k)
     {
@@ -692,7 +692,35 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         }
     }
 
-    // === Masken-Berechnung ===
+    // === NEU: Log-Attack-Time Berechnung ===
+    float totalAttackSlope = 0.0f;
+    int attackBins = 0;
+
+    if (isTransientFrame)
+    {
+        for (int k = 0; k < numBins; ++k)
+        {
+            const float currentEnergy = magLin[static_cast<size_t>(k)];
+            const float prevEnergy = hasPreviousMagnitudes ? previousMagnitudes[static_cast<size_t>(k)] : currentEnergy;
+            
+            // Steilheit des Anstiegs (Attack Slope)
+            float slope = (currentEnergy - prevEnergy) / (prevEnergy + eps);
+            attackSlope[static_cast<size_t>(k)] = slope;
+
+            // Log-Attack-Time approximiert (je steiler, desto kleiner LAT)
+            lastAttackTime[static_cast<size_t>(k)] = std::log10(1.0f / (slope + eps) + 1.0f);
+
+            if (slope > 0.15f)  // nur starke Anstiege zählen
+            {
+                totalAttackSlope += slope;
+                ++attackBins;
+            }
+        }
+
+        globalAttackSlope = attackBins > 0 ? totalAttackSlope / attackBins : 0.0f;
+    }
+
+   // === Masken-Verfeinerung mit LAT ===
     if (isTransientFrame)
     {
         float meanPos = 0.0f;
@@ -704,8 +732,16 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         for (int k = 0; k < numBins; ++k)
         {
             float score = (posDeltaLog[static_cast<size_t>(k)] - thresh) / (thresh + eps);
-            if (useHPSSPrePass) score *= hpPercussiveMask[static_cast<size_t>(k)] * 1.4f;
-            if (useHybridMode)  score *= (1.0f + broadbandFlux[static_cast<size_t>(k)] * 0.75f);
+
+            // LAT-Boost: kurze Attack-Time = starker Transient
+            if (useHybridMode)
+            {
+                const float latFactor = juce::jlimit(0.0f, 2.5f, 3.0f / (lastAttackTime[static_cast<size_t>(k)] + 0.3f));
+                score *= (1.0f + broadbandFlux[static_cast<size_t>(k)] * 0.75f + latFactor * 0.65f);
+            }
+
+            if (useHPSSPrePass)
+                score *= hpPercussiveMask[static_cast<size_t>(k)] * 1.4f;
 
             transientMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, score);
         }
