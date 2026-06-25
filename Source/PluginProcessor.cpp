@@ -26,11 +26,18 @@ PluginProcessor::PluginProcessor()
     accumulatedTransient.fill(0.0f);
     accumulatedTonal.fill(0.0f);
     accumulatedNoise.fill(0.0f);
+    peakTransient.fill(0.0f);
+    peakTonal.fill(0.0f);
+    peakNoise.fill(0.0f);
+    recordedMagnitudeFrames.clear();
     previousLogMagnitudes.fill(0.0f);
     tonalPersistence.fill(0.0f);
     spectralFluxHistory.clear();
     hfcHistory.clear();
     odfHistory.clear();
+    transientMeanHistory.clear();
+    tonalMeanHistory.clear();
+    noiseMeanHistory.clear();
     hasPreviousMagnitudes = false;
     autoDetectActive = false;
     autoDetectRecording = false;
@@ -84,9 +91,16 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     overlayTransient.fill(0.0f);
     overlayTonal.fill(0.0f);
     overlayNoise.fill(0.0f);
+    peakTransient.fill(0.0f);
+    peakTonal.fill(0.0f);
+    peakNoise.fill(0.0f);
+    recordedMagnitudeFrames.clear();
     spectralFluxHistory.clear();
     hfcHistory.clear();
     odfHistory.clear();
+    transientMeanHistory.clear();
+    tonalMeanHistory.clear();
+    noiseMeanHistory.clear();
     hasPreviousMagnitudes = false;
     autoDetectActive = false;
     autoDetectRecording = false;
@@ -136,7 +150,7 @@ void PluginProcessor::updateTargetBinGains()
     }
 
     // --- Step 1: Build object-aware gain mask ---
-    // Baseline pass-through unless muted/solo constrains it.
+    // Baseline pass-through unless solo constrains it.
     std::array<float, ObjectDatabase::NUM_BINS> raw{};
     raw.fill(1.0f);
 
@@ -162,7 +176,7 @@ void PluginProcessor::updateTargetBinGains()
             if (!objectDatabase->getObjectCopy(obj, item))
                 continue;
 
-            if (!item.solo || item.mute)
+            if (!item.solo)
                 continue;
 
             const float objectGain = currentTimelineObjectGains[static_cast<size_t>(obj)];
@@ -181,12 +195,29 @@ void PluginProcessor::updateTargetBinGains()
             if (!objectDatabase->getObjectCopy(obj, item))
                 continue;
 
-            const float objectGain = item.mute ? 0.0f : currentTimelineObjectGains[static_cast<size_t>(obj)];
+            if (item.mute)
+                continue;
+
+            const float objectGain = currentTimelineObjectGains[static_cast<size_t>(obj)];
             for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
             {
                 if (item.mask[static_cast<size_t>(bin)])
                     raw[static_cast<size_t>(bin)] *= objectGain;
             }
+        }
+    }
+
+    // Step B: apply all mute masks after solo/base composition.
+    for (int obj = 0; obj < numObjects; ++obj)
+    {
+        ObjectDatabase::ObjectMask item;
+        if (!objectDatabase->getObjectCopy(obj, item) || !item.mute)
+            continue;
+
+        for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
+        {
+            if (item.mask[static_cast<size_t>(bin)])
+                raw[static_cast<size_t>(bin)] *= 0.0f;
         }
     }
 
@@ -499,6 +530,60 @@ bool PluginProcessor::getSegmentationOverlay(std::array<float, SpectralFrameBuff
     return overlayValid;
 }
 
+juce::String PluginProcessor::getSegmentationDebugText() const
+{
+    juce::ScopedLock sl(segmentationLock);
+
+    float tMean = 0.0f;
+    float tonalMean = 0.0f;
+    float noiseMean = 0.0f;
+    for (int k = 0; k < SpectralFrameBuffer::NUM_BINS; ++k)
+    {
+        tMean += overlayTransient[static_cast<size_t>(k)];
+        tonalMean += overlayTonal[static_cast<size_t>(k)];
+        noiseMean += overlayNoise[static_cast<size_t>(k)];
+    }
+
+    const float invBins = 1.0f / static_cast<float>(SpectralFrameBuffer::NUM_BINS);
+    tMean *= invBins;
+    tonalMean *= invBins;
+    noiseMean *= invBins;
+
+    auto getMinMax = [](const std::deque<float>& hist, float fallback)
+    {
+        float minV = fallback;
+        float maxV = fallback;
+        if (!hist.empty())
+        {
+            minV = hist.front();
+            maxV = hist.front();
+            for (const float v : hist)
+            {
+                minV = juce::jmin(minV, v);
+                maxV = juce::jmax(maxV, v);
+            }
+        }
+        return std::pair<float, float>{ minV, maxV };
+    };
+
+    const auto [tMin, tMax] = getMinMax(transientMeanHistory, tMean);
+    const auto [tonMin, tonMax] = getMinMax(tonalMeanHistory, tonalMean);
+    const auto [nMin, nMax] = getMinMax(noiseMeanHistory, noiseMean);
+    const auto [odfMin, odfMax] = getMinMax(odfHistory, 0.0f);
+    const auto [fluxMin, fluxMax] = getMinMax(spectralFluxHistory, 0.0f);
+    const auto [hfcMin, hfcMax] = getMinMax(hfcHistory, 0.0f);
+
+    juce::String dbg = "Ranges";
+    dbg += "\nT:" + juce::String(tMin * 100.0f, 1) + "-" + juce::String(tMax * 100.0f, 1) + "%";
+    dbg += " Ton:" + juce::String(tonMin * 100.0f, 1) + "-" + juce::String(tonMax * 100.0f, 1) + "%";
+    dbg += " N:" + juce::String(nMin * 100.0f, 1) + "-" + juce::String(nMax * 100.0f, 1) + "%";
+    dbg += "\nODF:" + juce::String(odfMin, 2) + "-" + juce::String(odfMax, 2);
+    dbg += " Flux:" + juce::String(fluxMin, 2) + "-" + juce::String(fluxMax, 2);
+    dbg += " HFC:" + juce::String(hfcMin, 2) + "-" + juce::String(hfcMax, 2);
+    dbg += " Frames:" + juce::String(autoDetectFrameCount);
+    return dbg;
+}
+
 void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int64_t currentSampleIndex)
 {
     juce::ScopedLock sl(segmentationLock);
@@ -507,13 +592,15 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
     constexpr float eps = 1.0e-9f;
 
     std::array<float, numBins> magLin{};
+    std::array<float, numBins> rawMagLin{};
     std::array<float, numBins> logMag{};
     std::array<float, numBins> posDeltaLog{};
     std::array<float, numBins> tonalMask{};
     std::array<float, numBins> transientMask{};
     std::array<float, numBins> noiseMask{};
 
-    // === FFT + Flux + ODF (unverändert) ===
+    // Normalize per-frame magnitude so feature scales are content-level independent.
+    float magSum = 0.0f;
     float hfc = 0.0f;
     for (int k = 0; k < numBins; ++k)
     {
@@ -521,9 +608,20 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         const int imIdx = reIdx + 1;
         const float re = fftInterleaved[reIdx];
         const float im = fftInterleaved[imIdx];
-        magLin[static_cast<size_t>(k)] = std::sqrt(re * re + im * im) + eps;
-        logMag[static_cast<size_t>(k)] = std::log(magLin[static_cast<size_t>(k)]);
-        hfc += static_cast<float>(k + 1) * magLin[static_cast<size_t>(k)];
+        const float rawMag = std::sqrt(re * re + im * im) + eps;
+        rawMagLin[static_cast<size_t>(k)] = rawMag;
+        magLin[static_cast<size_t>(k)] = rawMag;
+        magSum += rawMag;
+    }
+
+    const float frameMeanMag = juce::jmax(eps, magSum / static_cast<float>(numBins));
+    for (int k = 0; k < numBins; ++k)
+    {
+        magLin[static_cast<size_t>(k)] /= frameMeanMag;
+        logMag[static_cast<size_t>(k)] = std::log(magLin[static_cast<size_t>(k)] + eps);
+
+        const float kNorm = static_cast<float>(k + 1) / static_cast<float>(numBins);
+        hfc += kNorm * magLin[static_cast<size_t>(k)];
     }
 
     float spectralFlux = 0.0f;
@@ -561,7 +659,7 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
 
     const float fluxZ = calcZScore(spectralFlux, spectralFluxHistory);
     const float hfcZ = calcZScore(hfc, hfcHistory);
-    const float odf = fluxZ + 0.6f * hfcZ;
+    const float odf = fluxZ + 0.55f * hfcZ;
 
     auto medianMad = [](const std::deque<float>& hist, float& median, float& mad)
     {
@@ -586,11 +684,11 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
     medianMad(odfHistory, odfMedian, odfMad);
 
     bool isTransientFrame = false;
-    const float odfThreshold = odfMedian + 2.8f * juce::jmax(odfMad, 0.15f);
+    const float odfThreshold = odfMedian + 2.0f * juce::jmax(odfMad, 0.12f);
     if (hasPreviousMagnitudes && odf > odfThreshold)
     {
         isTransientFrame = true;
-        transientHoldFrames = 2;
+        transientHoldFrames = 3;
     }
     else if (transientHoldFrames > 0)
     {
@@ -637,28 +735,42 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
 
         for (int iter = 0; iter < hpssIterations; ++iter)
         {
-            // Horizontal Median (Harmonic)
             for (int k = 0; k < numBins; ++k)
             {
-                float vals[3] = { magLin[static_cast<size_t>(juce::jmax(0, k-1))],
-                                  magLin[static_cast<size_t>(k)],
-                                  magLin[static_cast<size_t>(juce::jmin(numBins-1, k+1))] };
+                float vals[5] = {
+                    magLin[static_cast<size_t>(juce::jmax(0, k - 2))],
+                    magLin[static_cast<size_t>(juce::jmax(0, k - 1))],
+                    magLin[static_cast<size_t>(k)],
+                    magLin[static_cast<size_t>(juce::jmin(numBins - 1, k + 1))],
+                    magLin[static_cast<size_t>(juce::jmin(numBins - 1, k + 2))]
+                };
                 std::sort(std::begin(vals), std::end(vals));
-                tempH[static_cast<size_t>(k)] = vals[1];
-            }
-
-            // Vertical Median (Percussive) - vereinfacht über Zeit (hier nur aktueller Frame + vorheriger)
-            for (int k = 0; k < numBins; ++k)
-            {
-                const float prev = hasPreviousMagnitudes ? previousMagnitudes[static_cast<size_t>(k)] : magLin[static_cast<size_t>(k)];
-                float vals[2] = { prev, magLin[static_cast<size_t>(k)] };
-                tempP[static_cast<size_t>(k)] = std::max(vals[0], vals[1]); // einfache Variante
+                tempH[static_cast<size_t>(k)] = vals[2];
             }
 
             for (int k = 0; k < numBins; ++k)
             {
-                hpHarmonicMask[static_cast<size_t>(k)] = tempH[static_cast<size_t>(k)] / (magLin[static_cast<size_t>(k)] + eps);
-                hpPercussiveMask[static_cast<size_t>(k)] = 1.0f - hpHarmonicMask[static_cast<size_t>(k)];
+                const float prev = hasPreviousMagnitudes
+                    ? previousMagnitudes[static_cast<size_t>(k)]
+                    : magLin[static_cast<size_t>(k)];
+
+                const float diff = magLin[static_cast<size_t>(k)] - prev;
+                tempP[static_cast<size_t>(k)] = juce::jmax(0.0f, diff) * 1.2f + std::abs(diff) * 0.2f + eps;
+            }
+
+            for (int k = 0; k < numBins; ++k)
+            {
+                const float harmonicEnergy = tempH[static_cast<size_t>(k)] + eps;
+                const float percussiveEnergy = tempP[static_cast<size_t>(k)] + eps;
+                const float denom = harmonicEnergy + percussiveEnergy;
+
+                const float hMask = harmonicEnergy / denom;
+                const float pMask = percussiveEnergy / denom;
+
+                hpHarmonicMask[static_cast<size_t>(k)] =
+                    0.7f * hpHarmonicMask[static_cast<size_t>(k)] + 0.3f * juce::jlimit(0.0f, 1.0f, hMask);
+                hpPercussiveMask[static_cast<size_t>(k)] =
+                    0.7f * hpPercussiveMask[static_cast<size_t>(k)] + 0.3f * juce::jlimit(0.0f, 1.0f, pMask);
             }
         }
     }
@@ -676,6 +788,17 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             hpsScore[static_cast<size_t>(k)] = std::pow(hps, 0.25f);
         }
 
+        float minHps = hpsScore[0];
+        float maxHps = hpsScore[0];
+        for (int k = 1; k < numBins; ++k)
+        {
+            minHps = juce::jmin(minHps, hpsScore[static_cast<size_t>(k)]);
+            maxHps = juce::jmax(maxHps, hpsScore[static_cast<size_t>(k)]);
+        }
+        const float hpsRange = juce::jmax(1.0e-6f, maxHps - minHps);
+        for (int k = 0; k < numBins; ++k)
+            hpsScore[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, (hpsScore[static_cast<size_t>(k)] - minHps) / hpsRange);
+
         // Broadband Flux
         float lowFluxSum = 0.0f, highFluxSum = 0.0f;
         const int lowCut = numBins / 8;
@@ -686,9 +809,13 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             const float delta = posDeltaLog[static_cast<size_t>(k)];
             if (k < lowCut) lowFluxSum += delta;
             if (k > highCut) highFluxSum += delta;
+        }
 
-            const bool isBroadband = (lowFluxSum > 0.35f && highFluxSum > 0.22f);
-            broadbandFlux[static_cast<size_t>(k)] = delta * (isBroadband ? 1.85f : 1.0f);
+        const bool isBroadband = (lowFluxSum > 0.30f && highFluxSum > 0.18f);
+        for (int k = 0; k < numBins; ++k)
+        {
+            const float delta = posDeltaLog[static_cast<size_t>(k)];
+            broadbandFlux[static_cast<size_t>(k)] = delta * (isBroadband ? 1.35f : 1.0f);
         }
     }
 
@@ -727,11 +854,12 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         for (auto d : posDeltaLog) meanPos += d;
         meanPos /= numBins;
 
-        const float thresh = juce::jmax(0.018f, meanPos * 1.35f);
+        const float thresh = juce::jmax(0.008f, meanPos * 0.95f);
 
         for (int k = 0; k < numBins; ++k)
         {
             float score = (posDeltaLog[static_cast<size_t>(k)] - thresh) / (thresh + eps);
+            const float kNorm = static_cast<float>(k) / static_cast<float>(numBins - 1);
 
             // LAT-Boost: kurze Attack-Time = starker Transient
             if (useHybridMode)
@@ -741,40 +869,75 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             }
 
             if (useHPSSPrePass)
-                score *= hpPercussiveMask[static_cast<size_t>(k)] * 1.4f;
+                score *= (0.55f + 0.9f * hpPercussiveMask[static_cast<size_t>(k)]);
+
+            const float lowMidBoost = 1.0f + 0.25f * juce::jmax(0.0f, 1.0f - std::abs(kNorm - 0.28f) / 0.28f);
+            const float ultraHighPenalty = juce::jlimit(0.72f, 1.0f, 1.0f - 0.55f * juce::jmax(0.0f, kNorm - 0.78f));
+            score *= lowMidBoost * ultraHighPenalty;
 
             transientMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, score);
         }
-    }
-    else
-    {
-        for (int k = 2; k < numBins - 2; ++k)
+
+        std::array<float, numBins> widenedTransient = transientMask;
+        for (int k = 1; k < numBins - 1; ++k)
         {
-            // Bestehende Peak-Prominence-Logik
-            const float centerLin = magLin[static_cast<size_t>(k)];
-            if (!(centerLin > magLin[static_cast<size_t>(k-1)] && centerLin >= magLin[static_cast<size_t>(k+1)]))
-                continue;
-
-            std::array<float, 4> neighDb = {
-                20.0f * std::log10(magLin[static_cast<size_t>(k - 2)] + eps),
-                20.0f * std::log10(magLin[static_cast<size_t>(k - 1)] + eps),
-                20.0f * std::log10(magLin[static_cast<size_t>(k + 1)] + eps),
-                20.0f * std::log10(magLin[static_cast<size_t>(k + 2)] + eps)
-            };
-            std::sort(neighDb.begin(), neighDb.end());
-            const float neighMedianDb = 0.5f * (neighDb[1] + neighDb[2]);
-            const float centerDb = 20.0f * std::log10(centerLin + eps);
-            const float prominenceDb = centerDb - neighMedianDb;
-
-            float tonalCandidate = (prominenceDb > 4.5f) ? 1.0f : 0.0f;
-
-            if (useHPSSPrePass) tonalCandidate *= hpHarmonicMask[static_cast<size_t>(k)];
-            if (useHybridMode)  tonalCandidate *= hpsScore[static_cast<size_t>(k)] * 2.9f;
-
-            tonalPersistence[static_cast<size_t>(k)] = 0.81f * tonalPersistence[static_cast<size_t>(k)] + 0.19f * tonalCandidate;
-
-            tonalMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, (tonalPersistence[static_cast<size_t>(k)] - 0.22f) / 0.78f);
+            const float localPeak = juce::jmax(transientMask[static_cast<size_t>(k)],
+                juce::jmax(transientMask[static_cast<size_t>(k - 1)], transientMask[static_cast<size_t>(k + 1)]));
+            widenedTransient[static_cast<size_t>(k)] = juce::jmax(widenedTransient[static_cast<size_t>(k)], localPeak * 0.72f);
         }
+        transientMask = widenedTransient;
+    }
+
+    // Tonal candidate extraction runs every frame. During transient frames,
+    // persistence is frozen to avoid smearing short attacks into tonal masks.
+    if (!isTransientFrame)
+    {
+        for (auto& p : tonalPersistence)
+            p *= 0.94f;
+    }
+
+    for (int k = 2; k < numBins - 2; ++k)
+    {
+        // Bestehende Peak-Prominence-Logik
+        const float centerLin = magLin[static_cast<size_t>(k)];
+        if (!(centerLin > magLin[static_cast<size_t>(k-1)] && centerLin >= magLin[static_cast<size_t>(k+1)]))
+            continue;
+
+        std::array<float, 4> neighDb = {
+            20.0f * std::log10(magLin[static_cast<size_t>(k - 2)] + eps),
+            20.0f * std::log10(magLin[static_cast<size_t>(k - 1)] + eps),
+            20.0f * std::log10(magLin[static_cast<size_t>(k + 1)] + eps),
+            20.0f * std::log10(magLin[static_cast<size_t>(k + 2)] + eps)
+        };
+        std::sort(neighDb.begin(), neighDb.end());
+        const float neighMedianDb = 0.5f * (neighDb[1] + neighDb[2]);
+        const float centerDb = 20.0f * std::log10(centerLin + eps);
+        const float prominenceDb = centerDb - neighMedianDb;
+
+        float tonalCandidate = juce::jlimit(0.0f, 1.0f, (prominenceDb - 3.0f) / 5.0f);
+
+        // Attenuate very high bands to reduce whistle-like tonal bleed.
+        const float kNorm = static_cast<float>(k) / static_cast<float>(numBins - 1);
+        const float highBandPenalty = juce::jlimit(0.45f, 1.0f, 1.0f - 0.95f * juce::jmax(0.0f, kNorm - 0.62f));
+        tonalCandidate *= highBandPenalty;
+
+        if (useHPSSPrePass)
+        {
+            tonalCandidate *= (0.45f + 0.65f * hpHarmonicMask[static_cast<size_t>(k)]);
+            tonalCandidate *= (1.0f - 0.55f * hpPercussiveMask[static_cast<size_t>(k)]);
+        }
+
+        if (useHybridMode)
+            tonalCandidate *= (0.55f + 0.75f * hpsScore[static_cast<size_t>(k)]);
+
+        if (!isTransientFrame)
+        {
+            tonalPersistence[static_cast<size_t>(k)] =
+                0.90f * tonalPersistence[static_cast<size_t>(k)] + 0.10f * tonalCandidate;
+        }
+
+        tonalMask[static_cast<size_t>(k)] =
+            juce::jlimit(0.0f, 1.0f, (tonalPersistence[static_cast<size_t>(k)] - 0.14f) / 0.86f);
     }
 
     // === Ambient als verbesserte Restklasse ===
@@ -784,11 +947,20 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         float trSup = 1.0f - transientMask[static_cast<size_t>(k)];
         float sfm = lastFlatness[static_cast<size_t>(k)];
 
-        float noiseScore = sfm * tSup * trSup * 1.15f;
-        if (useHPSSPrePass) noiseScore *= (1.0f - hpPercussiveMask[static_cast<size_t>(k)] * 0.6f);
-        if (useHybridMode && hpsScore[static_cast<size_t>(k)] < 0.22f) noiseScore *= 1.65f;
+        const float flatnessGate = juce::jlimit(0.0f, 1.0f, (sfm - 0.32f) / 0.40f);
+        float noiseScore = flatnessGate * std::pow(juce::jmax(0.0f, tSup * trSup), 0.65f);
 
-        noiseMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, noiseScore);
+        if (useHPSSPrePass)
+        {
+            const float nonHarmonic = 1.0f - hpHarmonicMask[static_cast<size_t>(k)];
+            const float nonPercussive = 1.0f - hpPercussiveMask[static_cast<size_t>(k)];
+            noiseScore *= (0.35f + 0.65f * nonHarmonic) * (0.60f + 0.40f * nonPercussive);
+        }
+
+        if (useHybridMode)
+            noiseScore *= (0.55f + 0.45f * (1.0f - hpsScore[static_cast<size_t>(k)]));
+
+        noiseMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, noiseScore * 0.82f);
     }
 
     // === Smoothing & Overlay (unverändert) ===
@@ -799,15 +971,17 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
 
     for (int k = 0; k < numBins; ++k)
     {
-        const float sum = smoothTransient[static_cast<size_t>(k)]
-                        + smoothTonal[static_cast<size_t>(k)]
-                        + smoothNoise[static_cast<size_t>(k)];
+        const float transW = smoothTransient[static_cast<size_t>(k)] * 1.35f;
+        const float tonalW = smoothTonal[static_cast<size_t>(k)] * 1.20f;
+        const float noiseW = smoothNoise[static_cast<size_t>(k)] * 0.65f;
+        const float maxW = juce::jmax(transW, juce::jmax(tonalW, noiseW));
+        const float sum = transW + tonalW + noiseW;
 
-        if (sum > 1.0e-5f)
+        if (sum > 1.0e-5f && maxW > 0.05f)
         {
-            overlayTransient[static_cast<size_t>(k)] = smoothTransient[static_cast<size_t>(k)] / sum;
-            overlayTonal[static_cast<size_t>(k)] = smoothTonal[static_cast<size_t>(k)] / sum;
-            overlayNoise[static_cast<size_t>(k)] = smoothNoise[static_cast<size_t>(k)] / sum;
+            overlayTransient[static_cast<size_t>(k)] = transW / sum;
+            overlayTonal[static_cast<size_t>(k)] = tonalW / sum;
+            overlayNoise[static_cast<size_t>(k)] = noiseW / sum;
         }
         else
         {
@@ -821,17 +995,49 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             accumulatedTransient[static_cast<size_t>(k)] += overlayTransient[static_cast<size_t>(k)];
             accumulatedTonal[static_cast<size_t>(k)] += overlayTonal[static_cast<size_t>(k)];
             accumulatedNoise[static_cast<size_t>(k)] += overlayNoise[static_cast<size_t>(k)];
+            peakTransient[static_cast<size_t>(k)] = juce::jmax(peakTransient[static_cast<size_t>(k)], overlayTransient[static_cast<size_t>(k)]);
+            peakTonal[static_cast<size_t>(k)] = juce::jmax(peakTonal[static_cast<size_t>(k)], overlayTonal[static_cast<size_t>(k)]);
+            peakNoise[static_cast<size_t>(k)] = juce::jmax(peakNoise[static_cast<size_t>(k)], overlayNoise[static_cast<size_t>(k)]);
         }
 
         previousMagnitudes[static_cast<size_t>(k)] = magLin[static_cast<size_t>(k)];
         previousLogMagnitudes[static_cast<size_t>(k)] = logMag[static_cast<size_t>(k)];
     }
 
+    // Track frame-level class means over a sliding window for debug stability.
+    float frameTransientMean = 0.0f;
+    float frameTonalMean = 0.0f;
+    float frameNoiseMean = 0.0f;
+    for (int k = 0; k < numBins; ++k)
+    {
+        frameTransientMean += overlayTransient[static_cast<size_t>(k)];
+        frameTonalMean += overlayTonal[static_cast<size_t>(k)];
+        frameNoiseMean += overlayNoise[static_cast<size_t>(k)];
+    }
+    const float invBins = 1.0f / static_cast<float>(numBins);
+    frameTransientMean *= invBins;
+    frameTonalMean *= invBins;
+    frameNoiseMean *= invBins;
+
+    transientMeanHistory.push_back(frameTransientMean);
+    tonalMeanHistory.push_back(frameTonalMean);
+    noiseMeanHistory.push_back(frameNoiseMean);
+
+    static constexpr size_t overlayHistWindow = 96;
+    while (transientMeanHistory.size() > overlayHistWindow)
+        transientMeanHistory.pop_front();
+    while (tonalMeanHistory.size() > overlayHistWindow)
+        tonalMeanHistory.pop_front();
+    while (noiseMeanHistory.size() > overlayHistWindow)
+        noiseMeanHistory.pop_front();
+
     overlayValid = true;
     hasPreviousMagnitudes = true;
 
     if (autoDetectActive || autoDetectRecording)
     {
+        recordedMagnitudeFrames.push_back(rawMagLin);
+
         ++autoDetectFrameCount;
         if (isTransientFrame)
             ++autoDetectTransientFrameCount;
@@ -876,6 +1082,10 @@ void PluginProcessor::resetAutoDetectAccumulation()
     accumulatedTransient.fill(0.0f);
     accumulatedTonal.fill(0.0f);
     accumulatedNoise.fill(0.0f);
+    peakTransient.fill(0.0f);
+    peakTonal.fill(0.0f);
+    peakNoise.fill(0.0f);
+    recordedMagnitudeFrames.clear();
     autoDetectFrameCount = 0;
     autoDetectTransientFrameCount = 0;
     autoDetectNonTransientFrameCount = 0;
@@ -892,21 +1102,276 @@ void PluginProcessor::finalizeAutoDetectedObjects()
     std::array<bool, SpectralFrameBuffer::NUM_BINS> tonalMask{};
     std::array<bool, SpectralFrameBuffer::NUM_BINS> noiseMask{};
 
-    const float transientNorm = static_cast<float>(juce::jmax(1, autoDetectTransientFrameCount));
-    const float nonTransientNorm = static_cast<float>(juce::jmax(1, autoDetectNonTransientFrameCount));
-
-    for (int k = 0; k < SpectralFrameBuffer::NUM_BINS; ++k)
+    if (recordedMagnitudeFrames.size() < 4)
     {
-        const float t = accumulatedTransient[static_cast<size_t>(k)] / transientNorm;
-        const float tn = accumulatedTonal[static_cast<size_t>(k)] / nonTransientNorm;
-        const float n = accumulatedNoise[static_cast<size_t>(k)] / nonTransientNorm;
+        objectDatabase->addObject("Transients");
+        objectDatabase->setObjectMask(0, transientMask);
+        objectDatabase->setObjectColor(0, static_cast<int>(juce::Colour(0xFFFF5252).getARGB()));
 
-        if (t >= tn && t >= n && t > 0.15f)
+        objectDatabase->addObject("Tonal Components");
+        objectDatabase->setObjectMask(1, tonalMask);
+        objectDatabase->setObjectColor(1, static_cast<int>(juce::Colour(0xFF4AA3FF).getARGB()));
+
+        objectDatabase->addObject("Ambient Noise");
+        objectDatabase->setObjectMask(2, noiseMask);
+        objectDatabase->setObjectColor(2, static_cast<int>(juce::Colour(0xFF4FD16A).getARGB()));
+        return;
+    }
+
+    constexpr int numBins = SpectralFrameBuffer::NUM_BINS;
+    constexpr float eps = 1.0e-9f;
+    const int numFrames = static_cast<int>(recordedMagnitudeFrames.size());
+
+    std::vector<std::array<float, numBins>> hBase(static_cast<size_t>(numFrames));
+    std::vector<std::array<float, numBins>> pBase(static_cast<size_t>(numFrames));
+    std::vector<std::array<float, numBins>> transientFinal(static_cast<size_t>(numFrames));
+    std::vector<std::array<float, numBins>> tonalFinal(static_cast<size_t>(numFrames));
+    std::vector<std::array<float, numBins>> ambientFinal(static_cast<size_t>(numFrames));
+
+    // Pass 1: 2D HPSS base masks from fixed-size median-filtered energies.
+    static constexpr int tonalWindowFrames = 15;
+    static constexpr int transientWindowBins = 11;
+    static constexpr int tRadius = tonalWindowFrames / 2;
+    static constexpr int fRadius = transientWindowBins / 2;
+    std::vector<float> work;
+    work.reserve(static_cast<size_t>(juce::jmax(2 * tRadius + 1, 2 * fRadius + 1)));
+
+    auto medianOf = [&work](int radius, auto valueAt)
+    {
+        work.clear();
+        work.reserve(static_cast<size_t>(2 * radius + 1));
+        for (int i = -radius; i <= radius; ++i)
+            work.push_back(valueAt(i));
+
+        const auto midIt = work.begin() + static_cast<std::ptrdiff_t>(work.size() / 2);
+        std::nth_element(work.begin(), midIt, work.end());
+        return *midIt;
+    };
+
+    for (int t = 0; t < numFrames; ++t)
+    {
+        for (int k = 0; k < numBins; ++k)
+        {
+            const float harmonicEnergy = medianOf(tRadius, [&](int dt)
+            {
+                const int tt = juce::jlimit(0, numFrames - 1, t + dt);
+                return recordedMagnitudeFrames[static_cast<size_t>(tt)][static_cast<size_t>(k)];
+            });
+
+            const float percussiveEnergy = medianOf(fRadius, [&](int df)
+            {
+                const int kk = juce::jlimit(0, numBins - 1, k + df);
+                return recordedMagnitudeFrames[static_cast<size_t>(t)][static_cast<size_t>(kk)];
+            });
+
+            const float denom = harmonicEnergy + percussiveEnergy + eps;
+            hBase[static_cast<size_t>(t)][static_cast<size_t>(k)] = harmonicEnergy / denom;
+            pBase[static_cast<size_t>(t)][static_cast<size_t>(k)] = percussiveEnergy / denom;
+        }
+    }
+
+    // Pass 2: rectified broadband flux gatekeeper on frame axis.
+    std::vector<float> rectFlux(static_cast<size_t>(numFrames), 0.0f);
+    for (int t = 1; t < numFrames; ++t)
+    {
+        float flux = 0.0f;
+        for (int k = 0; k < numBins; ++k)
+        {
+            const float d = recordedMagnitudeFrames[static_cast<size_t>(t)][static_cast<size_t>(k)]
+                          - recordedMagnitudeFrames[static_cast<size_t>(t - 1)][static_cast<size_t>(k)];
+            const float pos = juce::jmax(0.0f, d);
+            flux += pos * pos;
+        }
+        rectFlux[static_cast<size_t>(t)] = flux;
+    }
+
+    float fluxMean = 0.0f;
+    for (const float v : rectFlux)
+        fluxMean += v;
+    fluxMean /= static_cast<float>(juce::jmax(1, numFrames));
+    const float fluxThr = juce::jmax(1.0e-6f, fluxMean * 2.5f);
+
+    std::vector<bool> onsetFrame(static_cast<size_t>(numFrames), false);
+    for (int t = 1; t < numFrames - 1; ++t)
+    {
+        const float prev = rectFlux[static_cast<size_t>(t - 1)];
+        const float curr = rectFlux[static_cast<size_t>(t)];
+        const float next = rectFlux[static_cast<size_t>(t + 1)];
+        const bool localPeak = (curr > prev) && (curr > next);
+        onsetFrame[static_cast<size_t>(t)] = localPeak && (curr > fluxThr);
+    }
+
+    for (int t = 0; t < numFrames; ++t)
+    {
+        for (int k = 0; k < numBins; ++k)
+        {
+            const float p = pBase[static_cast<size_t>(t)][static_cast<size_t>(k)];
+            transientFinal[static_cast<size_t>(t)][static_cast<size_t>(k)] =
+                onsetFrame[static_cast<size_t>(t)] ? 1.0f : (0.15f * p);
+        }
+    }
+
+    // Pass 3: local SFM validation for tonal mask.
+    std::vector<float> frameFluxNorm = rectFlux;
+    float fluxMax = 0.0f;
+    for (const float f : rectFlux)
+        fluxMax = juce::jmax(fluxMax, f);
+    const float invFluxMax = (fluxMax > eps) ? (1.0f / fluxMax) : 0.0f;
+    for (auto& v : frameFluxNorm)
+        v *= invFluxMax;
+
+    std::vector<float> globalFlatness(static_cast<size_t>(numFrames), 0.0f);
+    for (int t = 0; t < numFrames; ++t)
+    {
+        float logSum = 0.0f;
+        float sum = 0.0f;
+        for (int k = 0; k < numBins; ++k)
+        {
+            const float m = recordedMagnitudeFrames[static_cast<size_t>(t)][static_cast<size_t>(k)] + eps;
+            logSum += std::log(m);
+            sum += m;
+        }
+        const float geo = std::exp(logSum / static_cast<float>(numBins));
+        const float arith = sum / static_cast<float>(numBins);
+        globalFlatness[static_cast<size_t>(t)] = juce::jlimit(0.0f, 1.0f, geo / (arith + eps));
+    }
+
+    std::vector<std::array<float, numBins>> ambientBias(static_cast<size_t>(numFrames));
+
+    static constexpr int sfmRadius = 4;
+    for (int t = 0; t < numFrames; ++t)
+    {
+        for (int k = 0; k < numBins; ++k)
+        {
+            float tonal = hBase[static_cast<size_t>(t)][static_cast<size_t>(k)];
+
+            float logSum = 0.0f;
+            float linSum = 0.0f;
+            int n = 0;
+            for (int df = -sfmRadius; df <= sfmRadius; ++df)
+            {
+                const int kk = juce::jlimit(0, numBins - 1, k + df);
+                const float m = recordedMagnitudeFrames[static_cast<size_t>(t)][static_cast<size_t>(kk)] + eps;
+                logSum += std::log(m);
+                linSum += m;
+                ++n;
+            }
+            const float geo = std::exp(logSum / static_cast<float>(juce::jmax(1, n)));
+            const float arith = linSum / static_cast<float>(juce::jmax(1, n));
+            const float localSfm = juce::jlimit(0.0f, 1.0f, geo / (arith + eps));
+
+            const float freqHz = (static_cast<float>(k) / static_cast<float>(juce::jmax(1, numBins - 1)))
+                               * static_cast<float>(0.5 * currentSampleRate);
+            const bool isBass = (freqHz < 200.0f);
+
+            if (localSfm > 0.6f)
+                tonal = 0.0f;
+
+            if (isBass && localSfm > 0.50f)
+            {
+                tonal = 0.0f;
+                ambientBias[static_cast<size_t>(t)][static_cast<size_t>(k)] = 1.0f;
+            }
+
+            if (onsetFrame[static_cast<size_t>(t)])
+                tonal *= 0.2f;
+
+            tonalFinal[static_cast<size_t>(t)][static_cast<size_t>(k)] = tonal;
+        }
+    }
+
+    // Pass 4: ambient as residual + positive noise evidence.
+    for (int t = 0; t < numFrames; ++t)
+    {
+        const float lowFluxFactor = 1.0f - juce::jlimit(0.0f, 1.0f, frameFluxNorm[static_cast<size_t>(t)]);
+        const float flatBoostFrame = juce::jlimit(0.0f, 1.0f, (globalFlatness[static_cast<size_t>(t)] - 0.5f) / 0.4f);
+
+        for (int k = 0; k < numBins; ++k)
+        {
+            const float tMask = transientFinal[static_cast<size_t>(t)][static_cast<size_t>(k)];
+            const float hMask = tonalFinal[static_cast<size_t>(t)][static_cast<size_t>(k)];
+            const float residual = juce::jlimit(0.0f, 1.0f, 1.0f - tMask - hMask);
+            const float noiseBoost = 0.35f * flatBoostFrame * lowFluxFactor;
+            const float bassBoost = 0.60f * ambientBias[static_cast<size_t>(t)][static_cast<size_t>(k)];
+            ambientFinal[static_cast<size_t>(t)][static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, residual + noiseBoost + bassBoost);
+        }
+    }
+
+    // Aggregate frame masks into per-bin object scores.
+    std::array<float, numBins> transientScores{};
+    std::array<float, numBins> tonalScores{};
+    std::array<float, numBins> noiseScores{};
+    for (int k = 0; k < numBins; ++k)
+    {
+        float tSum = 0.0f;
+        float hSum = 0.0f;
+        float nSum = 0.0f;
+        for (int t = 0; t < numFrames; ++t)
+        {
+            tSum += transientFinal[static_cast<size_t>(t)][static_cast<size_t>(k)];
+            hSum += tonalFinal[static_cast<size_t>(t)][static_cast<size_t>(k)];
+            nSum += ambientFinal[static_cast<size_t>(t)][static_cast<size_t>(k)];
+        }
+
+        const float invFrames = 1.0f / static_cast<float>(numFrames);
+        transientScores[static_cast<size_t>(k)] = tSum * invFrames;
+        tonalScores[static_cast<size_t>(k)] = hSum * invFrames;
+        noiseScores[static_cast<size_t>(k)] = nSum * invFrames;
+    }
+
+    auto percentile = [](std::vector<float> values, float q)
+    {
+        if (values.empty())
+            return 0.0f;
+        q = juce::jlimit(0.0f, 1.0f, q);
+        const size_t idx = static_cast<size_t>(q * static_cast<float>(values.size() - 1));
+        std::nth_element(values.begin(), values.begin() + static_cast<std::ptrdiff_t>(idx), values.end());
+        return values[idx];
+    };
+
+    std::vector<float> tVals(transientScores.begin(), transientScores.end());
+    std::vector<float> hVals(tonalScores.begin(), tonalScores.end());
+    std::vector<float> nVals(noiseScores.begin(), noiseScores.end());
+
+    const float tThr = juce::jmax(0.22f, percentile(tVals, 0.62f));
+    const float hThr = juce::jmax(0.08f, percentile(hVals, 0.64f));
+    const float nThr = juce::jmax(0.10f, percentile(nVals, 0.60f));
+
+    for (int k = 0; k < numBins; ++k)
+    {
+        const float t = transientScores[static_cast<size_t>(k)];
+        const float h = tonalScores[static_cast<size_t>(k)];
+        const float n = noiseScores[static_cast<size_t>(k)];
+
+        bool assigned = false;
+
+        if (t >= h && t >= n && t > tThr)
+        {
             transientMask[static_cast<size_t>(k)] = true;
-        else if (tn >= t && tn >= n && tn > 0.12f)
+            assigned = true;
+        }
+        else if (h >= t && h >= n && h > hThr)
+        {
             tonalMask[static_cast<size_t>(k)] = true;
-        else if (n > 0.12f)
+            assigned = true;
+        }
+        else if (n > nThr)
+        {
             noiseMask[static_cast<size_t>(k)] = true;
+            assigned = true;
+        }
+
+        // Strict residual assignment over full bin range (0..Nyquist):
+        // never leave bins unassigned, to avoid artificial cuts in any path.
+        if (!assigned)
+        {
+            if (t >= h && t >= n)
+                transientMask[static_cast<size_t>(k)] = true;
+            else if (h >= t && h >= n)
+                tonalMask[static_cast<size_t>(k)] = true;
+            else
+                noiseMask[static_cast<size_t>(k)] = true;
+        }
     }
 
     objectDatabase->addObject("Transients");

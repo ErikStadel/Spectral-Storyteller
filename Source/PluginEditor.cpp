@@ -16,6 +16,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         return processor.getSegmentationOverlay(transient, tonal, noise);
     });
+    spectralView->setDebugTextProvider([this]()
+    {
+        return processor.getSegmentationDebugText();
+    });
     addAndMakeVisible(*spectralView);
 
     // Create spectrogram selector (lasso/rectangle overlay)
@@ -145,6 +149,13 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     dryWetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.getValueTreeState(), "dryWet", dryWetSlider);
 
+    copyDebugButton.setTooltip("Kopiert Debug-Ranges in die Zwischenablage");
+    copyDebugButton.onClick = [this]()
+    {
+        juce::SystemClipboard::copyTextToClipboard(processor.getSegmentationDebugText());
+    };
+    addAndMakeVisible(copyDebugButton);
+
     // Version info
     versionLabel.setText(processor.getBuildInfo(), juce::dontSendNotification);
     versionLabel.setJustificationType(juce::Justification::bottomRight);
@@ -164,8 +175,11 @@ void PluginEditor::resized()
 {
     auto area = getLocalBounds().reduced(12);
     
-    // Top: version label (18px height)
-    versionLabel.setBounds(area.removeFromTop(18));
+    // Top: copy button + version label (24px height)
+    auto topBar = area.removeFromTop(24);
+    copyDebugButton.setBounds(topBar.removeFromLeft(112).reduced(0, 2));
+    topBar.removeFromLeft(8);
+    versionLabel.setBounds(topBar);
     area.removeFromTop(8);  // spacing
     
     // Reserve timeline strip; we will place it after side/center layout so the left object panel

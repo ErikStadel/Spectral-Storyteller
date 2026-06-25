@@ -40,6 +40,7 @@ public:
     void setSegmentationOverlayProvider(std::function<bool(std::array<float, SpectralFrameBuffer::NUM_BINS>&,
                                                             std::array<float, SpectralFrameBuffer::NUM_BINS>&,
                                                             std::array<float, SpectralFrameBuffer::NUM_BINS>&)> provider);
+    void setDebugTextProvider(std::function<juce::String()> provider);
     int getBinForY(int y) const;
 
 private:
@@ -72,6 +73,8 @@ private:
     std::array<float, SpectralFrameBuffer::NUM_BINS> overlayTonal{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> overlayNoise{};
     bool hasOverlay = false;
+    std::function<juce::String()> debugTextProvider;
+    juce::String debugText;
 
     // 512-Einträge Farb-LUT
     static constexpr int LUT_SIZE = 512;

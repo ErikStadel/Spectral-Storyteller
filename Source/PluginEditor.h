@@ -44,6 +44,7 @@ private:
     
     // Attachments & UI
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dryWetAttachment;
+    juce::TextButton copyDebugButton{ "Copy Debug" };
     juce::Label versionLabel;
     juce::TooltipWindow tooltipWindow;
 

@@ -12,7 +12,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 5;
-constexpr int VERSION_BUILD = 1;
+constexpr int VERSION_BUILD = 8;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -75,6 +75,7 @@ public:
     bool getSegmentationOverlay(std::array<float, SpectralFrameBuffer::NUM_BINS>& transient,
                                 std::array<float, SpectralFrameBuffer::NUM_BINS>& tonal,
                                 std::array<float, SpectralFrameBuffer::NUM_BINS>& noise) const;
+    juce::String getSegmentationDebugText() const;
     double getTransportSeconds() const noexcept { return transportSeconds.load(); }
     bool isTransportPlaying() const noexcept { return transportPlaying.load(); }
 
@@ -116,11 +117,6 @@ private:
     std::unique_ptr<ObjectDatabase> objectDatabase;
     TimelineData timelineData;
 
-        // Hybrider Segmentation (PR5 Erweiterung)
-    std::array<float, SpectralFrameBuffer::NUM_BINS> hpsScore{};           // Harmonic Product Spectrum
-    std::array<float, SpectralFrameBuffer::NUM_BINS> broadbandFlux{};      // Für Transienten
-    bool useHybridMode = true;  // später als Parameter
-
     // === Hybrid Segmentation + HPSS Pre-Pass (Step 2) ===
     std::array<float, SpectralFrameBuffer::NUM_BINS> hpHarmonicMask{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> hpPercussiveMask{};
@@ -146,11 +142,18 @@ private:
     std::array<float, SpectralFrameBuffer::NUM_BINS> accumulatedTransient{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> accumulatedTonal{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> accumulatedNoise{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> peakTransient{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> peakTonal{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> peakNoise{};
+    std::vector<std::array<float, SpectralFrameBuffer::NUM_BINS>> recordedMagnitudeFrames;
     std::array<float, SpectralFrameBuffer::NUM_BINS> previousLogMagnitudes{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> tonalPersistence{};
     std::deque<float> spectralFluxHistory;
     std::deque<float> hfcHistory;
     std::deque<float> odfHistory;
+    std::deque<float> transientMeanHistory;
+    std::deque<float> tonalMeanHistory;
+    std::deque<float> noiseMeanHistory;
     bool hasPreviousMagnitudes = false;
     bool autoDetectActive = false;
     bool autoDetectRecording = false;
