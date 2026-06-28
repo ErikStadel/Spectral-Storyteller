@@ -13,7 +13,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 6;
-constexpr int VERSION_BUILD = 12;
+constexpr int VERSION_BUILD = 14;
 
 class PluginProcessor : public juce::AudioProcessor
 {

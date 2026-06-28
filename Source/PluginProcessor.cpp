@@ -278,12 +278,6 @@ void PluginProcessor::updateTargetBinGains()
                 0.5f);
 
             TransformSettings transformSettings;
-            transformSettings.modulatorGain = juce::jlimit(0.0f,
-                                                           4.0f,
-                                                           objectDatabase->getObjectFxParameterValue(item.id,
-                                                                                                    "Transform",
-                                                                                                    "Gain",
-                                                                                                    1.0f));
             transformSettings.amount = juce::jlimit(0.0f,
                                                     1.0f,
                                                     objectDatabase->getInterpolatedAutomationValue(item.id,
@@ -763,7 +757,8 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
         const float carrierPhase = std::atan2(im, re);
         const float normalizedModMag = smoothed;
         const float scaledModMag = normalizedModMag * settings.modulatorGain;
-        const float morphedMag = ((1.0f - settings.amount) * carrierMag) + (settings.amount * scaledModMag);
+        const float morphedMag = ((1.0f - settings.amount) * carrierMag)
+                       + (settings.amount * smoothed);
 
         fftData[2 * bin] = morphedMag * std::cos(carrierPhase);
         fftData[2 * bin + 1] = morphedMag * std::sin(carrierPhase);
@@ -1186,24 +1181,6 @@ void PluginProcessor::loadTransformFileAsync(int objectId, const juce::File& fil
 
         if (frames.empty())
             frames.push_back(makeFrameFromFile(fileAudio, localFft, window, fftSize, 0));
-
-        float peakMagnitude = 0.0f;
-        for (const auto& frame : frames)
-        {
-            for (float magnitude : frame)
-                peakMagnitude = juce::jmax(peakMagnitude, magnitude);
-        }
-
-        const float targetPeak = std::pow(10.0f, -0.1f / 20.0f);
-        const float normaliseGain = (peakMagnitude > 1.0e-5f)
-            ? (targetPeak / peakMagnitude)
-            : 1.0f;
-
-        for (auto& frame : frames)
-        {
-            for (float& magnitude : frame)
-                magnitude *= normaliseGain;
-        }
 
         juce::ScopedLock sl(transformFileLock);
         TransformFileData data;

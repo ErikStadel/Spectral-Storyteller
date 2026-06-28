@@ -60,7 +60,7 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
         fx.selectedParameterIndex = 0;
         fx.parameters.push_back({ "Amount", {} });
         fx.parameters.push_back({ "Smooth", {} });
-        fx.parameters[0].keyframes.push_back({ 0.0, 0.0f, 0.0f });
+        fx.parameters[0].keyframes.push_back({ 0.0, 1.0f, 0.0f });
         fx.parameters[1].keyframes.push_back({ 0.0, 0.0f, 0.0f });
         fx.sourceObjectId = -1;
     }
@@ -906,21 +906,4 @@ bool ObjectDatabase::isAnyMaskingActive() const
     return false;
 }
 
-bool ObjectDatabase::setObjectFxSourceObjectId(int objectId, const std::string& effectName, int sourceId)
-{
-    juce::ScopedLock lock_(lock);
-    for (auto& object : objects)
-    {
-        if (object.id != objectId)
-            continue;
 
-        int fxIndex = findFxIndexByName(object, effectName);
-        if (fxIndex >= 0)
-        {
-            object.fxChain[static_cast<size_t>(fxIndex)].sourceObjectId = sourceId;
-            revision++;
-            return true;
-        }
-    }
-    return false;
-}
