@@ -5,116 +5,114 @@
 
 namespace
 {
-float wrapPhaseToPi(float phase)
-{
-    while (phase > juce::MathConstants<float>::pi)
-        phase -= juce::MathConstants<float>::twoPi;
-    while (phase < -juce::MathConstants<float>::pi)
-        phase += juce::MathConstants<float>::twoPi;
-    return phase;
-}
+    float wrapPhaseToPi(float phase)
+    {
+        while (phase > juce::MathConstants<float>::pi)
+            phase -= juce::MathConstants<float>::twoPi;
+        while (phase < -juce::MathConstants<float>::pi)
+            phase += juce::MathConstants<float>::twoPi;
+        return phase;
+    }
 
-std::array<float, ObjectDatabase::NUM_BINS> buildTransformPresetSpectrum(const juce::String& presetName)
-{
-    std::array<float, ObjectDatabase::NUM_BINS> mags{};
-    mags.fill(0.0f);
+    std::array<float, ObjectDatabase::NUM_BINS> buildTransformPresetSpectrum(const juce::String &presetName)
+    {
+        std::array<float, ObjectDatabase::NUM_BINS> mags{};
+        mags.fill(0.0f);
 
-    const juce::String p = presetName.trim().toLowerCase();
-    if (p.isEmpty())
+        const juce::String p = presetName.trim().toLowerCase();
+        if (p.isEmpty())
+            return mags;
+
+        constexpr int maxHarmonics = 64;
+        constexpr float fundamentalBin = 8.0f;
+
+        auto addHarmonic = [&mags, fundamentalBin](int harmonic, float amplitude)
+        {
+            const int bin = juce::jlimit(0,
+                                         ObjectDatabase::NUM_BINS - 1,
+                                         juce::roundToInt(harmonic * fundamentalBin));
+            mags[static_cast<size_t>(bin)] += juce::jmax(0.0f, amplitude);
+        };
+
+        if (p == "sine")
+        {
+            addHarmonic(1, 1.0f);
+        }
+        else if (p == "saw")
+        {
+            for (int h = 1; h <= maxHarmonics; ++h)
+                addHarmonic(h, 1.0f / static_cast<float>(h));
+        }
+        else if (p == "square")
+        {
+            for (int h = 1; h <= maxHarmonics; h += 2)
+                addHarmonic(h, 1.0f / static_cast<float>(h));
+        }
+        else if (p == "triangle")
+        {
+            for (int h = 1; h <= maxHarmonics; h += 2)
+            {
+                const float sign = ((h / 2) % 2 == 0) ? 1.0f : -1.0f;
+                const float amp = sign / static_cast<float>(h * h);
+                addHarmonic(h, std::abs(amp));
+            }
+        }
+
+        float maxMag = 0.0f;
+        for (float v : mags)
+            maxMag = juce::jmax(maxMag, v);
+        if (maxMag > 1.0e-6f)
+        {
+            for (float &v : mags)
+                v /= maxMag;
+        }
+
         return mags;
-
-    constexpr int maxHarmonics = 64;
-    constexpr float fundamentalBin = 8.0f;
-
-    auto addHarmonic = [&mags, fundamentalBin](int harmonic, float amplitude)
-    {
-        const int bin = juce::jlimit(0,
-                                     ObjectDatabase::NUM_BINS - 1,
-                                     juce::roundToInt(harmonic * fundamentalBin));
-        mags[static_cast<size_t>(bin)] += juce::jmax(0.0f, amplitude);
-    };
-
-    if (p == "sine")
-    {
-        addHarmonic(1, 1.0f);
     }
-    else if (p == "saw")
+
+    std::array<float, ObjectDatabase::NUM_BINS> makeFrameFromFile(const juce::AudioBuffer<float> &audio,
+                                                                  const juce::dsp::FFT &fft,
+                                                                  const std::vector<float> &window,
+                                                                  int fftSize,
+                                                                  int frameStart)
     {
-        for (int h = 1; h <= maxHarmonics; ++h)
-            addHarmonic(h, 1.0f / static_cast<float>(h));
-    }
-    else if (p == "square")
-    {
-        for (int h = 1; h <= maxHarmonics; h += 2)
-            addHarmonic(h, 1.0f / static_cast<float>(h));
-    }
-    else if (p == "triangle")
-    {
-        for (int h = 1; h <= maxHarmonics; h += 2)
+        std::array<float, ObjectDatabase::NUM_BINS> mags{};
+        mags.fill(0.0f);
+
+        std::vector<float> fftData(static_cast<size_t>(2 * fftSize), 0.0f);
+        for (int i = 0; i < fftSize; ++i)
         {
-            const float sign = ((h / 2) % 2 == 0) ? 1.0f : -1.0f;
-            const float amp = sign / static_cast<float>(h * h);
-            addHarmonic(h, std::abs(amp));
-        }
-    }
+            float sample = 0.0f;
+            for (int ch = 0; ch < audio.getNumChannels(); ++ch)
+            {
+                const int sampleIndex = frameStart + i;
+                if (sampleIndex < audio.getNumSamples())
+                    sample += audio.getSample(ch, sampleIndex);
+            }
 
-    float maxMag = 0.0f;
-    for (float v : mags)
-        maxMag = juce::jmax(maxMag, v);
-    if (maxMag > 1.0e-6f)
-    {
-        for (float& v : mags)
-            v /= maxMag;
-    }
-
-    return mags;
-}
-
-std::array<float, ObjectDatabase::NUM_BINS> makeFrameFromFile(const juce::AudioBuffer<float>& audio,
-                                                              const juce::dsp::FFT& fft,
-                                                              const std::vector<float>& window,
-                                                              int fftSize,
-                                                              int frameStart)
-{
-    std::array<float, ObjectDatabase::NUM_BINS> mags{};
-    mags.fill(0.0f);
-
-    std::vector<float> fftData(static_cast<size_t>(2 * fftSize), 0.0f);
-    for (int i = 0; i < fftSize; ++i)
-    {
-        float sample = 0.0f;
-        for (int ch = 0; ch < audio.getNumChannels(); ++ch)
-        {
-            const int sampleIndex = frameStart + i;
-            if (sampleIndex < audio.getNumSamples())
-                sample += audio.getSample(ch, sampleIndex);
+            sample /= juce::jmax(1, audio.getNumChannels());
+            fftData[static_cast<size_t>(i)] = sample * window[static_cast<size_t>(i)];
         }
 
-        sample /= juce::jmax(1, audio.getNumChannels());
-        fftData[static_cast<size_t>(i)] = sample * window[static_cast<size_t>(i)];
-    }
+        fft.performRealOnlyForwardTransform(fftData.data(), false);
+        for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
+        {
+            const float re = fftData[static_cast<size_t>(2 * bin)];
+            const float im = fftData[static_cast<size_t>(2 * bin + 1)];
+            mags[static_cast<size_t>(bin)] = std::sqrt(re * re + im * im);
+        }
 
-    fft.performRealOnlyForwardTransform(fftData.data(), false);
-    for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
-    {
-        const float re = fftData[static_cast<size_t>(2 * bin)];
-        const float im = fftData[static_cast<size_t>(2 * bin + 1)];
-        mags[static_cast<size_t>(bin)] = std::sqrt(re * re + im * im);
+        return mags;
     }
-
-    return mags;
-}
 }
 
 PluginProcessor::PluginProcessor()
     : AudioProcessor(BusesProperties()
-            .withInput("Input", juce::AudioChannelSet::stereo(), true)
-            .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+                         .withInput("Input", juce::AudioChannelSet::stereo(), true)
+                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters(*this, nullptr, juce::Identifier("Parameters"),
-                 {
-                     std::make_unique<juce::AudioParameterFloat>("dryWet", "Dry/Wet", 0.0f, 1.0f, 1.0f),
-                     std::make_unique<juce::AudioParameterFloat>("transientThreshold", "Transient Threshold", -60.0f, 0.0f, -24.0f)
-                 }),
+                 {std::make_unique<juce::AudioParameterFloat>("dryWet", "Dry/Wet", 0.0f, 1.0f, 1.0f),
+                  std::make_unique<juce::AudioParameterFloat>("transientThreshold", "Transient Threshold", -60.0f, 0.0f, -24.0f)}),
       fft(fftOrder),
       window(fftSize),
       fftData(2 * fftSize),
@@ -244,10 +242,9 @@ void PluginProcessor::releaseResources()
 {
 }
 
-bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+bool PluginProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
 {
-    return layouts.getMainInputChannelSet() == juce::AudioChannelSet::stereo()
-        && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
+    return layouts.getMainInputChannelSet() == juce::AudioChannelSet::stereo() && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
 void PluginProcessor::updateTargetBinGains()
@@ -281,18 +278,18 @@ void PluginProcessor::updateTargetBinGains()
             transformSettings.amount = juce::jlimit(0.0f,
                                                     1.0f,
                                                     objectDatabase->getInterpolatedAutomationValue(item.id,
-                                                                                                  "Transform",
-                                                                                                  "Amount",
-                                                                                                  nowSec,
-                                                                                                  0.0f));
+                                                                                                   "Transform",
+                                                                                                   "Amount",
+                                                                                                   nowSec,
+                                                                                                   0.0f));
             transformSettings.smoothMs = juce::jlimit(0.0f,
                                                       500.0f,
                                                       objectDatabase->getInterpolatedAutomationValue(item.id,
                                                                                                      "Transform",
                                                                                                      "Smooth",
                                                                                                      nowSec,
-                                                                                                     0.0f)
-                                                          * 500.0f);
+                                                                                                     0.0f) *
+                                                          500.0f);
             transformSettings.sourceObjectId = objectDatabase->getObjectFxSourceObjectId(item.id, "Transform");
             transformSettingsByObject[item.id] = transformSettings;
 
@@ -304,7 +301,7 @@ void PluginProcessor::updateTargetBinGains()
     static constexpr float objectGainAlpha = 0.20f;
     for (int obj = 0; obj < ObjectDatabase::MAX_OBJECTS; ++obj)
     {
-        float& g = currentTimelineObjectGains[static_cast<size_t>(obj)];
+        float &g = currentTimelineObjectGains[static_cast<size_t>(obj)];
         const float target = timelineObjectGains[static_cast<size_t>(obj)];
         g = objectGainAlpha * target + (1.0f - objectGainAlpha) * g;
     }
@@ -396,10 +393,10 @@ void PluginProcessor::updateTargetBinGains()
 
             float objectGain = currentTimelineObjectGains[static_cast<size_t>(obj)];
             const float pitchNorm = objectDatabase->getInterpolatedAutomationValue(item.id,
-                                                                                    "Pitch",
-                                                                                    "Semitones",
-                                                                                    nowSec,
-                                                                                    0.5f);
+                                                                                   "Pitch",
+                                                                                   "Semitones",
+                                                                                   nowSec,
+                                                                                   0.5f);
             const float objectSemitones = (juce::jlimit(0.0f, 1.0f, pitchNorm) - 0.5f) * 4.0f;
             const bool isTransientObject = juce::String(item.name).equalsIgnoreCase("Transients");
             if (isTransientObject && !transientGateOpen.load())
@@ -440,10 +437,10 @@ void PluginProcessor::updateTargetBinGains()
 
             float objectGain = currentTimelineObjectGains[static_cast<size_t>(obj)];
             const float pitchNorm = objectDatabase->getInterpolatedAutomationValue(item.id,
-                                                                                    "Pitch",
-                                                                                    "Semitones",
-                                                                                    nowSec,
-                                                                                    0.5f);
+                                                                                   "Pitch",
+                                                                                   "Semitones",
+                                                                                   nowSec,
+                                                                                   0.5f);
             const float objectSemitones = (juce::jlimit(0.0f, 1.0f, pitchNorm) - 0.5f) * 4.0f;
             const bool isTransientObject = juce::String(item.name).equalsIgnoreCase("Transients");
             if (isTransientObject && !transientGateOpen.load())
@@ -518,9 +515,8 @@ void PluginProcessor::updateTargetBinGains()
         {
             const int idx = juce::jlimit(0, ObjectDatabase::NUM_BINS - 1, bin + k);
             // Cosine weight: 1 at centre, 0 at ±(radius+1)
-            const float w = 0.5f * (1.0f + std::cos(juce::MathConstants<float>::pi
-                * static_cast<float>(k) / static_cast<float>(radius + 1)));
-            weighted    += raw[static_cast<size_t>(idx)] * w;
+            const float w = 0.5f * (1.0f + std::cos(juce::MathConstants<float>::pi * static_cast<float>(k) / static_cast<float>(radius + 1)));
+            weighted += raw[static_cast<size_t>(idx)] * w;
             totalWeight += w;
         }
 
@@ -552,8 +548,8 @@ void PluginProcessor::updateTargetBinGains()
     {
         const float w = pitchWeight[static_cast<size_t>(bin)];
         targetBinPitchSemitones[static_cast<size_t>(bin)] = (w > 0.0f)
-            ? (pitchSum[static_cast<size_t>(bin)] / w)
-            : 0.0f;
+                                                                ? (pitchSum[static_cast<size_t>(bin)] / w)
+                                                                : 0.0f;
     }
 
     // Note: NO additional gain compensation here.
@@ -600,7 +596,7 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
 
     // DC (k=0)
     {
-        float& gain = currentBinGains[channel][0];
+        float &gain = currentBinGains[channel][0];
         gain = maskSmoothAlpha * targetBinGains[0] + (1.0f - maskSmoothAlpha) * gain;
         fftData[0] *= gain;
         fftData[1] *= gain;
@@ -609,7 +605,7 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
     // Regular positive bins
     for (int bin = 1; bin < nyquistBin; ++bin)
     {
-        float& gain = currentBinGains[channel][static_cast<size_t>(bin)];
+        float &gain = currentBinGains[channel][static_cast<size_t>(bin)];
         gain = maskSmoothAlpha * targetBinGains[static_cast<size_t>(bin)] + (1.0f - maskSmoothAlpha) * gain;
         const int reIdx = 2 * bin;
         const int imIdx = reIdx + 1;
@@ -619,7 +615,7 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
 
     // Nyquist (k=N/2)
     {
-        float& gain = currentBinGains[channel][static_cast<size_t>(nyquistBin)];
+        float &gain = currentBinGains[channel][static_cast<size_t>(nyquistBin)];
         gain = maskSmoothAlpha * targetBinGains[static_cast<size_t>(nyquistBin)] + (1.0f - maskSmoothAlpha) * gain;
         const int reIdx = 2 * nyquistBin;
         const int imIdx = reIdx + 1;
@@ -649,7 +645,7 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
 void PluginProcessor::applyTransformCrossSynthesis(int channel)
 {
     constexpr int nyquistBin = fftSize / 2;
-    auto& smoothStates = transformSmoothStates[channel];
+    auto &smoothStates = transformSmoothStates[channel];
     std::vector<int> firstFrameObjects;
     const bool transportIsPlaying = transportPlaying.load();
     const double transportSec = transportSeconds.load();
@@ -667,23 +663,28 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
         const int carrierObjectId = targetBinDominantObjectIds[static_cast<size_t>(bin)];
         if (carrierObjectId < 0)
             continue;
+        double carrierEnergy = 0.0;
+        for (int b = 0; b <= nyquistBin; ++b)
+            carrierEnergy += static_cast<double>(binMagnitudes[b]) * binMagnitudes[b];
+        const float currentAnalysisRms = static_cast<float>(
+            std::sqrt(carrierEnergy / juce::jmax(1, nyquistBin + 1)));
 
         const auto settingsIt = transformSettingsByObject.find(carrierObjectId);
         if (settingsIt == transformSettingsByObject.end())
             continue;
 
-        const auto& settings = settingsIt->second;
+        const auto &settings = settingsIt->second;
         if (settings.amount <= 1.0e-4f)
             continue;
 
         float modMag = 0.0f;
- if (settings.sourceObjectId >= 0)
+        if (settings.sourceObjectId >= 0)
         {
             ObjectDatabase::ObjectMask sourceObj;
             if (objectDatabase->getObjectCopyById(settings.sourceObjectId, sourceObj))
             {
                 float sourceEnergySq = 0.0f;
-                float sourceWeight   = 0.0f;
+                float sourceWeight = 0.0f;
 
                 for (int sourceBin = 0; sourceBin <= nyquistBin; ++sourceBin)
                 {
@@ -692,46 +693,54 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
 
                     const float sourceMag = currentAnalysisMagnitudes[static_cast<size_t>(sourceBin)];
                     sourceEnergySq += sourceMag * sourceMag;
-                    sourceWeight   += 1.0f;
+                    sourceWeight += 1.0f;
                 }
 
                 // RMS als absolute Magnitude – gleiche Einheit wie carrierMag
                 modMag = (sourceWeight > 0.0f)
-                    ? std::sqrt(sourceEnergySq / sourceWeight)
-                    : 0.0f;
+                             ? std::sqrt(sourceEnergySq / sourceWeight)
+                             : 0.0f;
             }
         }
         else if (settings.sourceObjectId == ObjectDatabase::FILE_SOURCE_ID || settings.sourceObjectId == -3)
         {
-            juce::ScopedLock sl(transformFileLock);
-            const auto fileIt = transformFileBuffer.find(carrierObjectId);
-            if (fileIt != transformFileBuffer.end() && !fileIt->second.frames.empty())
+            // Externer Sound: nur abspielen, wenn DAW-Transport läuft.
+            // -3 = interne Preset-Quelle (statisches Spektrum) → immer aktiv.
+            const bool isExternalFile = (settings.sourceObjectId == ObjectDatabase::FILE_SOURCE_ID);
+            if (isExternalFile && !transportIsPlaying)
             {
-                const auto& sourceData = fileIt->second;
-                const auto& frames = sourceData.frames;
-                const int frameCount = static_cast<int>(frames.size());
-                int frameIndex = 0;
-
-                if (settings.sourceObjectId == ObjectDatabase::FILE_SOURCE_ID)
+                modMag = 0.0f;
+            }
+            else
+            {
+                juce::ScopedLock sl(transformFileLock);
+                const auto fileIt = transformFileBuffer.find(carrierObjectId);
+                if (fileIt != transformFileBuffer.end() && !fileIt->second.frames.empty())
                 {
-                    if (transportIsPlaying && sourceData.durationSeconds > 1.0e-6)
+                    const auto &sourceData = fileIt->second;
+                    const auto &frames = sourceData.frames;
+                    const int frameCount = static_cast<int>(frames.size());
+                    int frameIndex = 0;
+
+                    if (isExternalFile && sourceData.durationSeconds > 1.0e-6)
                     {
+                        // fmod → Loop über die tatsächlich geladene Dauer
                         const double phase = std::fmod(juce::jmax(0.0, transportSec), sourceData.durationSeconds);
                         const double normalized = phase / sourceData.durationSeconds;
-                        frameIndex = juce::jlimit(0, frameCount - 1, static_cast<int>(std::floor(normalized * frameCount)));
+                        frameIndex = juce::jlimit(0, frameCount - 1,
+                                                  static_cast<int>(std::floor(normalized * frameCount)));
                     }
-                }
 
-                modMag = frames[static_cast<size_t>(frameIndex)][static_cast<size_t>(bin)];
+                    modMag = frames[static_cast<size_t>(frameIndex)][static_cast<size_t>(bin)];
+                }
             }
         }
 
-        auto& smoothState = smoothStates[carrierObjectId];
+        auto &smoothState = smoothStates[carrierObjectId];
         const bool isFirstFrame = !smoothState.initialized;
         if (isFirstFrame)
         {
-            const bool seenBefore = std::find(firstFrameObjects.begin(), firstFrameObjects.end(), carrierObjectId)
-                != firstFrameObjects.end();
+            const bool seenBefore = std::find(firstFrameObjects.begin(), firstFrameObjects.end(), carrierObjectId) != firstFrameObjects.end();
             if (!seenBefore)
             {
                 smoothState.smoothedMagnitudes.fill(0.0f);
@@ -742,10 +751,10 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
         const float smoothSec = settings.smoothMs * 0.001f;
         const float frameDt = static_cast<float>(hopSize / juce::jmax(1.0, currentSampleRate));
         const float alpha = (smoothSec <= 1.0e-6f)
-            ? 1.0f
-            : juce::jlimit(0.0f, 1.0f, frameDt / (smoothSec + frameDt));
+                                ? 1.0f
+                                : juce::jlimit(0.0f, 1.0f, frameDt / (smoothSec + frameDt));
 
-        float& smoothed = smoothState.smoothedMagnitudes[static_cast<size_t>(bin)];
+        float &smoothed = smoothState.smoothedMagnitudes[static_cast<size_t>(bin)];
         if (isFirstFrame)
             smoothed = modMag;
         else
@@ -755,10 +764,16 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
         const float im = fftData[2 * bin + 1];
         const float carrierMag = std::sqrt(re * re + im * im);
         const float carrierPhase = std::atan2(im, re);
-        const float normalizedModMag = smoothed;
-        const float scaledModMag = normalizedModMag * settings.modulatorGain;
-        const float morphedMag = ((1.0f - settings.amount) * carrierMag)
-                       + (settings.amount * smoothed);
+
+        // Modulator (normalisiert auf RMS≈1) auf das aktuelle Carrier-Level heben,
+        // damit Amount=1 ungefähr dieselbe Lautstärke ergibt wie das Eingangssignal.
+        const float carrierRefLevel = currentAnalysisRms; // siehe c)
+        const float scaledModMag = smoothed * carrierRefLevel;
+
+        // Gain wirkt auf den INPUT (Carrier), nicht auf den Modulator.
+        const float scaledCarrierMag = carrierMag * settings.modulatorGain;
+
+        const float morphedMag = ((1.0f - settings.amount) * scaledCarrierMag) + (settings.amount * scaledModMag);
 
         fftData[2 * bin] = morphedMag * std::cos(carrierPhase);
         fftData[2 * bin + 1] = morphedMag * std::sin(carrierPhase);
@@ -773,15 +788,13 @@ void PluginProcessor::applyPhaseVocoderPitchShift(int channel)
     constexpr int nyquistBin = fftSize / 2;
     std::array<float, 2 * fftSize> shifted{};
 
-    auto& stateMap = phaseVocoderStates[channel];
-    const float nominalCoeff = juce::MathConstants<float>::twoPi
-        * static_cast<float>(hopSize)
-        / static_cast<float>(fftSize);
+    auto &stateMap = phaseVocoderStates[channel];
+    const float nominalCoeff = juce::MathConstants<float>::twoPi * static_cast<float>(hopSize) / static_cast<float>(fftSize);
 
     for (int k = 0; k <= nyquistBin; ++k)
     {
         const int objectId = juce::jmax(0, targetBinDominantObjectIds[static_cast<size_t>(k)]);
-        auto& objState = stateMap[objectId];
+        auto &objState = stateMap[objectId];
 
         const float re = fftData[2 * k];
         const float im = fftData[2 * k + 1];
@@ -827,7 +840,7 @@ void PluginProcessor::applyPhaseVocoderPitchShift(int channel)
         fftData[static_cast<size_t>(i)] = shifted[static_cast<size_t>(i)];
 }
 
-void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
     juce::ignoreUnused(midiMessages);
@@ -835,7 +848,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const int numSamples = buffer.getNumSamples();
     const int numChannels = juce::jmin(buffer.getNumChannels(), 2);
 
-    if (auto* playHead = getPlayHead())
+    if (auto *playHead = getPlayHead())
     {
         if (auto pos = playHead->getPosition())
         {
@@ -864,7 +877,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     int sampleCount = 0;
     for (int ch = 0; ch < numChannels; ++ch)
     {
-        const float* in = buffer.getReadPointer(ch);
+        const float *in = buffer.getReadPointer(ch);
         for (int i = 0; i < numSamples; ++i)
         {
             const float s = in[i];
@@ -874,8 +887,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     }
 
     const float blockRms = (sampleCount > 0)
-        ? static_cast<float>(std::sqrt(sumSq / static_cast<double>(sampleCount)))
-        : 0.0f;
+                               ? static_cast<float>(std::sqrt(sumSq / static_cast<double>(sampleCount)))
+                               : 0.0f;
     const float thresholdDb = transientThresholdParam != nullptr ? transientThresholdParam->load() : -24.0f;
     const float thresholdLin = std::pow(10.0f, thresholdDb / 20.0f);
     const bool gateTrigger = (blockRms >= thresholdLin);
@@ -895,7 +908,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     for (int ch = 0; ch < numChannels; ++ch)
     {
-        float* channelData = buffer.getWritePointer(ch);
+        float *channelData = buffer.getWritePointer(ch);
 
         for (int i = 0; i < numSamples; ++i)
         {
@@ -909,8 +922,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             if (samplesInBuffer[ch] < fftSize)
                 ++samplesInBuffer[ch];
 
-            if (++samplesSinceLastFrame[ch] >= hopSize
-                && samplesInBuffer[ch] == fftSize)
+            if (++samplesSinceLastFrame[ch] >= hopSize && samplesInBuffer[ch] == fftSize)
             {
                 processStftFrame(ch, currentSampleIndex);
                 samplesSinceLastFrame[ch] = 0;
@@ -918,8 +930,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
             const float norm = outputNormBuffers[ch][bufferPos];
             const float stftSample = (norm > 1.0e-9f)
-                ? (outputBuffers[ch][bufferPos] / norm)
-                : inputSample;
+                                         ? (outputBuffers[ch][bufferPos] / norm)
+                                         : inputSample;
 
             // Smoothly crossfade STFT path in/out to avoid hard route switches.
             const float targetBlend = maskingActive ? 1.0f : 0.0f;
@@ -937,7 +949,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     totalSamplesProcessed += numSamples;
 }
 
-juce::AudioProcessorEditor* PluginProcessor::createEditor()
+juce::AudioProcessorEditor *PluginProcessor::createEditor()
 {
     return new PluginEditor(*this);
 }
@@ -947,7 +959,7 @@ bool PluginProcessor::hasEditor() const
     return true;
 }
 
-void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
+void PluginProcessor::getStateInformation(juce::MemoryBlock &destData)
 {
     auto state = parameters.copyState();
 
@@ -961,7 +973,7 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
         copyXmlToBinary(*xml, destData);
 }
 
-void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
+void PluginProcessor::setStateInformation(const void *data, int sizeInBytes)
 {
     if (auto xmlState = getXmlFromBinary(data, sizeInBytes))
     {
@@ -1014,8 +1026,8 @@ std::vector<TimelineData::Keyframe> PluginProcessor::getTimelineKeyframes(int ob
     const auto keys = objectDatabase->getAutomationKeyframes(objectId, "Volume", "Gain");
     std::vector<TimelineData::Keyframe> out;
     out.reserve(keys.size());
-    for (const auto& k : keys)
-        out.push_back({ k.timeSec, k.value });
+    for (const auto &k : keys)
+        out.push_back({k.timeSec, k.value});
     return out;
 }
 
@@ -1031,7 +1043,7 @@ juce::String PluginProcessor::getTimelineTrackName(int objectIndex) const
     return item.name;
 }
 
-void PluginProcessor::setTimelineTrackName(int objectIndex, const std::string& newName)
+void PluginProcessor::setTimelineTrackName(int objectIndex, const std::string &newName)
 {
     if (objectDatabase == nullptr || objectIndex < 0 || objectIndex >= objectDatabase->getNumObjects())
         return;
@@ -1066,7 +1078,7 @@ std::vector<ObjectDatabase::FXModule> PluginProcessor::getFxChainForSelectedObje
     return getFxChainForObject(getSelectedObjectId());
 }
 
-void PluginProcessor::setObjectFxEnabled(int objectId, const juce::String& effectName, bool enabled)
+void PluginProcessor::setObjectFxEnabled(int objectId, const juce::String &effectName, bool enabled)
 {
     if (objectDatabase == nullptr || objectId < 0)
         return;
@@ -1074,7 +1086,7 @@ void PluginProcessor::setObjectFxEnabled(int objectId, const juce::String& effec
     objectDatabase->setObjectFxEnabled(objectId, effectName.toStdString(), enabled);
 }
 
-void PluginProcessor::addOrEnableObjectFx(int objectId, const juce::String& effectName)
+void PluginProcessor::addOrEnableObjectFx(int objectId, const juce::String &effectName)
 {
     if (objectDatabase == nullptr || objectId < 0)
         return;
@@ -1082,7 +1094,7 @@ void PluginProcessor::addOrEnableObjectFx(int objectId, const juce::String& effe
     objectDatabase->addOrEnableObjectFx(objectId, effectName.toStdString());
 }
 
-void PluginProcessor::setObjectFxSelectedParameter(int objectId, const juce::String& effectName, int parameterIndex)
+void PluginProcessor::setObjectFxSelectedParameter(int objectId, const juce::String &effectName, int parameterIndex)
 {
     if (objectDatabase == nullptr || objectId < 0)
         return;
@@ -1091,8 +1103,8 @@ void PluginProcessor::setObjectFxSelectedParameter(int objectId, const juce::Str
 }
 
 std::vector<ObjectDatabase::AutomationKeyframe> PluginProcessor::getFxAutomationKeyframes(int objectId,
-                                                                                            const juce::String& effectName,
-                                                                                            const juce::String& parameterName) const
+                                                                                          const juce::String &effectName,
+                                                                                          const juce::String &parameterName) const
 {
     if (objectDatabase == nullptr || objectId < 0)
         return {};
@@ -1101,11 +1113,11 @@ std::vector<ObjectDatabase::AutomationKeyframe> PluginProcessor::getFxAutomation
 }
 
 void PluginProcessor::addFxAutomationKeyframe(int objectId,
-                                              const juce::String& effectName,
-                                              const juce::String& parameterName,
+                                              const juce::String &effectName,
+                                              const juce::String &parameterName,
                                               double timeSec,
-                                            float value,
-                                            float curvature)
+                                              float value,
+                                              float curvature)
 {
     if (objectDatabase == nullptr || objectId < 0)
         return;
@@ -1119,8 +1131,8 @@ void PluginProcessor::addFxAutomationKeyframe(int objectId,
 }
 
 void PluginProcessor::setFxAutomationSegmentCurvature(int objectId,
-                                                      const juce::String& effectName,
-                                                      const juce::String& parameterName,
+                                                      const juce::String &effectName,
+                                                      const juce::String &parameterName,
                                                       double segmentStartTimeSec,
                                                       float curvature)
 {
@@ -1150,13 +1162,13 @@ int PluginProcessor::getTransformSourceObjectId(int objectId) const
     return objectDatabase->getObjectFxSourceObjectId(objectId, "Transform");
 }
 
-void PluginProcessor::loadTransformFileAsync(int objectId, const juce::File& file)
+void PluginProcessor::loadTransformFileAsync(int objectId, const juce::File &file)
 {
     if (objectId < 0 || !file.existsAsFile())
         return;
 
     std::thread([this, objectId, file]()
-    {
+                {
         juce::AudioFormatManager formatManager;
         formatManager.registerBasicFormats();
         std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
@@ -1170,6 +1182,28 @@ void PluginProcessor::loadTransformFileAsync(int objectId, const juce::File& fil
         juce::AudioBuffer<float> fileAudio(static_cast<int>(reader->numChannels), static_cast<int>(numSamples));
         if (!reader->read(&fileAudio, 0, static_cast<int>(numSamples), 0, true, true))
             return;
+
+            // Normalisierung auf Basis des RMS
+double sumSq = 0.0;
+int numChannels = fileAudio.getNumChannels();
+int numSamps = fileAudio.getNumSamples();
+
+for (int ch = 0; ch < numChannels; ++ch)
+{
+    auto* data = fileAudio.getReadPointer(ch);
+    for (int i = 0; i < numSamps; ++i)
+        sumSq += static_cast<double>(data[i]) * data[i];
+}
+
+double rms = std::sqrt(sumSq / static_cast<double>(juce::jmax(1, numChannels * numSamps)));
+
+if (rms > 0.0000001) // Schutz gegen Division durch Null
+{
+    float scale = static_cast<float>(1.0 / rms);
+    for (int ch = 0; ch < numChannels; ++ch)
+        fileAudio.applyGain(ch, 0, numSamps, scale);
+}
+
 
         juce::dsp::FFT localFft(fftOrder);
         std::vector<std::array<float, ObjectDatabase::NUM_BINS>> frames;
@@ -1185,12 +1219,12 @@ void PluginProcessor::loadTransformFileAsync(int objectId, const juce::File& fil
         juce::ScopedLock sl(transformFileLock);
         TransformFileData data;
         data.frames = std::move(frames);
-        data.durationSeconds = juce::jmax(0.0, reader->lengthInSamples / reader->sampleRate);
-        transformFileBuffer[objectId] = std::move(data);
-    }).detach();
+        data.durationSeconds = juce::jmax(0.0, static_cast<double>(numSamples) / reader->sampleRate);
+        transformFileBuffer[objectId] = std::move(data); })
+        .detach();
 }
 
-int PluginProcessor::createTransformObjectFromPreset(const juce::String& presetName)
+int PluginProcessor::createTransformObjectFromPreset(const juce::String &presetName)
 {
     if (objectDatabase == nullptr)
         return -1;
@@ -1234,7 +1268,7 @@ int PluginProcessor::createTransformObjectFromPreset(const juce::String& presetN
     return newObjectId;
 }
 
-int PluginProcessor::createTransformObjectFromFile(const juce::File& file)
+int PluginProcessor::createTransformObjectFromFile(const juce::File &file)
 {
     if (objectDatabase == nullptr || !file.existsAsFile())
         return -1;
@@ -1267,8 +1301,8 @@ int PluginProcessor::createTransformObjectFromFile(const juce::File& file)
 }
 
 void PluginProcessor::deleteFxAutomationKeyframe(int objectId,
-                                                 const juce::String& effectName,
-                                                 const juce::String& parameterName,
+                                                 const juce::String &effectName,
+                                                 const juce::String &parameterName,
                                                  double timeSec)
 {
     if (objectDatabase == nullptr || objectId < 0)
@@ -1328,9 +1362,9 @@ bool PluginProcessor::isAutoDetectRunning() const
     return autoDetectActive || autoDetectRecording;
 }
 
-bool PluginProcessor::getSegmentationOverlay(std::array<float, SpectralFrameBuffer::NUM_BINS>& transient,
-                                             std::array<float, SpectralFrameBuffer::NUM_BINS>& tonal,
-                                             std::array<float, SpectralFrameBuffer::NUM_BINS>& noise) const
+bool PluginProcessor::getSegmentationOverlay(std::array<float, SpectralFrameBuffer::NUM_BINS> &transient,
+                                             std::array<float, SpectralFrameBuffer::NUM_BINS> &tonal,
+                                             std::array<float, SpectralFrameBuffer::NUM_BINS> &noise) const
 {
     juce::ScopedLock sl(segmentationLock);
     transient = overlayTransient;
@@ -1358,7 +1392,7 @@ juce::String PluginProcessor::getSegmentationDebugText() const
     tonalMean *= invBins;
     noiseMean *= invBins;
 
-    auto getMinMax = [](const std::deque<float>& hist, float fallback)
+    auto getMinMax = [](const std::deque<float> &hist, float fallback)
     {
         float minV = fallback;
         float maxV = fallback;
@@ -1372,7 +1406,7 @@ juce::String PluginProcessor::getSegmentationDebugText() const
                 maxV = juce::jmax(maxV, v);
             }
         }
-        return std::pair<float, float>{ minV, maxV };
+        return std::pair<float, float>{minV, maxV};
     };
 
     const auto [tMin, tMax] = getMinMax(transientMeanHistory, tMean);
@@ -1393,7 +1427,7 @@ juce::String PluginProcessor::getSegmentationDebugText() const
     return dbg;
 }
 
-void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int64_t currentSampleIndex)
+void PluginProcessor::analyseSegmentationFrame(const float *fftInterleaved, int64_t currentSampleIndex)
 {
     juce::ScopedLock sl(segmentationLock);
 
@@ -1449,7 +1483,7 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
     spectralFluxHistory.push_back(0.0f);
     hfcHistory.push_back(hfc);
     odfHistory.push_back(isTransientFrame ? 1.0f : 0.0f);
-   static constexpr size_t histWindow = 96;
+    static constexpr size_t histWindow = 96;
     while (spectralFluxHistory.size() > histWindow)
         spectralFluxHistory.pop_front();
     while (hfcHistory.size() > histWindow)
@@ -1492,8 +1526,7 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
                     magLin[static_cast<size_t>(juce::jmax(0, k - 1))],
                     magLin[static_cast<size_t>(k)],
                     magLin[static_cast<size_t>(juce::jmin(numBins - 1, k + 1))],
-                    magLin[static_cast<size_t>(juce::jmin(numBins - 1, k + 2))]
-                };
+                    magLin[static_cast<size_t>(juce::jmin(numBins - 1, k + 2))]};
                 std::sort(std::begin(vals), std::end(vals));
                 tempH[static_cast<size_t>(k)] = vals[2];
             }
@@ -1501,8 +1534,8 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             for (int k = 0; k < numBins; ++k)
             {
                 const float prev = hasPreviousMagnitudes
-                    ? previousMagnitudes[static_cast<size_t>(k)]
-                    : magLin[static_cast<size_t>(k)];
+                                       ? previousMagnitudes[static_cast<size_t>(k)]
+                                       : magLin[static_cast<size_t>(k)];
 
                 const float diff = magLin[static_cast<size_t>(k)] - prev;
                 tempP[static_cast<size_t>(k)] = juce::jmax(0.0f, diff) * 1.2f + std::abs(diff) * 0.2f + eps;
@@ -1532,9 +1565,12 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         for (int k = 0; k < numBins; ++k)
         {
             float hps = magLin[static_cast<size_t>(k)];
-            if (k >= 2) hps *= magLin[static_cast<size_t>(k/2)];
-            if (k >= 3) hps *= magLin[static_cast<size_t>(k/3)];
-            if (k >= 4) hps *= magLin[static_cast<size_t>(k/4)];
+            if (k >= 2)
+                hps *= magLin[static_cast<size_t>(k / 2)];
+            if (k >= 3)
+                hps *= magLin[static_cast<size_t>(k / 3)];
+            if (k >= 4)
+                hps *= magLin[static_cast<size_t>(k / 4)];
             hpsScore[static_cast<size_t>(k)] = std::pow(hps, 0.25f);
         }
 
@@ -1557,8 +1593,10 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         for (int k = 0; k < numBins; ++k)
         {
             const float delta = posDeltaLog[static_cast<size_t>(k)];
-            if (k < lowCut) lowFluxSum += delta;
-            if (k > highCut) highFluxSum += delta;
+            if (k < lowCut)
+                lowFluxSum += delta;
+            if (k > highCut)
+                highFluxSum += delta;
         }
 
         const bool isBroadband = (lowFluxSum > 0.30f && highFluxSum > 0.18f);
@@ -1597,22 +1635,21 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
     transientMask.fill(isTransientFrame ? 1.0f : 0.0f);
 
     // Tonal persistence must not depend on the transient gate.
-    for (auto& p : tonalPersistence)
+    for (auto &p : tonalPersistence)
         p *= 0.96f;
 
     for (int k = 2; k < numBins - 2; ++k)
     {
         // Bestehende Peak-Prominence-Logik
         const float centerLin = magLin[static_cast<size_t>(k)];
-        if (!(centerLin > magLin[static_cast<size_t>(k-1)] && centerLin >= magLin[static_cast<size_t>(k+1)]))
+        if (!(centerLin > magLin[static_cast<size_t>(k - 1)] && centerLin >= magLin[static_cast<size_t>(k + 1)]))
             continue;
 
         std::array<float, 4> neighDb = {
             20.0f * std::log10(magLin[static_cast<size_t>(k - 2)] + eps),
             20.0f * std::log10(magLin[static_cast<size_t>(k - 1)] + eps),
             20.0f * std::log10(magLin[static_cast<size_t>(k + 1)] + eps),
-            20.0f * std::log10(magLin[static_cast<size_t>(k + 2)] + eps)
-        };
+            20.0f * std::log10(magLin[static_cast<size_t>(k + 2)] + eps)};
         std::sort(neighDb.begin(), neighDb.end());
         const float neighMedianDb = 0.5f * (neighDb[1] + neighDb[2]);
         const float centerDb = 20.0f * std::log10(centerLin + eps);
@@ -1622,14 +1659,14 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
 
         const float kNorm = static_cast<float>(k) / static_cast<float>(numBins - 1);
         const float lowBandBoost = juce::jlimit(1.0f, 1.22f,
-            1.22f - 1.35f * juce::jmin(1.0f, kNorm / 0.16f));
+                                                1.22f - 1.35f * juce::jmin(1.0f, kNorm / 0.16f));
         const float highBandPenalty = juce::jlimit(0.45f, 1.0f, 1.0f - 0.95f * juce::jmax(0.0f, kNorm - 0.62f));
         const float flatnessPenalty = juce::jlimit(0.20f, 1.0f,
-            1.08f - 1.10f * lastFlatness[static_cast<size_t>(k)]);
+                                                   1.08f - 1.10f * lastFlatness[static_cast<size_t>(k)]);
         const float attackPenalty = juce::jlimit(0.10f, 1.0f,
-            1.00f - 0.85f * juce::jlimit(0.0f, 1.0f, attackSlope[static_cast<size_t>(k)] / 0.45f));
+                                                 1.00f - 0.85f * juce::jlimit(0.0f, 1.0f, attackSlope[static_cast<size_t>(k)] / 0.45f));
         const float fluxPenalty = juce::jlimit(0.18f, 1.0f,
-            1.00f - 0.75f * juce::jlimit(0.0f, 1.0f, broadbandFlux[static_cast<size_t>(k)] / 0.35f));
+                                               1.00f - 0.75f * juce::jlimit(0.0f, 1.0f, broadbandFlux[static_cast<size_t>(k)] / 0.35f));
         tonalCandidate *= lowBandBoost;
         tonalCandidate *= highBandPenalty;
         tonalCandidate *= flatnessPenalty;
@@ -1652,11 +1689,11 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
             const float attackN = juce::jlimit(0.0f, 1.0f, attackSlope[static_cast<size_t>(k)] / 0.14f);
             const float percN = juce::jlimit(0.0f, 1.0f, hpPercussiveMask[static_cast<size_t>(k)] / 0.62f);
             percussiveLikelihood = juce::jlimit(0.0f, 1.0f,
-                0.42f * fluxN + 0.33f * attackN + 0.40f * percN);
+                                                0.42f * fluxN + 0.33f * attackN + 0.40f * percN);
 
             const float damping = (kNorm > 0.45f)
-                ? (1.0f - 0.90f * percussiveLikelihood)
-                : (1.0f - 0.75f * percussiveLikelihood);
+                                      ? (1.0f - 0.90f * percussiveLikelihood)
+                                      : (1.0f - 0.75f * percussiveLikelihood);
             tonalCandidate *= juce::jlimit(0.08f, 1.0f, damping);
 
             // Extra snare suppression in mid-band while keeping low-end intact.
@@ -1676,36 +1713,29 @@ void PluginProcessor::analyseSegmentationFrame(const float* fftInterleaved, int6
         }
 
         // Nur während aktiver Detection akkumulieren
-// Basiert auf dem rohen tonalCandidate – BEVOR er gegen Noise/Transienten konkurriert
-if (autoDetectActive || autoDetectRecording)
-{
-    const float kNorm = static_cast<float>(k) / static_cast<float>(numBins - 1);
-    const bool lowBandExempt = (kNorm < 0.10f);
-    // Flux is used as a conservative veto only when it agrees with
-    // percussive/attack evidence, to avoid suppressing true tonal sustain.
-    const bool strongFlux = (broadbandFlux[static_cast<size_t>(k)] > 0.085f);
-    const bool veryStrongFlux = (broadbandFlux[static_cast<size_t>(k)] > 0.16f);
-    const bool strongPercussive = (hpPercussiveMask[static_cast<size_t>(k)] > 0.50f);
-    const bool fastAttack = (attackSlope[static_cast<size_t>(k)] > 0.075f);
-    const bool snareBand = (kNorm > 0.20f && kNorm < 0.50f);
-    const bool snareLike = snareBand
-        && (broadbandFlux[static_cast<size_t>(k)] > 0.12f)
-        && ((hpPercussiveMask[static_cast<size_t>(k)] > 0.46f) || (attackSlope[static_cast<size_t>(k)] > 0.07f));
-    const bool percussiveLike = !lowBandExempt && (
-        (strongFlux && (strongPercussive || fastAttack))
-        || (strongPercussive && fastAttack)
-        || (veryStrongFlux && kNorm > 0.20f)
-        || (strongFlux && kNorm > 0.45f)
-        || snareLike);
+        // Basiert auf dem rohen tonalCandidate – BEVOR er gegen Noise/Transienten konkurriert
+        if (autoDetectActive || autoDetectRecording)
+        {
+            const float kNorm = static_cast<float>(k) / static_cast<float>(numBins - 1);
+            const bool lowBandExempt = (kNorm < 0.10f);
+            // Flux is used as a conservative veto only when it agrees with
+            // percussive/attack evidence, to avoid suppressing true tonal sustain.
+            const bool strongFlux = (broadbandFlux[static_cast<size_t>(k)] > 0.085f);
+            const bool veryStrongFlux = (broadbandFlux[static_cast<size_t>(k)] > 0.16f);
+            const bool strongPercussive = (hpPercussiveMask[static_cast<size_t>(k)] > 0.50f);
+            const bool fastAttack = (attackSlope[static_cast<size_t>(k)] > 0.075f);
+            const bool snareBand = (kNorm > 0.20f && kNorm < 0.50f);
+            const bool snareLike = snareBand && (broadbandFlux[static_cast<size_t>(k)] > 0.12f) && ((hpPercussiveMask[static_cast<size_t>(k)] > 0.46f) || (attackSlope[static_cast<size_t>(k)] > 0.07f));
+            const bool percussiveLike = !lowBandExempt && ((strongFlux && (strongPercussive || fastAttack)) || (strongPercussive && fastAttack) || (veryStrongFlux && kNorm > 0.20f) || (strongFlux && kNorm > 0.45f) || snareLike);
 
-    const float tonalCandidateMin = snareBand ? 0.16f : 0.12f;
-    if (tonalCandidate > tonalCandidateMin && !percussiveLike)  // Nur echte Sustain-Kandidaten zählen
-    {
-        tonalDetectionCount[static_cast<size_t>(k)] += 1.0f;
-        // Magnitude als Gewichtung: stärkere Töne bekommen mehr Einfluss
-        tonalDetectionMagnitude[static_cast<size_t>(k)] += tonalCandidate;
-    }
-}
+            const float tonalCandidateMin = snareBand ? 0.16f : 0.12f;
+            if (tonalCandidate > tonalCandidateMin && !percussiveLike) // Nur echte Sustain-Kandidaten zählen
+            {
+                tonalDetectionCount[static_cast<size_t>(k)] += 1.0f;
+                // Magnitude als Gewichtung: stärkere Töne bekommen mehr Einfluss
+                tonalDetectionMagnitude[static_cast<size_t>(k)] += tonalCandidate;
+            }
+        }
 
         tonalMask[static_cast<size_t>(k)] =
             juce::jlimit(0.0f, 1.0f, (tonalPersistence[static_cast<size_t>(k)] - 0.14f) / 0.86f);
@@ -1726,21 +1756,15 @@ if (autoDetectActive || autoDetectRecording)
         const float attackN = juce::jlimit(0.0f, 1.0f, attackSlope[static_cast<size_t>(k)] / 0.16f);
         const float percN = juce::jlimit(0.0f, 1.0f, hpPercussiveMask[static_cast<size_t>(k)] / 0.62f);
         const float percussiveLikelihood = juce::jlimit(0.0f, 1.0f,
-            0.45f * fluxN + 0.35f * attackN + 0.38f * percN);
+                                                        0.45f * fluxN + 0.35f * attackN + 0.38f * percN);
         const float percussivePenalty = juce::jlimit(0.10f, 1.0f, 1.0f - 0.80f * percussiveLikelihood);
 
         const float lowBandPenalty = juce::jlimit(0.20f, 1.0f,
-            0.35f + 0.65f * juce::jmin(1.0f, kNorm / 0.11f));
+                                                  0.35f + 0.65f * juce::jmin(1.0f, kNorm / 0.11f));
         const float midHighBoost = juce::jlimit(1.0f, 1.10f,
-            1.0f + 0.10f * juce::jmax(0.0f, juce::jmin(1.0f, (kNorm - 0.20f) / 0.50f)));
+                                                1.0f + 0.10f * juce::jmax(0.0f, juce::jmin(1.0f, (kNorm - 0.20f) / 0.50f)));
 
-        float noiseScore = flatnessScore
-            * tonalDuck
-            * persistenceDuck
-            * harmonicPenalty
-            * hpsPenalty
-            * percussivePenalty
-            * lowBandPenalty;
+        float noiseScore = flatnessScore * tonalDuck * persistenceDuck * harmonicPenalty * hpsPenalty * percussivePenalty * lowBandPenalty;
         noiseScore *= midHighBoost;
         noiseMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, noiseScore);
     }
@@ -1838,8 +1862,8 @@ if (autoDetectActive || autoDetectRecording)
     }
 }
 
-void PluginProcessor::applyCosineMaskSmoothing(const std::array<float, SpectralFrameBuffer::NUM_BINS>& input,
-                                               std::array<float, SpectralFrameBuffer::NUM_BINS>& output) const
+void PluginProcessor::applyCosineMaskSmoothing(const std::array<float, SpectralFrameBuffer::NUM_BINS> &input,
+                                               std::array<float, SpectralFrameBuffer::NUM_BINS> &output) const
 {
     static constexpr int radius = 6;
     for (int bin = 0; bin < SpectralFrameBuffer::NUM_BINS; ++bin)
@@ -1850,8 +1874,7 @@ void PluginProcessor::applyCosineMaskSmoothing(const std::array<float, SpectralF
         for (int k = -radius; k <= radius; ++k)
         {
             const int idx = juce::jlimit(0, SpectralFrameBuffer::NUM_BINS - 1, bin + k);
-            const float w = 0.5f * (1.0f + std::cos(juce::MathConstants<float>::pi
-                * static_cast<float>(k) / static_cast<float>(radius + 1)));
+            const float w = 0.5f * (1.0f + std::cos(juce::MathConstants<float>::pi * static_cast<float>(k) / static_cast<float>(radius + 1)));
             weighted += input[static_cast<size_t>(idx)] * w;
             totalWeight += w;
         }
@@ -1927,7 +1950,7 @@ void PluginProcessor::finalizeAutoDetectedObjects()
             }
 
             const float invF = 1.0f / static_cast<float>(numFrames);
-            meanDb[static_cast<size_t>(k)]  = mean;
+            meanDb[static_cast<size_t>(k)] = mean;
             meanLin[static_cast<size_t>(k)] = sumLin * invF;
             varDb[static_cast<size_t>(k)] = m2 * invF;
         }
@@ -1997,32 +2020,25 @@ void PluginProcessor::finalizeAutoDetectedObjects()
 
             const float count = tonalDetectionCount[static_cast<size_t>(k)];
             const float meanCandidateStrength = count > 0.0f
-                ? (tonalDetectionMagnitude[static_cast<size_t>(k)] / count)
-                : 0.0f;
+                                                    ? (tonalDetectionMagnitude[static_cast<size_t>(k)] / count)
+                                                    : 0.0f;
             const float countVsDuration = count / std::sqrt(static_cast<float>(juce::jmax(1, numFrames)));
             const float evidenceScore = 1.0f - std::exp(-countVsDuration / 1.6f);
             const float strengthScore = juce::jlimit(0.0f, 1.0f, (meanCandidateStrength - 0.12f) / 0.48f);
             const float flatnessPenalty = juce::jlimit(0.40f, 1.0f,
-                1.00f - 0.75f * localFlatness[static_cast<size_t>(k)]);
+                                                       1.00f - 0.75f * localFlatness[static_cast<size_t>(k)]);
             const float kNorm = static_cast<float>(k) / static_cast<float>(juce::jmax(1, numBins - 1));
             const float lowBandBoost = juce::jlimit(1.0f, 1.30f,
-                1.30f - 1.55f * juce::jmin(1.0f, kNorm / 0.14f));
+                                                    1.30f - 1.55f * juce::jmin(1.0f, kNorm / 0.14f));
 
             evidenceDrivenScore[static_cast<size_t>(k)] =
-                (0.18f + 0.82f * evidenceScore)
-                * (0.28f + 0.72f * strengthScore)
-                * juce::jlimit(0.55f, 1.0f, 1.03f - 0.60f * localFlatness[static_cast<size_t>(k)])
-                * lowBandBoost;
+                (0.18f + 0.82f * evidenceScore) * (0.28f + 0.72f * strengthScore) * juce::jlimit(0.55f, 1.0f, 1.03f - 0.60f * localFlatness[static_cast<size_t>(k)]) * lowBandBoost;
 
             evidenceDrivenScore[static_cast<size_t>(k)] *=
                 (0.42f + 0.58f * baselineStabilityScore[static_cast<size_t>(k)]);
 
             tonalScore[static_cast<size_t>(k)] =
-                (0.28f + 0.72f * stabilityScore)
-                * (0.58f + 0.42f * evidenceScore)
-                * (0.62f + 0.38f * strengthScore)
-                * flatnessPenalty
-                * lowBandBoost;
+                (0.28f + 0.72f * stabilityScore) * (0.58f + 0.42f * evidenceScore) * (0.62f + 0.38f * strengthScore) * flatnessPenalty * lowBandBoost;
 
             tonalScore[static_cast<size_t>(k)] = juce::jmax(
                 tonalScore[static_cast<size_t>(k)],
@@ -2045,22 +2061,18 @@ void PluginProcessor::finalizeAutoDetectedObjects()
 
             // Lokaler Peak in meanLin?
             const float center = meanLin[static_cast<size_t>(k)];
-            const bool isPeak = center > meanLin[static_cast<size_t>(k - 1)]
-                             && center > meanLin[static_cast<size_t>(k - 2)]
-                             && center >= meanLin[static_cast<size_t>(k + 1)]
-                             && center >= meanLin[static_cast<size_t>(k + 2)];
+            const bool isPeak = center > meanLin[static_cast<size_t>(k - 1)] && center > meanLin[static_cast<size_t>(k - 2)] && center >= meanLin[static_cast<size_t>(k + 1)] && center >= meanLin[static_cast<size_t>(k + 2)];
 
             // Prominenz gegen Nachbar-Median in dB (wie im Echtzeit-Pfad)
             std::array<float, 4> neighDb = {
                 20.0f * std::log10(meanLin[static_cast<size_t>(k - 2)] + eps),
                 20.0f * std::log10(meanLin[static_cast<size_t>(k - 1)] + eps),
                 20.0f * std::log10(meanLin[static_cast<size_t>(k + 1)] + eps),
-                20.0f * std::log10(meanLin[static_cast<size_t>(k + 2)] + eps)
-            };
+                20.0f * std::log10(meanLin[static_cast<size_t>(k + 2)] + eps)};
             std::sort(neighDb.begin(), neighDb.end());
             const float neighMedianDb = 0.5f * (neighDb[1] + neighDb[2]);
-            const float centerDb      = 20.0f * std::log10(center + eps);
-            const float prominenceDb  = centerDb - neighMedianDb;
+            const float centerDb = 20.0f * std::log10(center + eps);
+            const float prominenceDb = centerDb - neighMedianDb;
 
             const float kNorm = static_cast<float>(k) / static_cast<float>(juce::jmax(1, numBins - 1));
             const float requiredProminenceDb = juce::jmap(juce::jmin(1.0f, kNorm / 0.18f), 2.0f, 3.5f);
@@ -2073,8 +2085,7 @@ void PluginProcessor::finalizeAutoDetectedObjects()
             const float countVsDuration = count / std::sqrt(static_cast<float>(juce::jmax(1, numFrames)));
             const float recurringCountThreshold = (kNorm > 0.20f) ? 0.70f : 0.55f;
             const float recurringScoreThreshold = (kNorm > 0.20f) ? 0.24f : 0.20f;
-            const bool strongRecurringEvidence = countVsDuration > recurringCountThreshold
-                && evidenceDrivenScore[static_cast<size_t>(k)] > recurringScoreThreshold;
+            const bool strongRecurringEvidence = countVsDuration > recurringCountThreshold && evidenceDrivenScore[static_cast<size_t>(k)] > recurringScoreThreshold;
 
             if (!isPeak && !strongRecurringEvidence)
                 continue;
@@ -2086,8 +2097,8 @@ void PluginProcessor::finalizeAutoDetectedObjects()
             const float promScore = juce::jlimit(0.0f, 1.0f, (prominenceDb - requiredProminenceDb) / 7.0f);
             const float peakDrivenScore = tonalScore[static_cast<size_t>(k)] * (0.62f + 0.38f * promScore);
             const float recurringFallback = strongRecurringEvidence
-                ? evidenceDrivenScore[static_cast<size_t>(k)] * 0.88f
-                : 0.0f;
+                                                ? evidenceDrivenScore[static_cast<size_t>(k)] * 0.88f
+                                                : 0.0f;
             tonalScoreFinal[static_cast<size_t>(k)] = juce::jmax(peakDrivenScore, recurringFallback);
         }
 
@@ -2104,7 +2115,8 @@ void PluginProcessor::finalizeAutoDetectedObjects()
             for (int h = 2; h <= 8; ++h)
             {
                 const int hBin = k * h;
-                if (hBin >= numBins) break;
+                if (hBin >= numBins)
+                    break;
 
                 // Oberton erbt 65% des Grundton-Scores wenn er selbst schwächer ist
                 const float inherited = tonalScoreFinal[static_cast<size_t>(k)] * 0.72f;
@@ -2134,8 +2146,7 @@ void PluginProcessor::finalizeAutoDetectedObjects()
                     20.0f * std::log10(meanLin[static_cast<size_t>(k - 2)] + eps),
                     20.0f * std::log10(meanLin[static_cast<size_t>(k - 1)] + eps),
                     20.0f * std::log10(meanLin[static_cast<size_t>(k + 1)] + eps),
-                    20.0f * std::log10(meanLin[static_cast<size_t>(k + 2)] + eps)
-                };
+                    20.0f * std::log10(meanLin[static_cast<size_t>(k + 2)] + eps)};
                 std::sort(neighDb.begin(), neighDb.end());
                 const float neighMedianDb = 0.5f * (neighDb[1] + neighDb[2]);
                 const float centerDb = 20.0f * std::log10(center + eps);
@@ -2145,8 +2156,7 @@ void PluginProcessor::finalizeAutoDetectedObjects()
                     continue;
 
                 const float fallbackScore = juce::jmax(
-                    baselineStabilityScore[static_cast<size_t>(k)]
-                        * juce::jlimit(0.45f, 1.0f, 1.0f - 0.55f * localFlatness[static_cast<size_t>(k)]),
+                    baselineStabilityScore[static_cast<size_t>(k)] * juce::jlimit(0.45f, 1.0f, 1.0f - 0.55f * localFlatness[static_cast<size_t>(k)]),
                     evidenceDrivenScore[static_cast<size_t>(k)] * 0.72f);
 
                 tonalScoreFinal[static_cast<size_t>(k)] = juce::jmax(
@@ -2168,17 +2178,17 @@ void PluginProcessor::finalizeAutoDetectedObjects()
 
             const float kNorm = static_cast<float>(k) / static_cast<float>(juce::jmax(1, numBins - 1));
             const float flatnessScore = juce::jlimit(0.0f, 1.0f,
-                (localFlatness[static_cast<size_t>(k)] - 0.56f) / 0.32f);
+                                                     (localFlatness[static_cast<size_t>(k)] - 0.56f) / 0.32f);
             const float nonTonal = juce::jlimit(0.02f, 1.0f,
-                1.0f - 1.35f * tonalScoreFinal[static_cast<size_t>(k)]);
+                                                1.0f - 1.35f * tonalScoreFinal[static_cast<size_t>(k)]);
             const float stabilityPenalty = juce::jlimit(0.18f, 1.0f,
-                1.0f - 0.70f * baselineStabilityScore[static_cast<size_t>(k)]);
+                                                        1.0f - 0.70f * baselineStabilityScore[static_cast<size_t>(k)]);
             const float tonalEvidencePenalty = juce::jlimit(0.10f, 1.0f,
-                1.0f - 0.90f * evidenceDrivenScore[static_cast<size_t>(k)]);
+                                                            1.0f - 0.90f * evidenceDrivenScore[static_cast<size_t>(k)]);
             const float lowBandPenalty = juce::jlimit(0.30f, 1.0f,
-                0.40f + 0.60f * juce::jmin(1.0f, kNorm / 0.12f));
+                                                      0.40f + 0.60f * juce::jmin(1.0f, kNorm / 0.12f));
             const float midHighBoost = juce::jlimit(1.0f, 1.10f,
-                1.0f + 0.10f * juce::jmax(0.0f, juce::jmin(1.0f, (kNorm - 0.22f) / 0.55f)));
+                                                    1.0f + 0.10f * juce::jmax(0.0f, juce::jmin(1.0f, (kNorm - 0.22f) / 0.55f)));
 
             int activeFrames = 0;
             int gateOpenActiveFrames = 0;
@@ -2195,17 +2205,11 @@ void PluginProcessor::finalizeAutoDetectedObjects()
             }
 
             const float gateCoupling = activeFrames > 0
-                ? static_cast<float>(gateOpenActiveFrames) / static_cast<float>(activeFrames)
-                : 0.0f;
+                                           ? static_cast<float>(gateOpenActiveFrames) / static_cast<float>(activeFrames)
+                                           : 0.0f;
             const float gatePenalty = juce::jlimit(0.20f, 1.0f, 1.0f - 0.85f * gateCoupling);
 
-            ambientScore[static_cast<size_t>(k)] = flatnessScore
-                * nonTonal
-                * stabilityPenalty
-                * tonalEvidencePenalty
-                * lowBandPenalty
-                * gatePenalty
-                * midHighBoost;
+            ambientScore[static_cast<size_t>(k)] = flatnessScore * nonTonal * stabilityPenalty * tonalEvidencePenalty * lowBandPenalty * gatePenalty * midHighBoost;
         }
 
         // ================================================================
@@ -2217,13 +2221,11 @@ void PluginProcessor::finalizeAutoDetectedObjects()
         {
             tonalMask[static_cast<size_t>(k)] = (tonalScoreFinal[static_cast<size_t>(k)] > 0.12f);
             noiseMask[static_cast<size_t>(k)] =
-                !tonalMask[static_cast<size_t>(k)]
-                && (ambientScore[static_cast<size_t>(k)] > 0.30f)
-                && (meanLin[static_cast<size_t>(k)] >= energyFloorPerBin[static_cast<size_t>(k)]);
+                !tonalMask[static_cast<size_t>(k)] && (ambientScore[static_cast<size_t>(k)] > 0.30f) && (meanLin[static_cast<size_t>(k)] >= energyFloorPerBin[static_cast<size_t>(k)]);
         }
     }
 
-    auto findObjectIndexByName = [this](const juce::String& wanted)
+    auto findObjectIndexByName = [this](const juce::String &wanted)
     {
         if (objectDatabase == nullptr)
             return -1;
@@ -2241,9 +2243,9 @@ void PluginProcessor::finalizeAutoDetectedObjects()
         return -1;
     };
 
-    auto ensureAndMaybeUpdate = [this, &findObjectIndexByName](const juce::String& name,
-                                                                const std::array<bool, ObjectDatabase::NUM_BINS>& mask,
-                                                                const juce::Colour& color)
+    auto ensureAndMaybeUpdate = [this, &findObjectIndexByName](const juce::String &name,
+                                                               const std::array<bool, ObjectDatabase::NUM_BINS> &mask,
+                                                               const juce::Colour &color)
     {
         int idx = findObjectIndexByName(name);
         if (idx < 0)
@@ -2281,15 +2283,14 @@ void PluginProcessor::createHannWindow()
     for (int i = 0; i < fftSize; ++i)
     {
         const float hann = 0.5f * (1.0f - std::cos(
-            2.0f * juce::MathConstants<float>::pi * static_cast<float>(i)
-            / static_cast<float>(fftSize - 1)));
+                                              2.0f * juce::MathConstants<float>::pi * static_cast<float>(i) / static_cast<float>(fftSize - 1)));
         window[i] = std::sqrt(juce::jmax(0.0f, hann));
     }
 }
 
 //==============================================================================
 // Factory function required by JUCE to create the plugin instance
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter()
 {
     return new PluginProcessor();
 }
