@@ -65,11 +65,6 @@ void SpectralView::setSegmentationOverlayProvider(std::function<bool(std::array<
     overlayProvider = std::move(provider);
 }
 
-void SpectralView::setDebugTextProvider(std::function<juce::String()> provider)
-{
-    debugTextProvider = std::move(provider);
-}
-
 int SpectralView::getBinForY(int y) const
 {
     if (yToBinF.empty())
@@ -379,22 +374,6 @@ void SpectralView::paint(juce::Graphics& g)
 
     if (showGrid)
         drawGrid(g);
-
-    if (debugText.isNotEmpty())
-    {
-        const int boxW = juce::jmin(getWidth() - 12, 360);
-        const int boxH = 56;
-        const juce::Rectangle<int> box(6, 6, boxW, boxH);
-
-        g.setColour(juce::Colour(0xAA000000));
-        g.fillRoundedRectangle(box.toFloat(), 5.0f);
-        g.setColour(juce::Colour(0x66FFFFFF));
-        g.drawRoundedRectangle(box.toFloat(), 5.0f, 1.0f);
-
-        g.setColour(juce::Colour(0xFFE8E8E8));
-        g.setFont(juce::Font(11.0f));
-        g.drawFittedText(debugText, box.reduced(6, 4), juce::Justification::topLeft, 3);
-    }
 }
 
 void SpectralView::resized()
@@ -429,11 +408,6 @@ void SpectralView::timerCallback()
         hasOverlay = overlayProvider(overlayTransient, overlayTonal, overlayNoise);
     else
         hasOverlay = false;
-
-    if (debugTextProvider)
-        debugText = debugTextProvider();
-    else
-        debugText.clear();
 
     // Multi-Frame-Drain: alle neuen Frames konsumieren, max. 8 pro Tick
     static constexpr int kMaxFramesPerTick = 8;

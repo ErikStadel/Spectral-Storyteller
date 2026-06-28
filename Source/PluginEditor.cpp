@@ -16,10 +16,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         return processor.getSegmentationOverlay(transient, tonal, noise);
     });
-    spectralView->setDebugTextProvider([this]()
-    {
-        return processor.getSegmentationDebugText();
-    });
     addAndMakeVisible(*spectralView);
 
     // Create spectrogram selector (lasso/rectangle overlay)
@@ -75,27 +71,65 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
             if (db->addObject(objName))
             {
+                const int newIndex = db->getNumObjects() - 1;
+                const int newObjectId = db->getObjectIdAtIndex(newIndex);
+
                 // Create binary mask for this object
                 std::array<bool, ObjectDatabase::NUM_BINS> mask;
                 mask.fill(false);
                 for (int bin = clampedMinBin; bin <= clampedMaxBin; ++bin)
                     mask[bin] = true;
 
-                db->setObjectMask(db->getNumObjects() - 1, mask);
+                db->setObjectMask(newIndex, mask);
+
+                processor.setSelectedObjectId(newObjectId);
 
                 // Refresh sidebar
                 if (objectSidebar)
                     objectSidebar->refresh();
+
+                if (storyTimeline)
+                    storyTimeline->refresh();
             }
         }
     });
     addAndMakeVisible(*spectralSelector);
 
     // Create object sidebar
-    objectSidebar = std::make_unique<ObjectSidebar>(*processor.getObjectDatabase(), [this](bool enabled)
-    {
-        processor.setAutoDetectRecordingEnabled(enabled);
-    });
+    objectSidebar = std::make_unique<ObjectSidebar>(
+        *processor.getObjectDatabase(),
+        [this](bool enabled)
+        {
+            processor.setAutoDetectRecordingEnabled(enabled);
+        },
+        [this]() -> juce::String
+        {
+            const int frames = processor.getAutoDetectFrameCount();
+            const bool running = processor.isAutoDetectRunning();
+            return (running ? "[REC " : "[") + juce::String(frames) + " frames]";
+        },
+        [this](int objectId)
+        {
+            processor.setSelectedObjectId(objectId);
+            if (storyTimeline)
+                storyTimeline->refresh();
+        },
+        [this](const juce::String& presetName, const juce::File& file)
+        {
+            int newObjectId = -1;
+            if (file.existsAsFile())
+                newObjectId = processor.createTransformObjectFromFile(file);
+            else if (presetName.isNotEmpty())
+                newObjectId = processor.createTransformObjectFromPreset(presetName);
+
+            if (newObjectId > 0)
+            {
+                if (objectSidebar)
+                    objectSidebar->refresh();
+                if (storyTimeline)
+                    storyTimeline->refresh();
+            }
+        });
     addAndMakeVisible(*objectSidebar);
 
     // PR4: Story timeline (keyframe automation lanes)
@@ -145,23 +179,31 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     curveLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(curveLabel);
 
+    // Transient threshold knob
+    transientThresholdSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    transientThresholdSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 72, 20);
+    transientThresholdSlider.setRange(-60.0, 0.0, 0.1);
+    transientThresholdSlider.setSkewFactorFromMidPoint(-24.0);
+    transientThresholdSlider.setNumDecimalPlacesToDisplay(1);
+    transientThresholdSlider.setTextValueSuffix(" dB");
+    addAndMakeVisible(transientThresholdSlider);
+
+    transientThresholdLabel.setText("Transient Gate", juce::dontSendNotification);
+    transientThresholdLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(transientThresholdLabel);
+
     // Attachment for Dry/Wet parameter (audio processing)
     dryWetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.getValueTreeState(), "dryWet", dryWetSlider);
-
-    copyDebugButton.setTooltip("Kopiert Debug-Ranges in die Zwischenablage");
-    copyDebugButton.onClick = [this]()
-    {
-        juce::SystemClipboard::copyTextToClipboard(processor.getSegmentationDebugText());
-    };
-    addAndMakeVisible(copyDebugButton);
+    transientThresholdAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor.getValueTreeState(), "transientThreshold", transientThresholdSlider);
 
     // Version info
     versionLabel.setText(processor.getBuildInfo(), juce::dontSendNotification);
     versionLabel.setJustificationType(juce::Justification::bottomRight);
     addAndMakeVisible(versionLabel);
 
-    setSize(1200, 700);
+    setSize(1550, 700);
 }
 
 PluginEditor::~PluginEditor() = default;
@@ -175,22 +217,20 @@ void PluginEditor::resized()
 {
     auto area = getLocalBounds().reduced(12);
     
-    // Top: copy button + version label (24px height)
+    // Top: version label (24px height)
     auto topBar = area.removeFromTop(24);
-    copyDebugButton.setBounds(topBar.removeFromLeft(112).reduced(0, 2));
-    topBar.removeFromLeft(8);
     versionLabel.setBounds(topBar);
     area.removeFromTop(8);  // spacing
     
     // Reserve timeline strip; we will place it after side/center layout so the left object panel
     // can extend downward by a few rows without shrinking the spectrogram area.
-    // 4 visible object rows before scrolling: ruler (22) + 4 * rowHeight (52) = 230
-    auto timelineArea = area.removeFromBottom(230);
+    // Give the timeline enough vertical room for taller adaptive FX lanes.
+    auto timelineArea = area.removeFromBottom(320);
     timelineArea.removeFromBottom(6);
     
-    // Middle section: sidebar (left) + spectrogram (center) + controls (right)
-    const int sidebarWidth = 200;
-    const int controlPanelWidth = 96;
+    // Middle section: object sidebar + spectrogram + parameter sidebar
+    const int sidebarWidth = 280;
+    const int controlPanelWidth = 250;
     const int innerGap = 8;
     
     auto sidebar = area.removeFromLeft(sidebarWidth);
@@ -203,32 +243,42 @@ void PluginEditor::resized()
         objectSidebar->setBounds(sidebar);
 
     auto controls = controlPanel.reduced(2);
-    const int sectionSpacing = 10;
-    const int sectionHeight = (controls.getHeight() - sectionSpacing * 2) / 3;
-
-    auto section1 = controls.removeFromTop(sectionHeight);
-    controls.removeFromTop(sectionSpacing);
-    auto section2 = controls.removeFromTop(sectionHeight);
-    controls.removeFromTop(sectionSpacing);
-    auto section3 = controls;
-
+    const int blockSpacing = 10;
     const int labelH = 18;
-    const int sliderBottomPad = 4;
 
-    auto s1Label = section1.removeFromTop(labelH);
-    dryWetLabel.setBounds(s1Label);
-    section1.removeFromTop(2);
-    dryWetSlider.setBounds(section1.reduced(6, sliderBottomPad));
+    auto topSliderBlock = controls.removeFromTop(static_cast<int>(controls.getHeight() * 0.62f));
+    controls.removeFromTop(blockSpacing);
+    auto gateKnobBlock = controls;
 
-    auto s2Label = section2.removeFromTop(labelH);
-    gateLabel.setBounds(s2Label);
-    section2.removeFromTop(2);
-    gateSlider.setBounds(section2.reduced(6, sliderBottomPad));
+    auto sliderCols = topSliderBlock;
+    const int colGap = 8;
+    const int colWidth = (sliderCols.getWidth() - colGap * 2) / 3;
 
-    auto s3Label = section3.removeFromTop(labelH);
-    curveLabel.setBounds(s3Label);
-    section3.removeFromTop(2);
-    curveSlider.setBounds(section3.reduced(6, sliderBottomPad));
+    auto dryCol = sliderCols.removeFromLeft(colWidth);
+    sliderCols.removeFromLeft(colGap);
+    auto gateCol = sliderCols.removeFromLeft(colWidth);
+    sliderCols.removeFromLeft(colGap);
+    auto curveCol = sliderCols;
+
+    auto dryLabelArea = dryCol.removeFromTop(labelH);
+    dryWetLabel.setBounds(dryLabelArea);
+    dryCol.removeFromTop(2);
+    dryWetSlider.setBounds(dryCol.reduced(2, 2));
+
+    auto gateLabelArea = gateCol.removeFromTop(labelH);
+    gateLabel.setBounds(gateLabelArea);
+    gateCol.removeFromTop(2);
+    gateSlider.setBounds(gateCol.reduced(2, 2));
+
+    auto curveLabelArea = curveCol.removeFromTop(labelH);
+    curveLabel.setBounds(curveLabelArea);
+    curveCol.removeFromTop(2);
+    curveSlider.setBounds(curveCol.reduced(2, 2));
+
+    auto gateKnobLabel = gateKnobBlock.removeFromTop(labelH);
+    transientThresholdLabel.setBounds(gateKnobLabel);
+    gateKnobBlock.removeFromTop(4);
+    transientThresholdSlider.setBounds(gateKnobBlock.reduced(12, 2));
     
     // Spectrogram fills remaining area
     if (spectralView)

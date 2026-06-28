@@ -8,11 +8,12 @@
 #include "DSP/TimelineData.h"
 #include <memory>
 #include <deque>
+#include <unordered_map>
 
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
-constexpr int VERSION_MINOR = 5;
-constexpr int VERSION_BUILD = 8;
+constexpr int VERSION_MINOR = 6;
+constexpr int VERSION_BUILD = 12;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -70,8 +71,41 @@ public:
     std::vector<TimelineData::Keyframe> getTimelineKeyframes(int objectIndex) const;
     juce::String getTimelineTrackName(int objectIndex) const;
     void setTimelineTrackName(int objectIndex, const std::string& newName);
+    int getSelectedObjectId() const;
+    void setSelectedObjectId(int objectId);
+    std::vector<ObjectDatabase::FXModule> getFxChainForObject(int objectId) const;
+    std::vector<ObjectDatabase::FXModule> getFxChainForSelectedObject() const;
+    void setObjectFxEnabled(int objectId, const juce::String& effectName, bool enabled);
+    void addOrEnableObjectFx(int objectId, const juce::String& effectName);
+    void setObjectFxSelectedParameter(int objectId, const juce::String& effectName, int parameterIndex);
+    std::vector<ObjectDatabase::AutomationKeyframe> getFxAutomationKeyframes(int objectId,
+                                                                              const juce::String& effectName,
+                                                                              const juce::String& parameterName) const;
+    void addFxAutomationKeyframe(int objectId,
+                                 const juce::String& effectName,
+                                 const juce::String& parameterName,
+                                 double timeSec,
+                                 float value,
+                                 float curvature = 0.0f);
+    void setFxAutomationSegmentCurvature(int objectId,
+                                         const juce::String& effectName,
+                                         const juce::String& parameterName,
+                                         double segmentStartTimeSec,
+                                         float curvature);
+    void setTransformSourceObjectId(int objectId, int sourceObjectId);
+    int getTransformSourceObjectId(int objectId) const;
+    void loadTransformFileAsync(int objectId, const juce::File& file);
+    int createTransformObjectFromPreset(const juce::String& presetName);
+    int createTransformObjectFromFile(const juce::File& file);
+    void deleteFxAutomationKeyframe(int objectId,
+                                    const juce::String& effectName,
+                                    const juce::String& parameterName,
+                                    double timeSec);
     void requestAutoDetectObjects(double captureSeconds = 3.0);
+    void cancelAutoDetectObjects();
     void setAutoDetectRecordingEnabled(bool shouldRecord);
+    int getAutoDetectFrameCount() const;
+    bool isAutoDetectRunning() const;
     bool getSegmentationOverlay(std::array<float, SpectralFrameBuffer::NUM_BINS>& transient,
                                 std::array<float, SpectralFrameBuffer::NUM_BINS>& tonal,
                                 std::array<float, SpectralFrameBuffer::NUM_BINS>& noise) const;
@@ -82,6 +116,7 @@ public:
 private:
     juce::AudioProcessorValueTreeState parameters;
     std::atomic<float>* dryWetParam = nullptr;
+    std::atomic<float>* transientThresholdParam = nullptr;
 
     static constexpr int fftOrder = 11;
     static constexpr int fftSize = 1 << fftOrder;
@@ -99,7 +134,10 @@ private:
     std::array<int, 2> samplesSinceLastFrame{ 0, 0 };
     std::vector<float> fftData;
     std::array<float, ObjectDatabase::NUM_BINS> targetBinGains{};
+    std::array<float, ObjectDatabase::NUM_BINS> targetBinPitchSemitones{};
     std::array<std::array<float, ObjectDatabase::NUM_BINS>, 2> currentBinGains{};
+    std::array<int, ObjectDatabase::NUM_BINS> targetBinDominantObjectIds{};
+    float transientMuteCompressorGain = 1.0f;
 
     static constexpr float maskSmoothAlpha = 0.30f;  // one-pole per STFT frame ≈ 30ms @ 48kHz/512hop
     float stftBlend = 0.0f;
@@ -132,6 +170,10 @@ private:
     std::array<float, SpectralFrameBuffer::NUM_BINS> lastAttackTime{};     // LAT pro Bin
     float globalAttackSlope = 0.0f;                                        // für Frame-Level Entscheidung
 
+    // In PluginProcessor.h, bei den anderen PR5-Arrays:
+    std::array<float, SpectralFrameBuffer::NUM_BINS> tonalDetectionCount{};
+    std::array<float, SpectralFrameBuffer::NUM_BINS> tonalDetectionMagnitude{};  // Für Stärke-Gewichtung
+
     // PR5: rule-based segmentation backend
     mutable juce::CriticalSection segmentationLock;
     std::array<float, SpectralFrameBuffer::NUM_BINS> previousMagnitudes{};
@@ -146,6 +188,7 @@ private:
     std::array<float, SpectralFrameBuffer::NUM_BINS> peakTonal{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> peakNoise{};
     std::vector<std::array<float, SpectralFrameBuffer::NUM_BINS>> recordedMagnitudeFrames;
+    std::vector<bool> recordedGateFrames;
     std::array<float, SpectralFrameBuffer::NUM_BINS> previousLogMagnitudes{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> tonalPersistence{};
     std::deque<float> spectralFluxHistory;
@@ -159,14 +202,54 @@ private:
     bool autoDetectRecording = false;
     bool overlayValid = false;
     int transientHoldFrames = 0;
+    std::atomic<int> transientGateHoldSamplesRemaining{ 0 };
+    std::atomic<bool> transientGateOpen{ false };
     int64_t autoDetectStartSample = 0;
     int64_t autoDetectTargetSamples = 0;
     int autoDetectFrameCount = 0;
     int autoDetectTransientFrameCount = 0;
     int autoDetectNonTransientFrameCount = 0;
+    std::atomic<int> selectedObjectId{ -1 };
+
+    struct PhaseVocoderObjectState
+    {
+        std::array<float, ObjectDatabase::NUM_BINS> previousAnalysisPhase{};
+        std::array<float, ObjectDatabase::NUM_BINS> synthesisPhase{};
+        bool initialized = false;
+    };
+
+    std::array<std::unordered_map<int, PhaseVocoderObjectState>, 2> phaseVocoderStates;
+
+    struct TransformSettings
+    {
+        float modulatorGain = 1.0f;
+        float amount = 0.0f;
+        float smoothMs = 0.0f;
+        int sourceObjectId = -1;
+    };
+
+    struct TransformSmoothState
+    {
+        std::array<float, ObjectDatabase::NUM_BINS> smoothedMagnitudes{};
+        bool initialized = false;
+    };
+
+    struct TransformFileData
+    {
+        std::vector<std::array<float, ObjectDatabase::NUM_BINS>> frames;
+        double durationSeconds = 0.0;
+    };
+
+    std::unordered_map<int, TransformSettings> transformSettingsByObject;
+    std::array<std::unordered_map<int, TransformSmoothState>, 2> transformSmoothStates;
+    mutable juce::CriticalSection transformFileLock;
+    std::unordered_map<int, TransformFileData> transformFileBuffer;
+    std::array<float, ObjectDatabase::NUM_BINS> currentAnalysisMagnitudes{};
 
     void createHannWindow();
     void processStftFrame(int channel, int64_t currentSampleIndex);
+    void applyPhaseVocoderPitchShift(int channel);
+    void applyTransformCrossSynthesis(int channel);
     void updateTargetBinGains();
     void analyseSegmentationFrame(const float* fftInterleaved, int64_t currentSampleIndex);
     void applyCosineMaskSmoothing(const std::array<float, SpectralFrameBuffer::NUM_BINS>& input,

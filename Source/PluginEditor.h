@@ -36,15 +36,17 @@ private:
     juce::Slider dryWetSlider;
     juce::Slider gateSlider;
     juce::Slider curveSlider;
+    juce::Slider transientThresholdSlider;
     
     // Control labels
     juce::Label dryWetLabel;
     juce::Label gateLabel;
     juce::Label curveLabel;
+    juce::Label transientThresholdLabel;
     
     // Attachments & UI
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dryWetAttachment;
-    juce::TextButton copyDebugButton{ "Copy Debug" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> transientThresholdAttachment;
     juce::Label versionLabel;
     juce::TooltipWindow tooltipWindow;
 

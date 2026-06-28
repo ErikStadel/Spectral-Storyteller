@@ -15,13 +15,41 @@ public:
     static constexpr int NUM_BINS = (1 << 11) / 2 + 1;  // 1025 (matching FFT_SIZE=2048)
     static constexpr int MAX_OBJECTS = 32;
 
+    struct AutomationKeyframe
+    {
+        double timeSec = 0.0;
+        float value = 1.0f;
+        float curvature = 0.0f; // Segment curvature from this keyframe to the next keyframe.
+    };
+
+    struct FXParameter
+    {
+        std::string name;
+        std::vector<AutomationKeyframe> keyframes;
+    };
+
+    struct FXModule
+    {
+        std::string name;
+        bool enabled = true;
+        int selectedParameterIndex = 0;
+        int sourceObjectId = -1; // Used by Transform: object id or FILE_SOURCE_ID.
+        std::vector<FXParameter> parameters;
+    };
+
+    static constexpr int FILE_SOURCE_ID = -2;
+
     struct ObjectMask
     {
+        int id = -1;
         std::string name;
         std::array<bool, NUM_BINS> mask;
         bool solo = false;
         bool mute = false;
+        bool recordEnabled = false;
+        bool engaged = true;
         int color = 0xFF00AA00;  // Default: green
+        std::vector<FXModule> fxChain;
 
         ObjectMask() : name("Object_"), mask{} {}
     };
@@ -38,6 +66,7 @@ public:
      * Remove an object by index.
      */
     void removeObject(int objectIndex);
+    void moveObject(int fromIndex, int toIndex);
 
     /**
      * Get object mask at index (nullptr if out of bounds).
@@ -45,6 +74,9 @@ public:
     ObjectMask* getObject(int objectIndex);
     const ObjectMask* getObject(int objectIndex) const;
     bool getObjectCopy(int objectIndex, ObjectMask& outObject) const;
+    bool getObjectCopyById(int objectId, ObjectMask& outObject) const;
+    int getObjectIndexById(int objectId) const;
+    int getObjectIdAtIndex(int objectIndex) const;
 
     /**
      * Get total number of objects.
@@ -89,16 +121,59 @@ public:
      * Set custom name for an object (for timeline track display).
      */
     void setObjectName(int objectIndex, const std::string& newName);
+    void setObjectRecordEnabled(int objectIndex, bool enabled);
+    void setObjectEngaged(int objectIndex, bool engaged);
+    void setSelectedObjectId(int objectId);
+    int getSelectedObjectId() const;
+
+    std::vector<FXModule> getObjectFxChain(int objectId) const;
+    bool setObjectFxEnabled(int objectId, const std::string& effectName, bool enabled);
+    bool addOrEnableObjectFx(int objectId, const std::string& effectName);
+    bool setObjectFxSelectedParameter(int objectId, const std::string& effectName, int parameterIndex);
+    std::string getObjectFxSelectedParameterName(int objectId, const std::string& effectName) const;
+    bool setObjectFxSourceObjectId(int objectId, const std::string& effectName, int sourceObjectId);
+    int getObjectFxSourceObjectId(int objectId, const std::string& effectName) const;
+
+    void addAutomationKeyframe(int objectId,
+                               const std::string& effectName,
+                               const std::string& parameterName,
+                               double timeSec,
+                               float value,
+                               float curvature = 0.0f);
+    void setAutomationSegmentCurvature(int objectId,
+                                       const std::string& effectName,
+                                       const std::string& parameterName,
+                                       double segmentStartTimeSec,
+                                       float curvature);
+    void deleteAutomationKeyframe(int objectId, const std::string& effectName, const std::string& parameterName, double timeSec);
+    std::vector<AutomationKeyframe> getAutomationKeyframes(int objectId, const std::string& effectName, const std::string& parameterName) const;
+    float getInterpolatedAutomationValue(int objectId,
+                                         const std::string& effectName,
+                                         const std::string& parameterName,
+                                         double timeSec,
+                                         float fallback = 1.0f) const;
+    float getObjectFxParameterValue(int objectId,
+                                    const std::string& effectName,
+                                    const std::string& parameterName,
+                                    float fallback = 1.0f) const;
     uint64_t getRevision() const;
 
     /**
-     * Returns true if any object has solo or mute active.
+     * Returns true if any engaged object exists or if solo/mute states are active.
      * Used in DSP to decide whether to use STFT output or bypass.
      */
     bool isAnyMaskingActive() const;
 
 private:
+    static FXModule makeFxModule(const std::string& effectName);
+    static void ensureBaseFx(ObjectMask& object);
+    static std::string normaliseEffectName(const std::string& effectName);
+    static int findFxIndexByName(const ObjectMask& object, const std::string& effectName);
+    static int findParameterIndexByName(const FXModule& fx, const std::string& parameterName);
+
     std::vector<ObjectMask> objects;
     mutable juce::CriticalSection lock;
+    int selectedObjectId = -1;
+    int nextObjectId = 1;
     uint64_t revision = 0;
 };
