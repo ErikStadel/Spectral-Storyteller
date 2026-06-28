@@ -765,10 +765,17 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
         const float carrierMag = std::sqrt(re * re + im * im);
         const float carrierPhase = std::atan2(im, re);
 
-        // Modulator (normalisiert auf RMS≈1) auf das aktuelle Carrier-Level heben,
-        // damit Amount=1 ungefähr dieselbe Lautstärke ergibt wie das Eingangssignal.
-        const float carrierRefLevel = currentAnalysisRms; // siehe c)
-        const float scaledModMag = smoothed * carrierRefLevel;
+        // Fix C: gedämpftes RMS-Matching.
+        // Ziel-RMS der Modulator-Normalisierung beim Laden = 0.1 (-20 dBFS).
+        // Mit sqrt() begrenzen wir den Aufschaukel-Effekt bei lauten Carriern,
+        // und jlimit kappt Extremwerte (Stille / Peaks).
+        constexpr float kModulatorTargetRms = 0.1f;
+        const float rmsRatio   = currentAnalysisRms / kModulatorTargetRms;
+        const float matchGain  = std::sqrt(juce::jlimit(0.0f, 4.0f, rmsRatio));
+
+        const float carrierRefLevel = matchGain;
+        const float scaledModMag    = smoothed * carrierRefLevel;
+
 
         // Gain wirkt auf den INPUT (Carrier), nicht auf den Modulator.
         const float scaledCarrierMag = carrierMag * settings.modulatorGain;
@@ -947,6 +954,20 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
     }
 
     totalSamplesProcessed += numSamples;
+    // Soft-Limit auf -1 dBFS, hartes Clip darüber
+const float ceiling = 0.89f; // ~ -1 dBFS
+for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+{
+    auto* d = buffer.getWritePointer(ch);
+    for (int i = 0; i < buffer.getNumSamples(); ++i)
+    {
+        float x = d[i];
+        // tanh-Soft-Clip, dann hartes Cap
+        x = std::tanh(x * 0.9f) * 1.1f;
+        d[i] = juce::jlimit(-ceiling, ceiling, x);
+    }
+}
+
 }
 
 juce::AudioProcessorEditor *PluginProcessor::createEditor()
@@ -1188,21 +1209,23 @@ double sumSq = 0.0;
 int numChannels = fileAudio.getNumChannels();
 int numSamps = fileAudio.getNumSamples();
 
+for (int ch = 0; ch < numChannels; ++ch) {
+    const float* d = fileAudio.getReadPointer(ch);
+    for (int i = 0; i < numSamps; ++i) sumSq += (double)d[i]*d[i];
+}
+double rms  = std::sqrt(sumSq / juce::jmax(1, numChannels*numSamps));
+float  peak = fileAudio.getMagnitude(0, numSamps);
+
+// Ziel-RMS = -20 dBFS  (≈ 0.1) statt 1.0
+const double targetRms = 0.1;
+float scale = (rms > 1.0e-7) ? (float)(targetRms / rms) : 1.0f;
+
+// Peak-Cap: nach Skalierung darf Peak <= 0.95 sein
+if (peak * scale > 0.95f)
+    scale = 0.95f / juce::jmax(1.0e-6f, peak);
+
 for (int ch = 0; ch < numChannels; ++ch)
-{
-    auto* data = fileAudio.getReadPointer(ch);
-    for (int i = 0; i < numSamps; ++i)
-        sumSq += static_cast<double>(data[i]) * data[i];
-}
-
-double rms = std::sqrt(sumSq / static_cast<double>(juce::jmax(1, numChannels * numSamps)));
-
-if (rms > 0.0000001) // Schutz gegen Division durch Null
-{
-    float scale = static_cast<float>(1.0 / rms);
-    for (int ch = 0; ch < numChannels; ++ch)
-        fileAudio.applyGain(ch, 0, numSamps, scale);
-}
+    fileAudio.applyGain(ch, 0, numSamps, scale);
 
 
         juce::dsp::FFT localFft(fftOrder);
