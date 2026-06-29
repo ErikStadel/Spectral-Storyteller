@@ -111,8 +111,30 @@ PluginProcessor::PluginProcessor()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters(*this, nullptr, juce::Identifier("Parameters"),
-                 {std::make_unique<juce::AudioParameterFloat>("dryWet", "Dry/Wet", 0.0f, 1.0f, 1.0f),
-                  std::make_unique<juce::AudioParameterFloat>("transientThreshold", "Transient Threshold", -60.0f, 0.0f, -24.0f)}),
+{
+    std::make_unique<juce::AudioParameterFloat>("dryWet", "Dry/Wet", 0.0f, 1.0f, 1.0f),
+
+    std::make_unique<juce::AudioParameterFloat>(
+        "transientThreshold",
+        "Transient Threshold",
+        -60.0f,
+        0.0f,
+        -24.0f),
+
+    std::make_unique<juce::AudioParameterFloat>(
+        "inputGain",
+        "Input Gain",
+        -24.0f,
+        24.0f,
+        0.0f),
+
+    std::make_unique<juce::AudioParameterFloat>(
+        "outputGain",
+        "Output Gain",
+        -24.0f,
+        24.0f,
+        0.0f)
+}),
       fft(fftOrder),
       window(fftSize),
       fftData(2 * fftSize),
@@ -854,7 +876,20 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
 
     const int numSamples = buffer.getNumSamples();
     const int numChannels = juce::jmin(buffer.getNumChannels(), 2);
+    // Input Gain
+    const float inputGainDb =
+    parameters.getRawParameterValue("inputGain")->load();
 
+    const float inputGain =
+    juce::Decibels::decibelsToGain(inputGainDb);
+
+    buffer.applyGain(inputGain);
+
+// Eingangspegel messen
+float inMag = 0.0f;
+for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    inMag = juce::jmax(inMag,
+                       buffer.getMagnitude(ch, 0, buffer.getNumSamples()));
     if (auto *playHead = getPlayHead())
     {
         if (auto pos = playHead->getPosition())
@@ -955,9 +990,9 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
 
     totalSamplesProcessed += numSamples;
     // Soft-Limit auf -1 dBFS, hartes Clip darüber
-const float ceiling = 0.89f; // ~ -1 dBFS
-for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-{
+    const float ceiling = 0.89f; // ~ -1 dBFS
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    {
     auto* d = buffer.getWritePointer(ch);
     for (int i = 0; i < buffer.getNumSamples(); ++i)
     {
@@ -967,7 +1002,23 @@ for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         d[i] = juce::jlimit(-ceiling, ceiling, x);
     }
 }
+ // Output Gain
+const float outputGainDb =
+    parameters.getRawParameterValue("outputGain")->load();
 
+const float outputGain =
+    juce::Decibels::decibelsToGain(outputGainDb);
+
+buffer.applyGain(outputGain);
+
+// Ausgangspegel messen
+float outMag = 0.0f;
+for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    outMag = juce::jmax(outMag,
+                        buffer.getMagnitude(ch, 0, buffer.getNumSamples()));
+
+outputPeakDb.store(
+    juce::Decibels::gainToDecibels(outMag, -90.0f));
 }
 
 juce::AudioProcessorEditor *PluginProcessor::createEditor()

@@ -163,21 +163,36 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     gateLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(gateLabel);
 
-    // Curve slider
-    curveSlider.setSliderStyle(juce::Slider::LinearVertical);
-    curveSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 62, 20);
-    curveSlider.setRange(0.0, 10.0, 0.1);
-    curveSlider.setValue(2.0);
-    curveSlider.onValueChange = [this]
-    {
-        if (spectralView)
-            spectralView->setFrequencyCurve(static_cast<float>(curveSlider.getValue()));
-    };
-    addAndMakeVisible(curveSlider);
+        // Input gain + meter
+    inputGainSlider.setSliderStyle(juce::Slider::LinearVertical);
+    inputGainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 56, 18);
+    inputGainSlider.setRange(-24.0, 24.0, 0.1);
+    inputGainSlider.setValue(0.0);
+    inputGainSlider.setTextValueSuffix(" dB");
+    addAndMakeVisible(inputGainSlider);
 
-    curveLabel.setText("Curve", juce::dontSendNotification);
-    curveLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(curveLabel);
+    inputLabel.setText("Input", juce::dontSendNotification);
+    inputLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(inputLabel);
+
+    inputMeter.setSource(&processor.getInputPeakDb());
+    addAndMakeVisible(inputMeter);
+
+    // Output gain + meter
+    outputGainSlider.setSliderStyle(juce::Slider::LinearVertical);
+    outputGainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 56, 18);
+    outputGainSlider.setRange(-24.0, 24.0, 0.1);
+    outputGainSlider.setValue(0.0);
+    outputGainSlider.setTextValueSuffix(" dB");
+    addAndMakeVisible(outputGainSlider);
+
+    outputLabel.setText("Output", juce::dontSendNotification);
+    outputLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(outputLabel);
+
+    outputMeter.setSource(&processor.getOutputPeakDb());
+    addAndMakeVisible(outputMeter);
+
 
     // Transient threshold knob
     transientThresholdSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -197,6 +212,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         processor.getValueTreeState(), "dryWet", dryWetSlider);
     transientThresholdAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.getValueTreeState(), "transientThreshold", transientThresholdSlider);
+            inputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor.getValueTreeState(), "inputGain", inputGainSlider);
+    outputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor.getValueTreeState(), "outputGain", outputGainSlider);
+
 
     // Version info
     versionLabel.setText(processor.getBuildInfo(), juce::dontSendNotification);
@@ -242,43 +262,54 @@ void PluginEditor::resized()
     if (objectSidebar)
         objectSidebar->setBounds(sidebar);
 
-    auto controls = controlPanel.reduced(2);
+        auto controls = controlPanel.reduced(2);
     const int blockSpacing = 10;
-    const int labelH = 18;
+    const int labelH       = 18;
+    const int meterW       = 10;   // schmaler Pegelmesser
+    const int meterGap     = 4;
 
-    auto topSliderBlock = controls.removeFromTop(static_cast<int>(controls.getHeight() * 0.62f));
+    // Oben: 4 vertikale Slider (Input | Output | Dry/Wet | Gate)
+    auto topBlock = controls.removeFromTop(static_cast<int>(controls.getHeight() * 0.65f));
     controls.removeFromTop(blockSpacing);
-    auto gateKnobBlock = controls;
+    auto knobBlock = controls;
 
-    auto sliderCols = topSliderBlock;
-    const int colGap = 8;
-    const int colWidth = (sliderCols.getWidth() - colGap * 2) / 3;
+    const int colGap   = 6;
+    const int numCols  = 4;
+    const int colWidth = (topBlock.getWidth() - colGap * (numCols - 1)) / numCols;
 
-    auto dryCol = sliderCols.removeFromLeft(colWidth);
-    sliderCols.removeFromLeft(colGap);
-    auto gateCol = sliderCols.removeFromLeft(colWidth);
-    sliderCols.removeFromLeft(colGap);
-    auto curveCol = sliderCols;
+    auto layoutSliderCol = [&](juce::Rectangle<int> col, juce::Label& lbl, juce::Slider& sld)
+    {
+        lbl.setBounds(col.removeFromTop(labelH));
+        col.removeFromTop(2);
+        sld.setBounds(col.reduced(2, 2));
+    };
 
-    auto dryLabelArea = dryCol.removeFromTop(labelH);
-    dryWetLabel.setBounds(dryLabelArea);
-    dryCol.removeFromTop(2);
-    dryWetSlider.setBounds(dryCol.reduced(2, 2));
+    auto layoutMeterCol = [&](juce::Rectangle<int> col, juce::Label& lbl,
+                              juce::Slider& sld, LevelMeter& meter)
+    {
+        lbl.setBounds(col.removeFromTop(labelH));
+        col.removeFromTop(2);
+        auto meterArea = col.removeFromLeft(meterW);
+        col.removeFromLeft(meterGap);
+        meter.setBounds(meterArea.reduced(0, 2));
+        sld.setBounds(col.reduced(2, 2));
+    };
 
-    auto gateLabelArea = gateCol.removeFromTop(labelH);
-    gateLabel.setBounds(gateLabelArea);
-    gateCol.removeFromTop(2);
-    gateSlider.setBounds(gateCol.reduced(2, 2));
+    auto inCol  = topBlock.removeFromLeft(colWidth); topBlock.removeFromLeft(colGap);
+    auto outCol = topBlock.removeFromLeft(colWidth); topBlock.removeFromLeft(colGap);
+    auto dryCol = topBlock.removeFromLeft(colWidth); topBlock.removeFromLeft(colGap);
+    auto gateCol = topBlock;
 
-    auto curveLabelArea = curveCol.removeFromTop(labelH);
-    curveLabel.setBounds(curveLabelArea);
-    curveCol.removeFromTop(2);
-    curveSlider.setBounds(curveCol.reduced(2, 2));
+    layoutMeterCol(inCol,  inputLabel,  inputGainSlider,  inputMeter);
+    layoutMeterCol(outCol, outputLabel, outputGainSlider, outputMeter);
+    layoutSliderCol(dryCol,  dryWetLabel, dryWetSlider);
+    layoutSliderCol(gateCol, gateLabel,   gateSlider);
 
-    auto gateKnobLabel = gateKnobBlock.removeFromTop(labelH);
-    transientThresholdLabel.setBounds(gateKnobLabel);
-    gateKnobBlock.removeFromTop(4);
-    transientThresholdSlider.setBounds(gateKnobBlock.reduced(12, 2));
+    // Unten: Transient Gate (Rotary)
+    transientThresholdLabel.setBounds(knobBlock.removeFromTop(labelH));
+    knobBlock.removeFromTop(4);
+    transientThresholdSlider.setBounds(knobBlock.reduced(12, 2));
+
     
     // Spectrogram fills remaining area
     if (spectralView)

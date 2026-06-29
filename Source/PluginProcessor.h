@@ -13,7 +13,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 6;
-constexpr int VERSION_BUILD = 16;
+constexpr int VERSION_BUILD = 17;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -45,6 +45,8 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     juce::AudioProcessorValueTreeState& getValueTreeState() { return parameters; }
+    std::atomic<float>& getInputPeakDb()  { return inputPeakDb; }
+    std::atomic<float>& getOutputPeakDb() { return outputPeakDb; }
     
     juce::String getVersion() const { 
         return juce::String(VERSION_MAJOR) + "." + juce::String(VERSION_MINOR) + "." + juce::String(VERSION_BUILD);
@@ -117,6 +119,8 @@ private:
     juce::AudioProcessorValueTreeState parameters;
     std::atomic<float>* dryWetParam = nullptr;
     std::atomic<float>* transientThresholdParam = nullptr;
+    std::atomic<float> inputPeakDb { -90.0f };
+    std::atomic<float> outputPeakDb{ -90.0f };
 
     static constexpr int fftOrder = 11;
     static constexpr int fftSize = 1 << fftOrder;
