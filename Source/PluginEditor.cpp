@@ -82,6 +82,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
                 db->setObjectMask(newIndex, mask);
 
+                ObjectDatabase::ObjectMask created;
+                if (db->getObjectCopy(newIndex, created))
+                    processor.calibrateDensityAnchor(created);
+
                 processor.setSelectedObjectId(newObjectId);
 
                 // Refresh sidebar

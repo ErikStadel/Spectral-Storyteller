@@ -13,8 +13,8 @@
 
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
-constexpr int VERSION_MINOR = 6;
-constexpr int VERSION_BUILD = 20;
+constexpr int VERSION_MINOR = 7;
+constexpr int VERSION_BUILD = 1;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -118,6 +118,7 @@ public:
     bool isTransportPlaying() const noexcept { return transportPlaying.load(); }
 
     ModulationMatrix& getModulationMatrix() { return modMatrix; }
+    void calibrateDensityAnchor(ObjectDatabase::ObjectMask& obj);
 
 private:
     juce::AudioProcessorValueTreeState parameters;
@@ -250,7 +251,17 @@ private:
         double durationSeconds = 0.0;
     };
 
+    struct SpectralFxSettings
+    {
+        float density = 1.0f;
+        float brightness = 0.0f;
+        float thresholdLin = 0.0f;
+        float centerBin = 1.0f;
+        float tiltExp = 0.0f;
+    };
+
     std::unordered_map<int, TransformSettings> transformSettingsByObject;
+    std::unordered_map<int, SpectralFxSettings> spectralFxByObject;
     std::array<std::unordered_map<int, TransformSmoothState>, 2> transformSmoothStates;
     mutable juce::CriticalSection transformFileLock;
     std::unordered_map<int, TransformFileData> transformFileBuffer;

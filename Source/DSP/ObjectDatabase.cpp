@@ -64,6 +64,17 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
         fx.parameters[1].keyframes.push_back({ 0.0, 0.0f, 0.0f });
         fx.sourceObjectId = -1;
     }
+    else if (fx.name == "Density")
+    {
+        fx.parameters.push_back({ "Density", {} });
+        fx.parameters[0].keyframes.push_back({ 0.0, 1.0f, 0.0f });
+    }
+    else if (fx.name == "Brightness")
+    {
+        // Stored as 0..1 where 0.5 maps to neutral (0.0 in DSP bipolar domain).
+        fx.parameters.push_back({ "Brightness", {} });
+        fx.parameters[0].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+    }
     else
     {
         fx.parameters.push_back({ "Amount", {} });
@@ -74,6 +85,50 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
 
 void ObjectDatabase::ensureBaseFx(ObjectMask& object)
 {
+    auto ensureAtIndex = [&object](const std::string& effectName, int wantedIndex)
+    {
+        const int idx = findFxIndexByName(object, effectName);
+        if (idx < 0)
+        {
+            auto it = object.fxChain.begin() + juce::jlimit(0, static_cast<int>(object.fxChain.size()), wantedIndex);
+            object.fxChain.insert(it, makeFxModule(effectName));
+            return;
+        }
+
+        if (idx != wantedIndex)
+        {
+            auto fx = object.fxChain[static_cast<size_t>(idx)];
+            object.fxChain.erase(object.fxChain.begin() + idx);
+            auto it = object.fxChain.begin() + juce::jlimit(0, static_cast<int>(object.fxChain.size()), wantedIndex);
+            object.fxChain.insert(it, std::move(fx));
+        }
+    };
+
+    ensureAtIndex("Density", 0);
+    ensureAtIndex("Brightness", 1);
+
+    const int densityIdx = findFxIndexByName(object, "Density");
+    if (densityIdx >= 0)
+    {
+        auto& density = object.fxChain[static_cast<size_t>(densityIdx)];
+        density.enabled = true;
+        if (density.parameters.empty())
+            density.parameters.push_back({ "Density", {} });
+        if (density.parameters[0].keyframes.empty())
+            density.parameters[0].keyframes.push_back({ 0.0, 1.0f, 0.0f });
+    }
+
+    const int brightnessIdx = findFxIndexByName(object, "Brightness");
+    if (brightnessIdx >= 0)
+    {
+        auto& brightness = object.fxChain[static_cast<size_t>(brightnessIdx)];
+        brightness.enabled = true;
+        if (brightness.parameters.empty())
+            brightness.parameters.push_back({ "Brightness", {} });
+        if (brightness.parameters[0].keyframes.empty())
+            brightness.parameters[0].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+    }
+
     const int volIdx = findFxIndexByName(object, "Volume");
     if (volIdx < 0)
         object.fxChain.push_back(makeFxModule("Volume"));
@@ -618,6 +673,24 @@ int ObjectDatabase::getObjectFxSourceObjectId(int objectId, const std::string& e
     return -1;
 }
 
+bool ObjectDatabase::setObjectDensityAnchor(int objectId, float anchorDb, bool valid)
+{
+    juce::ScopedLock lock_(lock);
+
+    for (auto& object : objects)
+    {
+        if (object.id != objectId)
+            continue;
+
+        object.densityAnchorDb = anchorDb;
+        object.densityAnchorValid = valid;
+        ++revision;
+        return true;
+    }
+
+    return false;
+}
+
 std::string ObjectDatabase::getObjectFxSelectedParameterName(int objectId, const std::string& effectName) const
 {
     juce::ScopedLock lock_(lock);
@@ -904,6 +977,165 @@ bool ObjectDatabase::isAnyMaskingActive() const
     }
 
     return false;
+}
+
+juce::ValueTree ObjectDatabase::toValueTree() const
+{
+    juce::ScopedLock lock_(lock);
+
+    juce::ValueTree root("ObjectDatabase");
+    root.setProperty("selectedObjectId", selectedObjectId, nullptr);
+    root.setProperty("nextObjectId", nextObjectId, nullptr);
+
+    for (const auto& object : objects)
+    {
+        juce::ValueTree objNode("Object");
+        objNode.setProperty("id", object.id, nullptr);
+        objNode.setProperty("name", juce::String(object.name), nullptr);
+        objNode.setProperty("solo", object.solo, nullptr);
+        objNode.setProperty("mute", object.mute, nullptr);
+        objNode.setProperty("recordEnabled", object.recordEnabled, nullptr);
+        objNode.setProperty("engaged", object.engaged, nullptr);
+        objNode.setProperty("color", object.color, nullptr);
+        objNode.setProperty("densityAnchorDb", object.densityAnchorDb, nullptr);
+        objNode.setProperty("densityAnchorValid", object.densityAnchorValid, nullptr);
+
+        juce::String maskBits;
+        maskBits.preallocateBytes(NUM_BINS + 1);
+        for (int i = 0; i < NUM_BINS; ++i)
+            maskBits << (object.mask[static_cast<size_t>(i)] ? '1' : '0');
+        objNode.setProperty("mask", maskBits, nullptr);
+
+        juce::ValueTree fxRoot("FxChain");
+        for (const auto& fx : object.fxChain)
+        {
+            juce::ValueTree fxNode("Fx");
+            fxNode.setProperty("name", juce::String(fx.name), nullptr);
+            fxNode.setProperty("enabled", fx.enabled, nullptr);
+            fxNode.setProperty("selectedParameterIndex", fx.selectedParameterIndex, nullptr);
+            fxNode.setProperty("sourceObjectId", fx.sourceObjectId, nullptr);
+
+            for (const auto& parameter : fx.parameters)
+            {
+                juce::ValueTree paramNode("Param");
+                paramNode.setProperty("name", juce::String(parameter.name), nullptr);
+
+                for (const auto& keyframe : parameter.keyframes)
+                {
+                    juce::ValueTree keyNode("Key");
+                    keyNode.setProperty("time", keyframe.timeSec, nullptr);
+                    keyNode.setProperty("value", keyframe.value, nullptr);
+                    keyNode.setProperty("curvature", keyframe.curvature, nullptr);
+                    paramNode.appendChild(keyNode, nullptr);
+                }
+
+                fxNode.appendChild(paramNode, nullptr);
+            }
+
+            fxRoot.appendChild(fxNode, nullptr);
+        }
+
+        objNode.appendChild(fxRoot, nullptr);
+        root.appendChild(objNode, nullptr);
+    }
+
+    return root;
+}
+
+void ObjectDatabase::fromValueTree(const juce::ValueTree& tree)
+{
+    juce::ScopedLock lock_(lock);
+
+    if (!tree.isValid() || !tree.hasType("ObjectDatabase"))
+        return;
+
+    objects.clear();
+    selectedObjectId = static_cast<int>(tree.getProperty("selectedObjectId", -1));
+    nextObjectId = static_cast<int>(tree.getProperty("nextObjectId", 1));
+
+    int maxId = 0;
+    for (int i = 0; i < tree.getNumChildren(); ++i)
+    {
+        const auto objNode = tree.getChild(i);
+        if (!objNode.hasType("Object"))
+            continue;
+
+        ObjectMask object;
+        object.id = static_cast<int>(objNode.getProperty("id", -1));
+        object.name = objNode.getProperty("name", "Object").toString().toStdString();
+        object.solo = static_cast<bool>(objNode.getProperty("solo", false));
+        object.mute = static_cast<bool>(objNode.getProperty("mute", false));
+        object.recordEnabled = static_cast<bool>(objNode.getProperty("recordEnabled", false));
+        object.engaged = static_cast<bool>(objNode.getProperty("engaged", true));
+        object.color = static_cast<int>(objNode.getProperty("color", static_cast<int>(0xFF00AA00)));
+        object.densityAnchorDb = static_cast<float>(objNode.getProperty("densityAnchorDb", -60.0f));
+        object.densityAnchorValid = static_cast<bool>(objNode.getProperty("densityAnchorValid", false));
+        object.mask.fill(false);
+
+        const auto maskBits = objNode.getProperty("mask", juce::String()).toString();
+        const int maskLen = juce::jmin(NUM_BINS, maskBits.length());
+        for (int bin = 0; bin < maskLen; ++bin)
+            object.mask[static_cast<size_t>(bin)] = (maskBits[bin] == '1');
+
+        const auto fxRoot = objNode.getChildWithName("FxChain");
+        if (fxRoot.isValid())
+        {
+            object.fxChain.clear();
+            for (int fxIdx = 0; fxIdx < fxRoot.getNumChildren(); ++fxIdx)
+            {
+                const auto fxNode = fxRoot.getChild(fxIdx);
+                if (!fxNode.hasType("Fx"))
+                    continue;
+
+                FXModule fx;
+                fx.name = fxNode.getProperty("name", "Effect").toString().toStdString();
+                fx.enabled = static_cast<bool>(fxNode.getProperty("enabled", true));
+                fx.selectedParameterIndex = static_cast<int>(fxNode.getProperty("selectedParameterIndex", 0));
+                fx.sourceObjectId = static_cast<int>(fxNode.getProperty("sourceObjectId", -1));
+
+                for (int p = 0; p < fxNode.getNumChildren(); ++p)
+                {
+                    const auto paramNode = fxNode.getChild(p);
+                    if (!paramNode.hasType("Param"))
+                        continue;
+
+                    FXParameter parameter;
+                    parameter.name = paramNode.getProperty("name", "Amount").toString().toStdString();
+
+                    for (int k = 0; k < paramNode.getNumChildren(); ++k)
+                    {
+                        const auto keyNode = paramNode.getChild(k);
+                        if (!keyNode.hasType("Key"))
+                            continue;
+
+                        AutomationKeyframe key;
+                        key.timeSec = static_cast<double>(keyNode.getProperty("time", 0.0));
+                        key.value = static_cast<float>(keyNode.getProperty("value", 1.0f));
+                        key.curvature = static_cast<float>(keyNode.getProperty("curvature", 0.0f));
+                        parameter.keyframes.push_back(key);
+                    }
+
+                    std::sort(parameter.keyframes.begin(), parameter.keyframes.end(),
+                              [](const AutomationKeyframe& a, const AutomationKeyframe& b)
+                              {
+                                  return a.timeSec < b.timeSec;
+                              });
+                    fx.parameters.push_back(std::move(parameter));
+                }
+
+                object.fxChain.push_back(std::move(fx));
+            }
+        }
+
+        ensureBaseFx(object);
+        maxId = juce::jmax(maxId, object.id);
+        objects.push_back(std::move(object));
+    }
+
+    if (nextObjectId <= maxId)
+        nextObjectId = maxId + 1;
+
+    ++revision;
 }
 
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <juce_data_structures/juce_data_structures.h>
 #include <vector>
 #include <array>
 
@@ -49,6 +50,8 @@ public:
         bool recordEnabled = false;
         bool engaged = true;
         int color = 0xFF00AA00;  // Default: green
+        float densityAnchorDb = -60.0f;
+        bool densityAnchorValid = false;
         std::vector<FXModule> fxChain;
 
         ObjectMask() : name("Object_"), mask{} {}
@@ -133,6 +136,7 @@ public:
     std::string getObjectFxSelectedParameterName(int objectId, const std::string& effectName) const;
     bool setObjectFxSourceObjectId(int objectId, const std::string& effectName, int sourceObjectId);
     int getObjectFxSourceObjectId(int objectId, const std::string& effectName) const;
+    bool setObjectDensityAnchor(int objectId, float anchorDb, bool valid);
 
     void addAutomationKeyframe(int objectId,
                                const std::string& effectName,
@@ -157,6 +161,8 @@ public:
                                     const std::string& parameterName,
                                     float fallback = 1.0f) const;
     uint64_t getRevision() const;
+    juce::ValueTree toValueTree() const;
+    void fromValueTree(const juce::ValueTree& tree);
 
     /**
      * Returns true if any engaged object exists or if solo/mute states are active.

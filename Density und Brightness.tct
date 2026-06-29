@@ -1,0 +1,146 @@
+1) Model/SpectralObject.h — Anchor + Defaults
+In der Struktur, die ein Objekt repräsentiert (vermutlich SpectralObject o.ä.), zwei Felder ergänzen:
+
+// Innerhalb der Objekt-Struktur (z.B. SpectralObject)
+float densityAnchorDb = -60.0f;   // Referenzpegel, gesetzt bei Erstellung
+bool  densityAnchorValid = false; // false = noch nicht kalibriert
+
+// In toValueTree() ergänzen:
+v.setProperty("densityAnchorDb", densityAnchorDb, nullptr);
+v.setProperty("densityAnchorValid", densityAnchorValid, nullptr);
+
+// In fromValueTree() ergänzen:
+densityAnchorDb    = (float) v.getProperty("densityAnchorDb", -60.0f);
+densityAnchorValid = (bool)  v.getProperty("densityAnchorValid", false);
+2) FX-Defaults — beide Module standardmäßig in jedes Objekt
+Dort, wo ein neues Objekt seine fxChain initialisiert (vermutlich SpectralObject::createDefaultFx() oder beim Konstruktor / in addObject(...)), beide Module anlegen:
+
+// Beide Module IMMER als erste hinzufügen, damit Reihenfolge stabil ist.
+fxChain.add ({ "density",    { { "Density",    1.0f, 0.0f, 1.0f } } });
+fxChain.add ({ "brightness", { { "Brightness", 0.0f, -1.0f, 1.0f } } });
+Wichtig: Parameter-IDs exakt "density" und "brightness" (kleingeschrieben) — die Mod-Matrix verwendet diese IDs zum Routen.
+
+3) Pegel-Kalibrierung bei Objekt-Erstellung
+3a) Helper in PluginProcessor.h
+// In der Klasse PluginProcessor, public:
+void calibrateDensityAnchor (SpectralObject& obj);
+3b) Implementierung in PluginProcessor.cpp
+void PluginProcessor::calibrateDensityAnchor (SpectralObject& obj)
+{
+    // Aktuelles Spektrogramm holen — passe das an deine API an.
+    // Hier: spectrogramData[frame][bin] mit Magnituden in linearem Maß.
+    const auto& spec = analyzer.getMagnitudeFrames(); // <-- ggf. anpassen
+    if (spec.empty()) return;
+
+    double sum = 0.0;
+    int count  = 0;
+
+    for (int f = obj.startFrame; f <= obj.endFrame; ++f)
+    {
+        if (f < 0 || f >= (int) spec.size()) continue;
+        for (int b = obj.lowBin; b <= obj.highBin; ++b)
+        {
+            if (b < 0 || b >= (int) spec[f].size()) continue;
+            if (! obj.maskContains(f, b)) continue; // falls Maske vorhanden
+            const float m = spec[f][b];
+            if (m > 1.0e-7f) { sum += m; ++count; }
+        }
+    }
+
+    if (count > 0)
+    {
+        const float avgMag = (float) (sum / count);
+        obj.densityAnchorDb    = juce::Decibels::gainToDecibels (avgMag, -120.0f);
+        obj.densityAnchorValid = true;
+    }
+    else
+    {
+        obj.densityAnchorDb    = -60.0f;
+        obj.densityAnchorValid = true;
+    }
+}
+3c) Aufrufstellen
+Überall, wo ein Objekt neu entsteht — typischerweise:
+
+Lasso-Commit (z.B. onLassoFinalized(...) / addObjectFromLasso(...))
+Auto-Detect (z.B. runAutoDetect() / createObjectsFromDetection(...))
+Direkt nach objects.add(newObj) bzw. nach Erzeugung:
+
+calibrateDensityAnchor (newObj);
+4) DSP — Density & Brightness in der Bin-Schleife
+In PluginProcessor::applyTransform... (oder wie deine pro-Objekt Verrechnungsschleife heißt). Direkt vor dem Schreiben der Magnitude in den Output-Buffer einfügen:
+
+// === Parameter (Base + Modulation) ===
+auto getParamWithMod = [&] (const SpectralObject& o, const juce::String& id, float def) -> float
+{
+    float base = o.getFxParam (id, def);
+    float mod  = modMatrix.getModulation (o.id, id); // additiv, [-1..1] skaliert in MM
+    return base + mod;
+};
+
+const float density    = juce::jlimit (0.0f, 1.0f,
+                            getParamWithMod (obj, "density", 1.0f));
+const float brightness = juce::jlimit (-1.0f, 1.0f,
+                            getParamWithMod (obj, "brightness", 0.0f));
+
+// === DENSITY: Threshold-Berechnung ===
+// Density=1 -> -120 dB (alles durch), Density=0.5 -> Anchor, Density=0 -> 0 dB
+const float anchorDb = obj.densityAnchorValid ? obj.densityAnchorDb : -60.0f;
+float thresholdDb;
+if (density >= 0.5f)
+{
+    // 1.0 -> -120 dB, 0.5 -> anchor
+    const float t = (1.0f - density) * 2.0f; // 0..1
+    thresholdDb = juce::jmap (t, -120.0f, anchorDb);
+}
+else
+{
+    // 0.5 -> anchor, 0.0 -> 0 dB (nur lautester Peak)
+    const float t = (0.5f - density) * 2.0f; // 0..1
+    thresholdDb = juce::jmap (t, anchorDb, 0.0f);
+}
+const float thresholdLin = juce::Decibels::decibelsToGain (thresholdDb, -120.0f);
+
+// === BRIGHTNESS: Tilt-Vorbereitung ===
+const float centerBin = juce::jmax (1.0f, (obj.lowBin + obj.highBin) * 0.5f);
+const float tiltExp   = brightness * 2.0f; // -2..+2
+
+// === Pro Bin in der Objektmaske ===
+for (int b = obj.lowBin; b <= obj.highBin; ++b)
+{
+    if (! obj.maskContains (frameIdx, b)) continue;
+
+    float mag = magnitudes[b];
+
+    // DENSITY: Spectral Gate
+    if (mag < thresholdLin)
+    {
+        mag = 0.0f;
+    }
+    else
+    {
+        // BRIGHTNESS: Tilt um centerBin
+        // factor = (bin/center)^(brightness*2)
+        if (brightness != 0.0f && b > 0)
+        {
+            float ratio  = (float) b / centerBin;
+            float factor = std::pow (ratio, tiltExp);
+            // Sicherheits-Clamp gegen Extremwerte
+            factor = juce::jlimit (0.125f, 8.0f, factor);
+            mag   *= factor;
+        }
+    }
+
+    magnitudes[b] = mag;
+}
+Anpassen: magnitudes, frameIdx, obj.maskContains, obj.lowBin/highBin, modMatrix.getModulation — die Symbole heißen in deinem Code evtl. leicht anders, aber die Logik ist eindeutig.
+
+5) FX-UI — Standard-Slider reichen aus
+Da Density/Brightness wie alle anderen FX-Parameter über fxChain[].params definiert sind, sollte deine generische FXModuleComponent sie automatisch als Slider rendern. Falls du explizite Labels/Ranges brauchst, in der UI-Registry ergänzen:
+
+// z.B. in FxRegistry.cpp / FxFactory
+registerModule ("density",    "Density",
+    { { "Density",    0.0f, 1.0f,  1.0f } });
+registerModule ("brightness", "Brightness",
+    { { "Brightness", -1.0f, 1.0f, 0.0f } });
+Damit erscheinen sie auch im Drag-Target der Mod-Matrix (Header → LFO/XY-Slot).

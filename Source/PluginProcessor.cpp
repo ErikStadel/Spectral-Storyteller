@@ -223,6 +223,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     targetBinPitchSemitones.fill(0.0f);
     targetBinDominantObjectIds.fill(-1);
     transformSettingsByObject.clear();
+    spectralFxByObject.clear();
     timelineObjectGains.fill(1.0f);
     currentTimelineObjectGains.fill(1.0f);
     previousMagnitudes.fill(0.0f);
@@ -273,6 +274,7 @@ void PluginProcessor::updateTargetBinGains()
 {
     const double nowSec = transportSeconds.load();
     transformSettingsByObject.clear();
+    spectralFxByObject.clear();
 
     const auto getModulatedNorm = [this, nowSec](int objectId,
                                                  const juce::String& fxName,
@@ -303,6 +305,9 @@ void PluginProcessor::updateTargetBinGains()
             if (!objectDatabase->getObjectCopy(obj, item))
                 continue;
 
+            if (!item.densityAnchorValid)
+                calibrateDensityAnchor(item);
+
                         const float volumeNorm = getModulatedNorm(item.id, "Volume", "Gain", 0.5f);
 
             TransformSettings transformSettings;
@@ -320,6 +325,42 @@ void PluginProcessor::updateTargetBinGains()
                                                                                                             getModulatedNorm(item.id, "Transform", "Smooth", 0.0f) * 500.0f);
             transformSettings.sourceObjectId = objectDatabase->getObjectFxSourceObjectId(item.id, "Transform");
             transformSettingsByObject[item.id] = transformSettings;
+
+            const float density = juce::jlimit(0.0f,
+                                               1.0f,
+                                               getModulatedNorm(item.id, "Density", "Density", 1.0f));
+            const float brightnessNorm = juce::jlimit(0.0f,
+                                                      1.0f,
+                                                      getModulatedNorm(item.id, "Brightness", "Brightness", 0.5f));
+            const float brightness = (brightnessNorm - 0.5f) * 2.0f;
+
+            int lowBin = -1;
+            int highBin = -1;
+            for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
+            {
+                if (!item.mask[static_cast<size_t>(bin)])
+                    continue;
+
+                if (lowBin < 0)
+                    lowBin = bin;
+                highBin = bin;
+            }
+
+            const float anchorDb = item.densityAnchorValid ? item.densityAnchorDb : -60.0f;
+            const float thresholdDb = (density >= 0.5f)
+                                          ? juce::jmap((1.0f - density) * 2.0f, -120.0f, anchorDb)
+                                          : juce::jmap((0.5f - density) * 2.0f, anchorDb, 0.0f);
+
+            SpectralFxSettings spectralSettings;
+            spectralSettings.density = density;
+            spectralSettings.brightness = brightness;
+            spectralSettings.thresholdLin = juce::Decibels::decibelsToGain(thresholdDb, -120.0f);
+            spectralSettings.centerBin = juce::jmax(1.0f,
+                                                    (lowBin >= 0 && highBin >= lowBin)
+                                                        ? 0.5f * static_cast<float>(lowBin + highBin)
+                                                        : 1.0f);
+            spectralSettings.tiltExp = brightness * 2.0f;
+            spectralFxByObject[item.id] = spectralSettings;
 
             timelineObjectGains[static_cast<size_t>(obj)] = juce::jlimit(0.0f, 2.0f, volumeNorm * 2.0f);
         }
@@ -339,6 +380,7 @@ void PluginProcessor::updateTargetBinGains()
     {
         targetBinGains.fill(1.0f);
         targetBinPitchSemitones.fill(0.0f);
+        spectralFxByObject.clear();
         transientMuteCompressorGain = 1.0f;
         return;
     }
@@ -578,6 +620,39 @@ void PluginProcessor::updateTargetBinGains()
     // the selected bins without boosting anything.
 }
 
+void PluginProcessor::calibrateDensityAnchor(ObjectDatabase::ObjectMask& obj)
+{
+    if (objectDatabase == nullptr || obj.id < 0)
+        return;
+
+    double sum = 0.0;
+    int count = 0;
+
+    for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
+    {
+        if (!obj.mask[static_cast<size_t>(bin)])
+            continue;
+
+        const float mag = currentAnalysisMagnitudes[static_cast<size_t>(bin)];
+        if (mag > 1.0e-7f)
+        {
+            sum += mag;
+            ++count;
+        }
+    }
+
+    float anchorDb = -60.0f;
+    if (count > 0)
+    {
+        const float avgMag = static_cast<float>(sum / static_cast<double>(count));
+        anchorDb = juce::Decibels::gainToDecibels(avgMag, -120.0f);
+    }
+
+    obj.densityAnchorDb = anchorDb;
+    obj.densityAnchorValid = true;
+    objectDatabase->setObjectDensityAnchor(obj.id, anchorDb, true);
+}
+
 void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
 {
     // --- Analysis window + FFT ---
@@ -614,34 +689,42 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
     //   re(k) = fftData[2*k], im(k) = fftData[2*k+1]
     // For real input, bins k=0..N/2 are independent.
 
-    // DC (k=0)
+    auto applyBinGain = [this, channel](int bin)
     {
-        float &gain = currentBinGains[channel][0];
-        gain = maskSmoothAlpha * targetBinGains[0] + (1.0f - maskSmoothAlpha) * gain;
-        fftData[0] *= gain;
-        fftData[1] *= gain;
-    }
+        float &smoothGain = currentBinGains[channel][static_cast<size_t>(bin)];
+        smoothGain = maskSmoothAlpha * targetBinGains[static_cast<size_t>(bin)] + (1.0f - maskSmoothAlpha) * smoothGain;
 
-    // Regular positive bins
-    for (int bin = 1; bin < nyquistBin; ++bin)
-    {
-        float &gain = currentBinGains[channel][static_cast<size_t>(bin)];
-        gain = maskSmoothAlpha * targetBinGains[static_cast<size_t>(bin)] + (1.0f - maskSmoothAlpha) * gain;
+        float spectralFactor = 1.0f;
+        const int objectId = targetBinDominantObjectIds[static_cast<size_t>(bin)];
+        const auto fxIt = spectralFxByObject.find(objectId);
+        if (fxIt != spectralFxByObject.end())
+        {
+            const auto& spectral = fxIt->second;
+            const float mag = currentAnalysisMagnitudes[static_cast<size_t>(bin)];
+
+            if (mag < spectral.thresholdLin)
+            {
+                spectralFactor = 0.0f;
+            }
+            else if (std::abs(spectral.brightness) > 1.0e-6f && bin > 0)
+            {
+                const float ratio = static_cast<float>(bin) / spectral.centerBin;
+                const float factor = std::pow(ratio, spectral.tiltExp);
+                spectralFactor = juce::jlimit(0.125f, 8.0f, factor);
+            }
+        }
+
+        const float appliedGain = smoothGain * spectralFactor;
         const int reIdx = 2 * bin;
         const int imIdx = reIdx + 1;
-        fftData[reIdx] *= gain;
-        fftData[imIdx] *= gain;
-    }
+        fftData[reIdx] *= appliedGain;
+        fftData[imIdx] *= appliedGain;
+    };
 
-    // Nyquist (k=N/2)
-    {
-        float &gain = currentBinGains[channel][static_cast<size_t>(nyquistBin)];
-        gain = maskSmoothAlpha * targetBinGains[static_cast<size_t>(nyquistBin)] + (1.0f - maskSmoothAlpha) * gain;
-        const int reIdx = 2 * nyquistBin;
-        const int imIdx = reIdx + 1;
-        fftData[reIdx] *= gain;
-        fftData[imIdx] *= gain;
-    }
+    applyBinGain(0);
+    for (int bin = 1; bin < nyquistBin; ++bin)
+        applyBinGain(bin);
+    applyBinGain(nyquistBin);
 
     applyTransformCrossSynthesis(channel);
     applyPhaseVocoderPitchShift(channel);
@@ -1057,8 +1140,14 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock &destData)
     if (existingMod.isValid())
         state.removeChild(existingMod, nullptr);
 
+    const auto existingObjects = state.getChildWithName("ObjectDatabase");
+    if (existingObjects.isValid())
+        state.removeChild(existingObjects, nullptr);
+
     state.addChild(timelineData.toValueTree(), -1, nullptr);
     state.appendChild(modMatrix.toValueTree(), nullptr);
+    if (objectDatabase != nullptr)
+        state.appendChild(objectDatabase->toValueTree(), nullptr);
 
     if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destData);
@@ -1082,6 +1171,13 @@ void PluginProcessor::setStateInformation(const void *data, int sizeInBytes)
         {
             modMatrix.fromValueTree(modTree);
             state.removeChild(modTree, nullptr);
+        }
+
+        const auto objectsTree = state.getChildWithName("ObjectDatabase");
+        if (objectsTree.isValid() && objectDatabase != nullptr)
+        {
+            objectDatabase->fromValueTree(objectsTree);
+            state.removeChild(objectsTree, nullptr);
         }
 
         parameters.replaceState(state);
@@ -1349,6 +1445,12 @@ int PluginProcessor::createTransformObjectFromPreset(const juce::String &presetN
     objectDatabase->setObjectMute(newIndex, false);
     objectDatabase->setObjectSolo(newIndex, false);
 
+    {
+        ObjectDatabase::ObjectMask created;
+        if (objectDatabase->getObjectCopyById(newObjectId, created))
+            calibrateDensityAnchor(created);
+    }
+
     objectDatabase->addOrEnableObjectFx(newObjectId, "Transform");
     objectDatabase->setObjectFxEnabled(newObjectId, "Transform", true);
     objectDatabase->setObjectFxSourceObjectId(newObjectId, "Transform", -3);
@@ -1388,6 +1490,12 @@ int PluginProcessor::createTransformObjectFromFile(const juce::File &file)
     objectDatabase->setObjectEngaged(newIndex, true);
     objectDatabase->setObjectMute(newIndex, false);
     objectDatabase->setObjectSolo(newIndex, false);
+
+    {
+        ObjectDatabase::ObjectMask created;
+        if (objectDatabase->getObjectCopyById(newObjectId, created))
+            calibrateDensityAnchor(created);
+    }
 
     objectDatabase->addOrEnableObjectFx(newObjectId, "Transform");
     objectDatabase->setObjectFxEnabled(newObjectId, "Transform", true);
@@ -1438,6 +1546,11 @@ int PluginProcessor::createTransientObject()
     objectDatabase->setObjectEngaged(idx, true);
 
     const int objectId = objectDatabase->getObjectIdAtIndex(idx);
+    {
+        ObjectDatabase::ObjectMask created;
+        if (objectDatabase->getObjectCopyById(objectId, created))
+            calibrateDensityAnchor(created);
+    }
     setSelectedObjectId(objectId);
     return objectId;
 }
@@ -2398,6 +2511,10 @@ void PluginProcessor::finalizeAutoDetectedObjects()
             idx = objectDatabase->getNumObjects() - 1;
             objectDatabase->setObjectMask(idx, mask);
             objectDatabase->setObjectColor(idx, static_cast<int>(color.getARGB()));
+            const int objectId = objectDatabase->getObjectIdAtIndex(idx);
+            ObjectDatabase::ObjectMask created;
+            if (objectDatabase->getObjectCopyById(objectId, created))
+                calibrateDensityAnchor(created);
             return;
         }
 
@@ -2406,7 +2523,12 @@ void PluginProcessor::finalizeAutoDetectedObjects()
             return;
 
         if (existing.recordEnabled)
+        {
             objectDatabase->setObjectMask(idx, mask);
+            ObjectDatabase::ObjectMask updated;
+            if (objectDatabase->getObjectCopy(idx, updated))
+                calibrateDensityAnchor(updated);
+        }
 
         objectDatabase->setObjectColor(idx, static_cast<int>(color.getARGB()));
     };
