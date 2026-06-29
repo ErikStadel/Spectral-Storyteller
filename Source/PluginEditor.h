@@ -6,6 +6,7 @@
 #include "UI/SpectralSelector.h"
 #include "UI/ObjectSidebar.h"
 #include "UI/StoryTimelineComponent.h"
+#include "UI/ModulationPanel.h"
 #include <atomic>
 #include <memory>
 
@@ -78,7 +79,8 @@ private:
     int peakHoldCounter = 0;
 };
 
-class PluginEditor : public juce::AudioProcessorEditor
+class PluginEditor : public juce::AudioProcessorEditor,
+                     public juce::DragAndDropContainer
 {
 public:
     PluginEditor(PluginProcessor&);
@@ -94,6 +96,7 @@ private:
     std::unique_ptr<SpectralSelector> spectralSelector;
     std::unique_ptr<ObjectSidebar> objectSidebar;
     std::unique_ptr<StoryTimelineComponent> storyTimeline;
+    std::unique_ptr<ModulationPanel> modulationPanel;
 
     juce::Slider inputGainSlider;
     juce::Slider outputGainSlider;

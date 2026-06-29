@@ -6,6 +6,7 @@
 #include "DSP/SpectralFrameBuffer.h"
 #include "DSP/ObjectDatabase.h"
 #include "DSP/TimelineData.h"
+#include "DSP/ModulationMatrix.h"
 #include <memory>
 #include <deque>
 #include <unordered_map>
@@ -13,7 +14,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 6;
-constexpr int VERSION_BUILD = 17;
+constexpr int VERSION_BUILD = 18;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -115,6 +116,8 @@ public:
     double getTransportSeconds() const noexcept { return transportSeconds.load(); }
     bool isTransportPlaying() const noexcept { return transportPlaying.load(); }
 
+    ModulationMatrix& getModulationMatrix() { return modMatrix; }
+
 private:
     juce::AudioProcessorValueTreeState parameters;
     std::atomic<float>* dryWetParam = nullptr;
@@ -127,6 +130,8 @@ private:
     static constexpr int hopSize = fftSize / 4;
     static constexpr int delaySamples = fftSize - 1;
     static constexpr int outputBufferSize = fftSize + delaySamples + hopSize;
+
+    ModulationMatrix modMatrix;
 
     juce::dsp::FFT fft;
     std::vector<float> window;

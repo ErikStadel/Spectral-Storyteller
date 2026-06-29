@@ -1,5 +1,6 @@
 #include "StoryTimelineComponent.h"
 #include "../PluginProcessor.h"
+#include "ModulationPanel.h"
 
 StoryTimelineComponent::StoryTimelineComponent(PluginProcessor& processorRef)
     : processor(processorRef)
@@ -297,6 +298,34 @@ void StoryTimelineComponent::mouseDrag(const juce::MouseEvent& event)
     const int selectedObjectId = processor.getSelectedObjectId();
     if (selectedObjectId < 0)
         return;
+
+    if (!draggingKeyframe && !draggingSegmentCurvature && event.getDistanceFromDragStart() > 3)
+    {
+        int laneForTab = -1;
+        int parameterIndex = -1;
+        if (hitTestParameterTab(event, laneForTab, parameterIndex))
+        {
+            const auto lanes = getVisibleLanes();
+            if (laneForTab >= 0 && laneForTab < static_cast<int>(lanes.size())
+                && parameterIndex >= 0
+                && parameterIndex < lanes[static_cast<size_t>(laneForTab)].parameterNames.size())
+            {
+                if (auto* dad = juce::DragAndDropContainer::findParentDragContainerFor(this))
+                {
+                    if (!dad->isDragAndDropActive())
+                    {
+                        const auto& lane = lanes[static_cast<size_t>(laneForTab)];
+                        const juce::String payload = ModulationPanel::makeDragPayload(
+                            selectedObjectId,
+                            lane.effectName,
+                            lane.parameterNames[parameterIndex]);
+                        dad->startDragging(payload, this, juce::ScaledImage(), true);
+                        return;
+                    }
+                }
+            }
+        }
+    }
 
     if (draggingSegmentCurvature)
     {

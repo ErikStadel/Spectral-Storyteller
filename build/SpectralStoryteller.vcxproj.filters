@@ -13,6 +13,9 @@
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\ObjectDatabase.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\ModulationMatrix.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\TimelineData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -23,6 +26,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\ObjectSidebar.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\ModulationPanel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.cpp">
@@ -84,6 +90,9 @@
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\ObjectDatabase.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\ModulationMatrix.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\TimelineData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -94,6 +103,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\ObjectSidebar.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\ModulationPanel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.h">

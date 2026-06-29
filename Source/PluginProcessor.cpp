@@ -274,6 +274,20 @@ void PluginProcessor::updateTargetBinGains()
     const double nowSec = transportSeconds.load();
     transformSettingsByObject.clear();
 
+    const auto getModulatedNorm = [this, nowSec](int objectId,
+                                                 const juce::String& fxName,
+                                                 const juce::String& paramName,
+                                                 float fallback)
+    {
+        const float base = objectDatabase->getInterpolatedAutomationValue(objectId,
+                                                                          fxName.toStdString(),
+                                                                          paramName.toStdString(),
+                                                                          nowSec,
+                                                                          fallback);
+        const float mod = modMatrix.getModulation(objectId, fxName, paramName);
+        return juce::jlimit(0.0f, 1.0f, base + mod);
+    };
+
     // Volume automation from per-object FX chain (Volume/Gain).
     for (int obj = 0; obj < ObjectDatabase::MAX_OBJECTS; ++obj)
     {
@@ -289,29 +303,21 @@ void PluginProcessor::updateTargetBinGains()
             if (!objectDatabase->getObjectCopy(obj, item))
                 continue;
 
-            const float volumeNorm = objectDatabase->getInterpolatedAutomationValue(
-                item.id,
-                "Volume",
-                "Gain",
-                nowSec,
-                0.5f);
+                        const float volumeNorm = getModulatedNorm(item.id, "Volume", "Gain", 0.5f);
 
             TransformSettings transformSettings;
+                        transformSettings.modulatorGain = juce::jlimit(0.0f,
+                                                                                                                     4.0f,
+                                                                                                                     objectDatabase->getObjectFxParameterValue(item.id,
+                                                                                                                                                                                                        "Transform",
+                                                                                                                                                                                                        "Gain",
+                                                                                                                                                                                                        1.0f));
             transformSettings.amount = juce::jlimit(0.0f,
                                                     1.0f,
-                                                    objectDatabase->getInterpolatedAutomationValue(item.id,
-                                                                                                   "Transform",
-                                                                                                   "Amount",
-                                                                                                   nowSec,
-                                                                                                   0.0f));
+                                                                                                        getModulatedNorm(item.id, "Transform", "Amount", 0.0f));
             transformSettings.smoothMs = juce::jlimit(0.0f,
                                                       500.0f,
-                                                      objectDatabase->getInterpolatedAutomationValue(item.id,
-                                                                                                     "Transform",
-                                                                                                     "Smooth",
-                                                                                                     nowSec,
-                                                                                                     0.0f) *
-                                                          500.0f);
+                                                                                                            getModulatedNorm(item.id, "Transform", "Smooth", 0.0f) * 500.0f);
             transformSettings.sourceObjectId = objectDatabase->getObjectFxSourceObjectId(item.id, "Transform");
             transformSettingsByObject[item.id] = transformSettings;
 
@@ -414,11 +420,7 @@ void PluginProcessor::updateTargetBinGains()
                 continue;
 
             float objectGain = currentTimelineObjectGains[static_cast<size_t>(obj)];
-            const float pitchNorm = objectDatabase->getInterpolatedAutomationValue(item.id,
-                                                                                   "Pitch",
-                                                                                   "Semitones",
-                                                                                   nowSec,
-                                                                                   0.5f);
+            const float pitchNorm = getModulatedNorm(item.id, "Pitch", "Semitones", 0.5f);
             const float objectSemitones = (juce::jlimit(0.0f, 1.0f, pitchNorm) - 0.5f) * 4.0f;
             const bool isTransientObject = juce::String(item.name).equalsIgnoreCase("Transients");
             if (isTransientObject && !transientGateOpen.load())
@@ -458,11 +460,7 @@ void PluginProcessor::updateTargetBinGains()
                 continue;
 
             float objectGain = currentTimelineObjectGains[static_cast<size_t>(obj)];
-            const float pitchNorm = objectDatabase->getInterpolatedAutomationValue(item.id,
-                                                                                   "Pitch",
-                                                                                   "Semitones",
-                                                                                   nowSec,
-                                                                                   0.5f);
+            const float pitchNorm = getModulatedNorm(item.id, "Pitch", "Semitones", 0.5f);
             const float objectSemitones = (juce::jlimit(0.0f, 1.0f, pitchNorm) - 0.5f) * 4.0f;
             const bool isTransientObject = juce::String(item.name).equalsIgnoreCase("Transients");
             if (isTransientObject && !transientGateOpen.load())
@@ -885,11 +883,22 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
 
     buffer.applyGain(inputGain);
 
+    double bpm = 120.0;
+if (auto* ph = getPlayHead())
+{
+    juce::AudioPlayHead::CurrentPositionInfo info;
+    if (ph->getCurrentPosition(info) && info.bpm > 0.0) bpm = info.bpm;
+}
+modMatrix.advance(bpm, currentSampleRate, buffer.getNumSamples());
+
+
 // Eingangspegel messen
 float inMag = 0.0f;
 for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     inMag = juce::jmax(inMag,
                        buffer.getMagnitude(ch, 0, buffer.getNumSamples()));
+inputPeakDb.store(
+    juce::Decibels::gainToDecibels(inMag, -90.0f));
     if (auto *playHead = getPlayHead())
     {
         if (auto pos = playHead->getPosition())
@@ -1039,7 +1048,12 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock &destData)
     if (existing.isValid())
         state.removeChild(existing, nullptr);
 
+    const auto existingMod = state.getChildWithName("ModMatrix");
+    if (existingMod.isValid())
+        state.removeChild(existingMod, nullptr);
+
     state.addChild(timelineData.toValueTree(), -1, nullptr);
+    state.appendChild(modMatrix.toValueTree(), nullptr);
 
     if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destData);
@@ -1056,6 +1070,13 @@ void PluginProcessor::setStateInformation(const void *data, int sizeInBytes)
         {
             timelineData.fromValueTree(timelineTree);
             state.removeChild(timelineTree, nullptr);
+        }
+
+        const auto modTree = state.getChildWithName("ModMatrix");
+        if (modTree.isValid())
+        {
+            modMatrix.fromValueTree(modTree);
+            state.removeChild(modTree, nullptr);
         }
 
         parameters.replaceState(state);

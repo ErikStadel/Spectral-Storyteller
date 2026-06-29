@@ -90,6 +90,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
                 if (storyTimeline)
                     storyTimeline->refresh();
+
+                if (modulationPanel)
+                    modulationPanel->refresh();
             }
         }
     });
@@ -113,6 +116,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             processor.setSelectedObjectId(objectId);
             if (storyTimeline)
                 storyTimeline->refresh();
+            if (modulationPanel)
+                modulationPanel->refresh();
         },
         [this](const juce::String& presetName, const juce::File& file)
         {
@@ -128,6 +133,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
                     objectSidebar->refresh();
                 if (storyTimeline)
                     storyTimeline->refresh();
+                if (modulationPanel)
+                    modulationPanel->refresh();
             }
         });
     addAndMakeVisible(*objectSidebar);
@@ -135,6 +142,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // PR4: Story timeline (keyframe automation lanes)
     storyTimeline = std::make_unique<StoryTimelineComponent>(processor);
     addAndMakeVisible(*storyTimeline);
+
+    modulationPanel = std::make_unique<ModulationPanel>(processor);
+    addAndMakeVisible(*modulationPanel);
+    modulationPanel->refresh();
 
     // Dry/Wet slider
     dryWetSlider.setSliderStyle(juce::Slider::LinearVertical);
@@ -247,6 +258,8 @@ void PluginEditor::resized()
     // Give the timeline enough vertical room for taller adaptive FX lanes.
     auto timelineArea = area.removeFromBottom(320);
     timelineArea.removeFromBottom(6);
+    const int modPanelWidth = 250 + 8;
+    auto modArea = timelineArea.removeFromRight(modPanelWidth);
     
     // Middle section: object sidebar + spectrogram + parameter sidebar
     const int sidebarWidth = 280;
@@ -318,6 +331,9 @@ void PluginEditor::resized()
     // Selector overlays the spectrogram
     if (spectralSelector)
         spectralSelector->setBounds(area);
+
+    if (modulationPanel)
+        modulationPanel->setBounds(modArea);
 
     if (storyTimeline)
         storyTimeline->setBounds(timelineArea);
