@@ -37,7 +37,10 @@ private:
 
     // LFO controls
     juce::ComboBox lfoRateCombo, lfoShapeCombo, lfoTargetCombo;
-    juce::Slider   lfoAmountSlider;
+    juce::Slider lfoAmountValue;
+    juce::Slider lfoOffsetValue;
+    juce::Label lfoAmountTextLabel { {}, "Amount" };
+    juce::Label lfoOffsetTextLabel { {}, "Offset" };
     juce::Label    lfoTargetLabel { {}, "Target" };
 
     // XY controls

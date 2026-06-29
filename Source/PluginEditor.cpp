@@ -136,6 +136,32 @@ PluginEditor::PluginEditor(PluginProcessor& p)
                 if (modulationPanel)
                     modulationPanel->refresh();
             }
+        },
+        [this]() -> int
+        {
+            const int objectId = processor.createTransientObject();
+            if (objectId > 0)
+            {
+                if (objectSidebar)
+                    objectSidebar->refresh();
+                if (storyTimeline)
+                    storyTimeline->refresh();
+                if (modulationPanel)
+                    modulationPanel->refresh();
+            }
+
+            return objectId;
+        },
+        [this]() -> float
+        {
+            if (auto* p = processor.getValueTreeState().getRawParameterValue("transientThreshold"))
+                return p->load();
+            return -24.0f;
+        },
+        [this](float thresholdDb)
+        {
+            if (auto* p = processor.getValueTreeState().getParameter("transientThreshold"))
+                p->setValueNotifyingHost(p->convertTo0to1(thresholdDb));
         });
     addAndMakeVisible(*objectSidebar);
 
@@ -205,24 +231,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     addAndMakeVisible(outputMeter);
 
 
-    // Transient threshold knob
-    transientThresholdSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    transientThresholdSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 72, 20);
-    transientThresholdSlider.setRange(-60.0, 0.0, 0.1);
-    transientThresholdSlider.setSkewFactorFromMidPoint(-24.0);
-    transientThresholdSlider.setNumDecimalPlacesToDisplay(1);
-    transientThresholdSlider.setTextValueSuffix(" dB");
-    addAndMakeVisible(transientThresholdSlider);
-
-    transientThresholdLabel.setText("Transient Gate", juce::dontSendNotification);
-    transientThresholdLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(transientThresholdLabel);
-
     // Attachment for Dry/Wet parameter (audio processing)
     dryWetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.getValueTreeState(), "dryWet", dryWetSlider);
-    transientThresholdAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.getValueTreeState(), "transientThreshold", transientThresholdSlider);
             inputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.getValueTreeState(), "inputGain", inputGainSlider);
     outputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -276,15 +287,12 @@ void PluginEditor::resized()
         objectSidebar->setBounds(sidebar);
 
         auto controls = controlPanel.reduced(2);
-    const int blockSpacing = 10;
     const int labelH       = 18;
     const int meterW       = 10;   // schmaler Pegelmesser
     const int meterGap     = 4;
 
     // Oben: 4 vertikale Slider (Input | Output | Dry/Wet | Gate)
-    auto topBlock = controls.removeFromTop(static_cast<int>(controls.getHeight() * 0.65f));
-    controls.removeFromTop(blockSpacing);
-    auto knobBlock = controls;
+    auto topBlock = controls;
 
     const int colGap   = 6;
     const int numCols  = 4;
@@ -318,12 +326,6 @@ void PluginEditor::resized()
     layoutSliderCol(dryCol,  dryWetLabel, dryWetSlider);
     layoutSliderCol(gateCol, gateLabel,   gateSlider);
 
-    // Unten: Transient Gate (Rotary)
-    transientThresholdLabel.setBounds(knobBlock.removeFromTop(labelH));
-    knobBlock.removeFromTop(4);
-    transientThresholdSlider.setBounds(knobBlock.reduced(12, 2));
-
-    
     // Spectrogram fills remaining area
     if (spectralView)
         spectralView->setBounds(area);

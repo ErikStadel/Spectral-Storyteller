@@ -10,6 +10,7 @@ juce::ValueTree ModulationMatrix::toValueTree() const
         n.setProperty("rate", lfos[i].rateIndex.load(), nullptr);
         n.setProperty("shape", lfos[i].shape.load(), nullptr);
         n.setProperty("amount", lfos[i].amount.load(), nullptr);
+        n.setProperty("phaseOffset", lfos[i].phaseOffset.load(), nullptr);
         Target t; { juce::ScopedLock sl(lfos[i].targetLock); t = lfos[i].target; }
         n.setProperty("tObj", t.objectId, nullptr);
         n.setProperty("tFx",  t.fxName, nullptr);
@@ -42,6 +43,7 @@ void ModulationMatrix::fromValueTree(const juce::ValueTree& root)
             lfos[i].rateIndex.store((int) n["rate"]);
             lfos[i].shape.store((int) n["shape"]);
             lfos[i].amount.store((float) n["amount"]);
+            lfos[i].phaseOffset.store((float) n.getProperty("phaseOffset", 0.0f));
             juce::ScopedLock sl(lfos[i].targetLock);
             lfos[i].target = { (int) n["tObj"], n["tFx"].toString(), n["tP"].toString() };
         }

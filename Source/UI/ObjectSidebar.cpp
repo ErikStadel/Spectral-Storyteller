@@ -29,9 +29,13 @@ class FxOverlayComponent : public juce::Component
 public:
     FxOverlayComponent(ObjectDatabase& databaseRef,
                        int objectIdRef,
+                                             std::function<float()> getTransientThresholdDbCallback,
+                                             std::function<void(float)> setTransientThresholdDbCallback,
                                              std::function<void()> onCloseCallback)
         : database(databaseRef),
           objectId(objectIdRef),
+                    getTransientThresholdDb(std::move(getTransientThresholdDbCallback)),
+                    setTransientThresholdDb(std::move(setTransientThresholdDbCallback)),
                     onClose(std::move(onCloseCallback))
     {
         setOpaque(true);
@@ -39,6 +43,8 @@ public:
 
         addAndMakeVisible(delayButton);
         addAndMakeVisible(filterButton);
+        addAndMakeVisible(transientThresholdLabel);
+        addAndMakeVisible(transientThresholdSlider);
         addAndMakeVisible(closeButton);
 
         delayButton.setButtonText("Delay");
@@ -47,6 +53,18 @@ public:
 
         delayButton.setClickingTogglesState(true);
         filterButton.setClickingTogglesState(true);
+
+        transientThresholdLabel.setText("Threshold", juce::dontSendNotification);
+        transientThresholdLabel.setJustificationType(juce::Justification::centredLeft);
+        transientThresholdSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+        transientThresholdSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 56, 18);
+        transientThresholdSlider.setRange(-60.0, 0.0, 0.1);
+        transientThresholdSlider.setTextValueSuffix(" dB");
+        transientThresholdSlider.onValueChange = [this]()
+        {
+            if (setTransientThresholdDb)
+                setTransientThresholdDb(static_cast<float>(transientThresholdSlider.getValue()));
+        };
 
         refreshFromDatabase();
 
@@ -78,11 +96,33 @@ public:
 
     void refreshFromDatabase()
     {
+        isTransientObject = false;
+        {
+            const int n = database.getNumObjects();
+            for (int i = 0; i < n; ++i)
+            {
+                ObjectDatabase::ObjectMask obj;
+                if (!database.getObjectCopy(i, obj) || obj.id != objectId)
+                    continue;
+
+                isTransientObject = juce::String(obj.name).equalsIgnoreCase("Transients");
+                break;
+            }
+        }
+
         const auto chain = database.getObjectFxChain(objectId);
         const bool delayEnabled = isFxEnabled(chain, "Delay");
         const bool filterEnabled = isFxEnabled(chain, "Filter");
         delayButton.setToggleState(delayEnabled, juce::dontSendNotification);
         filterButton.setToggleState(filterEnabled, juce::dontSendNotification);
+
+        transientThresholdLabel.setVisible(isTransientObject);
+        transientThresholdSlider.setVisible(isTransientObject);
+
+        if (isTransientObject && getTransientThresholdDb)
+        {
+            transientThresholdSlider.setValue(getTransientThresholdDb(), juce::dontSendNotification);
+        }
     }
 
     void resized() override
@@ -95,6 +135,14 @@ public:
         delayButton.setBounds(area.removeFromTop(26));
         area.removeFromTop(4);
         filterButton.setBounds(area.removeFromTop(26));
+
+        if (isTransientObject)
+        {
+            auto bottomZone = area.removeFromBottom(56);
+            transientThresholdLabel.setBounds(bottomZone.removeFromTop(18));
+            bottomZone.removeFromTop(4);
+            transientThresholdSlider.setBounds(bottomZone);
+        }
     }
 
 private:
@@ -111,23 +159,34 @@ private:
 
     ObjectDatabase& database;
     int objectId = -1;
+        bool isTransientObject = false;
+        std::function<float()> getTransientThresholdDb;
+        std::function<void(float)> setTransientThresholdDb;
     std::function<void()> onClose;
     juce::TextButton delayButton;
     juce::TextButton filterButton;
+        juce::Label transientThresholdLabel;
+        juce::Slider transientThresholdSlider;
     juce::TextButton closeButton;
 };
 } // namespace
 
 ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
-                                                         std::function<void(bool)> onAutoDetect,
-                                                         std::function<juce::String()> statusProvider,
-                                                         std::function<void(int)> onSelectedChanged,
-                                                         std::function<void(const juce::String&, const juce::File&)> onCreateTransformObjectCallback)
+                                                     std::function<void(bool)> onAutoDetect,
+                                                     std::function<juce::String()> statusProvider,
+                                                     std::function<void(int)> onSelectedChanged,
+                                                     std::function<void(const juce::String&, const juce::File&)> onCreateTransformObjectCallback,
+                                                     std::function<int()> onCreateTransientObjectCallback,
+                                                     std::function<float()> getTransientThresholdDbCallback,
+                                                     std::function<void(float)> setTransientThresholdDbCallback)
         : database(db),
             onAutoDetectClicked(std::move(onAutoDetect)),
             autoDetectStatusProvider(std::move(statusProvider)),
             onSelectedObjectChanged(std::move(onSelectedChanged)),
-            onCreateTransformObject(std::move(onCreateTransformObjectCallback))
+            onCreateTransformObject(std::move(onCreateTransformObjectCallback)),
+            onCreateTransientObject(std::move(onCreateTransientObjectCallback)),
+            getTransientThresholdDb(std::move(getTransientThresholdDbCallback)),
+            setTransientThresholdDb(std::move(setTransientThresholdDbCallback))
 {
     setOpaque(true);
     setWantsKeyboardFocus(true);
@@ -146,11 +205,11 @@ ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
     };
     addAndMakeVisible(*autoDetectButton);
 
-    transformButton = std::make_unique<juce::TextButton>("Transform");
+    transformButton = std::make_unique<juce::TextButton>("+");
     transformButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF3A3A42));
     transformButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF4A76B7));
     transformButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE8E8E8));
-    transformButton->setTooltip("Transform-Objekt aus Wavetable oder Datei erzeugen");
+    transformButton->setTooltip("Objekt-Menue (Transform / Transient)");
     transformButton->onClick = [this]()
     {
         showTransformMenu();
@@ -219,6 +278,8 @@ void ObjectSidebar::showFxOverlay(int objectId)
     fxOverlay = std::make_unique<FxOverlayComponent>(
         database,
         objectId,
+        getTransientThresholdDb,
+        setTransientThresholdDb,
         [this]() { hideFxOverlay(); });
 
     fxOverlay->setBounds(getLocalBounds().reduced(PADDING));
@@ -236,8 +297,11 @@ void ObjectSidebar::showTransformMenu()
         wtSaw,
         wtSquare,
         wtTriangle,
-        loadFile
+        loadFile,
+        createTransient
     };
+
+    menu.addSectionHeader("Transform");
 
     menu.addItem(wtSine, "Wavetable: Sine");
     menu.addItem(wtSaw, "Wavetable: Saw");
@@ -245,15 +309,26 @@ void ObjectSidebar::showTransformMenu()
     menu.addItem(wtTriangle, "Wavetable: Triangle");
     menu.addSeparator();
     menu.addItem(loadFile, "Datei laden...");
+    menu.addSeparator();
+    menu.addItem(createTransient, "Transient");
 
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(transformButton.get()),
                        [this](int result)
                        {
-                           if (result == 0 || onCreateTransformObject == nullptr)
+                           if (result == 0)
                                return;
+
+                           if (result == createTransient)
+                           {
+                               if (onCreateTransientObject)
+                                   onCreateTransientObject();
+                               return;
+                           }
 
                            if (result == loadFile)
                            {
+                               if (onCreateTransformObject == nullptr)
+                                   return;
                                transformFileChooser = std::make_unique<juce::FileChooser>("Transform-Datei laden",
                                                                                            juce::File(),
                                                                                            "*.wav;*.aif;*.aiff;*.flac;*.mp3");
@@ -273,7 +348,7 @@ void ObjectSidebar::showTransformMenu()
                            if (result == wtSquare) preset = "Square";
                            if (result == wtTriangle) preset = "Triangle";
 
-                           if (preset.isNotEmpty())
+                           if (preset.isNotEmpty() && onCreateTransformObject != nullptr)
                                onCreateTransformObject(preset, juce::File());
                        });
 }

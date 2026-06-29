@@ -1,26 +1,26 @@
 #pragma once
+
 #include <juce_core/juce_core.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <string>
 
 class ModulationMatrix
 {
 public:
     static constexpr int NUM_LFOS = 3;
-    static constexpr int NUM_XY   = 3;
+    static constexpr int NUM_XY = 3;
 
     enum class Shape { Sine = 0, Triangle, Saw, Square };
 
-    // Rate sync values in beats (1 = 1/4, 0.25 = 1/16, 4 = 1 bar @ 4/4)
-    static constexpr std::array<double, 9> kRateBeats {
-        4.0, 2.0, 1.0, 0.5, 0.25, 0.125, 1.0/3.0, 1.0/6.0, 1.0/12.0
-    };
     static const juce::StringArray& rateLabels()
     {
-        static const juce::StringArray l { "1 Bar","1/2","1/4","1/8","1/16","1/32","1/4T","1/8T","1/16T" };
-        return l;
+        static const juce::StringArray labels {
+            "1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "1 Bar", "2 Bar", "4 Bar"
+        };
+        return labels;
     }
 
     struct Target
@@ -28,18 +28,29 @@ public:
         int objectId = -1;
         juce::String fxName;
         juce::String paramName;
-        bool isValid() const noexcept { return objectId > 0 && fxName.isNotEmpty() && paramName.isNotEmpty(); }
+
+        bool isValid() const noexcept
+        {
+            return objectId > 0 && fxName.isNotEmpty() && paramName.isNotEmpty();
+        }
+
         bool operator==(const Target& o) const noexcept
-        { return objectId==o.objectId && fxName==o.fxName && paramName==o.paramName; }
+        {
+            return objectId == o.objectId && fxName == o.fxName && paramName == o.paramName;
+        }
+
         juce::String toString() const
-        { return isValid() ? (fxName + " · " + paramName) : juce::String("—"); }
+        {
+            return isValid() ? (fxName + " · " + paramName) : juce::String("none");
+        }
     };
 
     struct LFOState
     {
-        std::atomic<int>   rateIndex { 2 };       // 1/4
-        std::atomic<int>   shape     { (int)Shape::Sine };
-        std::atomic<float> amount    { 0.5f };    // 0..1 (bipolar amplitude)
+        std::atomic<int> rateIndex { 4 };
+        std::atomic<int> shape { 0 };
+        std::atomic<float> amount { 0.0f };
+        std::atomic<float> phaseOffset { 0.0f };
         Target target;
         juce::CriticalSection targetLock;
     };
@@ -48,78 +59,101 @@ public:
     {
         std::atomic<float> x { 0.5f };
         std::atomic<float> y { 0.5f };
-        Target targetX, targetY;
+        Target targetX;
+        Target targetY;
         juce::CriticalSection targetLock;
     };
 
-    LFOState& lfo(int i)            { return lfos[(size_t) juce::jlimit(0, NUM_LFOS-1, i)]; }
-    const LFOState& lfo(int i) const{ return lfos[(size_t) juce::jlimit(0, NUM_LFOS-1, i)]; }
-    XYState&  xy (int i)            { return xys [(size_t) juce::jlimit(0, NUM_XY  -1, i)]; }
-    const XYState&  xy (int i) const{ return xys [(size_t) juce::jlimit(0, NUM_XY  -1, i)]; }
+    LFOState& lfo(int i)             { return lfos[static_cast<size_t>(juce::jlimit(0, NUM_LFOS - 1, i))]; }
+    const LFOState& lfo(int i) const { return lfos[static_cast<size_t>(juce::jlimit(0, NUM_LFOS - 1, i))]; }
+    XYState& xy(int i)               { return xys[static_cast<size_t>(juce::jlimit(0, NUM_XY - 1, i))]; }
+    const XYState& xy(int i) const   { return xys[static_cast<size_t>(juce::jlimit(0, NUM_XY - 1, i))]; }
 
-    /** Returns additive modulation value in [-amount .. +amount] for a given target,
-        summed over all sources pointing at it. Call from FX param lookup. */
+    void setTransport(double ppqPositionAtBlockStart, double bpm, bool isPlaying) noexcept
+    {
+        currentPpq.store(ppqPositionAtBlockStart);
+        currentBpm.store(bpm > 0.0 ? bpm : 120.0);
+        transportActive.store(isPlaying);
+    }
+
+    static double rateIndexToBeats(int idx) noexcept
+    {
+        static constexpr double table[] = { 0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0 };
+        return table[juce::jlimit(0, static_cast<int>(std::size(table)) - 1, idx)];
+    }
+
+    float evalLfo(const LFOState& l) const noexcept
+    {
+        const double beats = rateIndexToBeats(l.rateIndex.load());
+        const double ppq = currentPpq.load();
+
+        double phase = std::fmod(ppq / beats, 1.0);
+        if (phase < 0.0)
+            phase += 1.0;
+
+        phase = std::fmod(phase + static_cast<double>(l.phaseOffset.load()), 1.0);
+        const float p = static_cast<float>(phase);
+
+        float y = 0.0f;
+        switch (l.shape.load())
+        {
+            case 0: y = std::sin(juce::MathConstants<float>::twoPi * p); break;
+            case 1: y = 4.0f * std::fabs(p - 0.5f) - 1.0f; break;
+            case 2: y = 2.0f * p - 1.0f; break;
+            default: y = (p < 0.5f) ? 1.0f : -1.0f; break;
+        }
+
+        return y * l.amount.load();
+    }
+
     float getModulation(int objectId, const juce::String& fxName, const juce::String& paramName) const
     {
         float sum = 0.0f;
+
         for (int i = 0; i < NUM_LFOS; ++i)
         {
-            Target t; { juce::ScopedLock sl(lfos[i].targetLock); t = lfos[i].target; }
-            if (t.objectId==objectId && t.fxName==fxName && t.paramName==paramName)
-                sum += currentLfoValue[i].load() * lfos[i].amount.load();
+            Target t;
+            {
+                juce::ScopedLock sl(lfos[static_cast<size_t>(i)].targetLock);
+                t = lfos[static_cast<size_t>(i)].target;
+            }
+
+            if (t.objectId == objectId && t.fxName == fxName && t.paramName == paramName)
+                sum += evalLfo(lfos[static_cast<size_t>(i)]);
         }
+
         for (int i = 0; i < NUM_XY; ++i)
         {
-            Target tx, ty;
-            { juce::ScopedLock sl(xys[i].targetLock); tx = xys[i].targetX; ty = xys[i].targetY; }
-            if (tx.objectId==objectId && tx.fxName==fxName && tx.paramName==paramName)
-                sum += (xys[i].x.load() - 0.5f) * 2.0f * 0.5f; // bipolar, depth 0.5
-            if (ty.objectId==objectId && ty.fxName==fxName && ty.paramName==paramName)
-                sum += (xys[i].y.load() - 0.5f) * 2.0f * 0.5f;
+            Target tx;
+            Target ty;
+            {
+                juce::ScopedLock sl(xys[static_cast<size_t>(i)].targetLock);
+                tx = xys[static_cast<size_t>(i)].targetX;
+                ty = xys[static_cast<size_t>(i)].targetY;
+            }
+
+            if (tx.objectId == objectId && tx.fxName == fxName && tx.paramName == paramName)
+                sum += (xys[static_cast<size_t>(i)].x.load() - 0.5f) * 2.0f * 0.5f;
+            if (ty.objectId == objectId && ty.fxName == fxName && ty.paramName == paramName)
+                sum += (xys[static_cast<size_t>(i)].y.load() - 0.5f) * 2.0f * 0.5f;
         }
+
         return juce::jlimit(-1.0f, 1.0f, sum);
     }
 
-    /** Advance LFO phases. Call once per processBlock with the current bpm + numSamples + sampleRate. */
-    void advance(double bpm, double sampleRate, int numSamples) noexcept
+    float getLfoVisualValue(int i) const
     {
-        if (bpm <= 0.0 || sampleRate <= 0.0) return;
-        const double secondsPerBeat = 60.0 / bpm;
-        const double dt = (double) numSamples / sampleRate;
-
-        for (int i = 0; i < NUM_LFOS; ++i)
-        {
-            const int idx = juce::jlimit(0, (int) kRateBeats.size()-1, lfos[i].rateIndex.load());
-            const double periodSec = kRateBeats[(size_t) idx] * secondsPerBeat;
-            if (periodSec <= 1.0e-6) continue;
-            double p = lfoPhase[i] + dt / periodSec;
-            p -= std::floor(p);
-            lfoPhase[i] = p;
-            currentLfoValue[i].store(evalShape((Shape) lfos[i].shape.load(), (float) p));
-        }
+        return evalLfo(lfo(i));
     }
 
-    float getLfoVisualValue(int i) const { return currentLfoValue[i].load(); }
-
-    // --- State persistence ---
     juce::ValueTree toValueTree() const;
     void fromValueTree(const juce::ValueTree& v);
 
 private:
-    static float evalShape(Shape s, float phase) noexcept
-    {
-        switch (s)
-        {
-            case Shape::Sine:     return std::sin(phase * juce::MathConstants<float>::twoPi);
-            case Shape::Triangle: return 4.0f * std::abs(phase - 0.5f) - 1.0f;
-            case Shape::Saw:      return 2.0f * phase - 1.0f;
-            case Shape::Square:   return phase < 0.5f ? 1.0f : -1.0f;
-        }
-        return 0.0f;
-    }
-
     std::array<LFOState, NUM_LFOS> lfos;
-    std::array<XYState,  NUM_XY>   xys;
-    std::array<double, NUM_LFOS> lfoPhase {};
-    std::array<std::atomic<float>, NUM_LFOS> currentLfoValue {};
+    std::array<XYState, NUM_XY> xys;
+
+    std::atomic<double> currentPpq { 0.0 };
+    std::atomic<double> currentBpm { 120.0 };
+    std::atomic<bool> transportActive { false };
 };

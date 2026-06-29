@@ -883,13 +883,18 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
 
     buffer.applyGain(inputGain);
 
+    juce::AudioPlayHead::CurrentPositionInfo pos;
+    double ppq = 0.0;
     double bpm = 120.0;
-if (auto* ph = getPlayHead())
-{
-    juce::AudioPlayHead::CurrentPositionInfo info;
-    if (ph->getCurrentPosition(info) && info.bpm > 0.0) bpm = info.bpm;
-}
-modMatrix.advance(bpm, currentSampleRate, buffer.getNumSamples());
+    bool playing = false;
+    if (auto* ph = getPlayHead(); ph != nullptr && ph->getCurrentPosition(pos))
+    {
+        ppq = pos.ppqPosition;
+        bpm = pos.bpm > 0.0 ? pos.bpm : 120.0;
+        playing = pos.isPlaying;
+    }
+    modMatrix.setTransport(ppq, bpm, playing);
+
 
 
 // Eingangspegel messen
@@ -1393,6 +1398,48 @@ int PluginProcessor::createTransformObjectFromFile(const juce::File &file)
     loadTransformFileAsync(newObjectId, file);
     setSelectedObjectId(newObjectId);
     return newObjectId;
+}
+
+int PluginProcessor::createTransientObject()
+{
+    if (objectDatabase == nullptr)
+        return -1;
+
+    auto findObjectIndexByName = [this](const juce::String& wanted)
+    {
+        const int n = objectDatabase->getNumObjects();
+        for (int i = 0; i < n; ++i)
+        {
+            ObjectDatabase::ObjectMask obj;
+            if (!objectDatabase->getObjectCopy(i, obj))
+                continue;
+
+            if (juce::String(obj.name).equalsIgnoreCase(wanted))
+                return i;
+        }
+        return -1;
+    };
+
+    std::array<bool, ObjectDatabase::NUM_BINS> transientMask{};
+    for (int k = 0; k < ObjectDatabase::NUM_BINS; ++k)
+        transientMask[static_cast<size_t>(k)] = true;
+
+    int idx = findObjectIndexByName("Transients");
+    if (idx < 0)
+    {
+        if (!objectDatabase->addObject("Transients"))
+            return -1;
+
+        idx = objectDatabase->getNumObjects() - 1;
+    }
+
+    objectDatabase->setObjectMask(idx, transientMask);
+    objectDatabase->setObjectColor(idx, static_cast<int>(juce::Colour(0xFFFF5252).getARGB()));
+    objectDatabase->setObjectEngaged(idx, true);
+
+    const int objectId = objectDatabase->getObjectIdAtIndex(idx);
+    setSelectedObjectId(objectId);
+    return objectId;
 }
 
 void PluginProcessor::deleteFxAutomationKeyframe(int objectId,

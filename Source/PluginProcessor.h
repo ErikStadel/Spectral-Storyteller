@@ -14,7 +14,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 6;
-constexpr int VERSION_BUILD = 18;
+constexpr int VERSION_BUILD = 20;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -100,6 +100,7 @@ public:
     void loadTransformFileAsync(int objectId, const juce::File& file);
     int createTransformObjectFromPreset(const juce::String& presetName);
     int createTransformObjectFromFile(const juce::File& file);
+    int createTransientObject();
     void deleteFxAutomationKeyframe(int objectId,
                                     const juce::String& effectName,
                                     const juce::String& parameterName,

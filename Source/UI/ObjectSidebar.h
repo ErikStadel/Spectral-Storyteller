@@ -17,7 +17,10 @@ public:
                            std::function<void(bool)> onAutoDetect = {},
                            std::function<juce::String()> autoDetectStatusProvider = {},
                            std::function<void(int)> onSelectedObjectChanged = {},
-                           std::function<void(const juce::String&, const juce::File&)> onCreateTransformObject = {});
+                           std::function<void(const juce::String&, const juce::File&)> onCreateTransformObject = {},
+                           std::function<int()> onCreateTransientObject = {},
+                           std::function<float()> getTransientThresholdDb = {},
+                           std::function<void(float)> setTransientThresholdDb = {});
     ~ObjectSidebar() override;
 
     void paint(juce::Graphics& g) override;
@@ -33,6 +36,9 @@ private:
     std::function<juce::String()> autoDetectStatusProvider;
     std::function<void(int)> onSelectedObjectChanged;
     std::function<void(const juce::String&, const juce::File&)> onCreateTransformObject;
+    std::function<int()> onCreateTransientObject;
+    std::function<float()> getTransientThresholdDb;
+    std::function<void(float)> setTransientThresholdDb;
 
     // One button row per object
     struct ObjectRow

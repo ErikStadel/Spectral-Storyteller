@@ -102,13 +102,11 @@ private:
     juce::Slider outputGainSlider;
     juce::Slider dryWetSlider;
     juce::Slider gateSlider;
-    juce::Slider transientThresholdSlider;
 
     juce::Label inputLabel;
     juce::Label outputLabel;
     juce::Label dryWetLabel;
     juce::Label gateLabel;
-    juce::Label transientThresholdLabel;
 
     LevelMeter inputMeter;
     LevelMeter outputMeter;
@@ -116,7 +114,6 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> inputGainAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> outputGainAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dryWetAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> transientThresholdAttachment;
 
     juce::Label versionLabel;
     juce::TooltipWindow tooltipWindow;
