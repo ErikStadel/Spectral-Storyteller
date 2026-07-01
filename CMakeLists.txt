@@ -32,18 +32,20 @@ juce_add_plugin(SpectralStoryteller
     FORMATS VST3 Standalone
 )
 
-# Add post-build command to copy VST3 to custom location
-add_custom_command(TARGET SpectralStoryteller POST_BUILD
-    COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-        "& {"
-        "$src='${CMAKE_CURRENT_BINARY_DIR}/SpectralStoryteller_artefacts/Release/VST3';"
-        "$dst='D:/VST/VST/VST3';"
-        "New-Item -ItemType Directory -Force -Path $dst | Out-Null;"
-        "if (Test-Path $src) { Copy-Item -Path (Join-Path $src '*') -Destination $dst -Recurse -Force -ErrorAction Continue }"
-        "exit 0"
-        "}"
-    COMMENT "Copying VST3 plugin to D:/VST/VST/VST3 (non-fatal on copy errors)"
-)
+# Add post-build command to copy VST3 to custom location (Windows only)
+if(WIN32)
+    add_custom_command(TARGET SpectralStoryteller POST_BUILD
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
+            "& {"
+            "$src='${CMAKE_CURRENT_BINARY_DIR}/SpectralStoryteller_artefacts/Release/VST3';"
+            "$dst='D:/VST/VST/VST3';"
+            "New-Item -ItemType Directory -Force -Path $dst | Out-Null;"
+            "if (Test-Path $src) { Copy-Item -Path (Join-Path $src '*') -Destination $dst -Recurse -Force -ErrorAction Continue }"
+            "exit 0"
+            "}"
+        COMMENT "Copying VST3 plugin to D:/VST/VST/VST3 (non-fatal on copy errors)"
+    )
+endif()
 
 # JUCE-Module verlinken
 target_link_libraries(SpectralStoryteller 
@@ -86,6 +88,10 @@ if(UNIX AND NOT APPLE)
         if(WEBKIT_FOUND)
             target_include_directories(SpectralStoryteller PRIVATE ${WEBKIT_INCLUDE_DIRS})
             target_link_libraries(SpectralStoryteller PRIVATE ${WEBKIT_LIBRARIES})
+        endif()
+        pkg_check_modules(CURL libcurl)
+        if(CURL_FOUND)
+            target_link_libraries(SpectralStoryteller PRIVATE ${CURL_LIBRARIES})
         endif()
     endif()
 endif()
