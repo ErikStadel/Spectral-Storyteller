@@ -14,6 +14,7 @@ class SpectralSelector : public juce::Component
 {
 public:
     static constexpr int NUM_BINS = (1 << 11) / 2 + 1;  // 1025
+    enum class ToolMode { Rectangle = 0, Brush };
 
     explicit SpectralSelector();
     ~SpectralSelector() override;
@@ -22,6 +23,10 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
+    void mouseMove(const juce::MouseEvent& event) override;
+    void mouseExit(const juce::MouseEvent& event) override;
+    void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
+    void resized() override;
 
     // -------------------------------------------------------------------------
     // Selection API
@@ -44,6 +49,11 @@ public:
     void setOnSelectionComplete(std::function<void(int minBin, int maxBin)> callback)
     {
         onSelectionComplete = callback;
+    }
+
+    void setOnBrushComplete(std::function<void(const juce::Image&)> callback)
+    {
+        onBrushComplete = callback;
     }
 
     void setOnSelectionStarted(std::function<void()> callback)
@@ -70,6 +80,9 @@ public:
      * Check if a selection is currently being made.
      */
     bool isSelecting() const { return isActive; }
+    void setToolMode(ToolMode newMode) { toolMode = newMode; }
+    ToolMode getToolMode() const { return toolMode; }
+    int getBrushDiameterPixels() const { return brushDiameterPixels; }
 
 private:
     // Selection geometry
@@ -85,11 +98,22 @@ private:
     int selectedMaxBin = 0;
     int selectedMinY = 0;
     int selectedMaxY = 0;
+    ToolMode toolMode = ToolMode::Rectangle;
+    int brushDiameterPixels = 28;
+    juce::Point<int> hoverPoint;
+    juce::Point<int> lastBrushPoint;
+    bool hasHoverPoint = false;
+    juce::Image brushMaskImage;
 
     std::function<void(int, int)> onSelectionComplete;
+    std::function<void(const juce::Image&)> onBrushComplete;
     std::function<void()> onSelectionStarted;
     std::function<void()> onSelectionFinished;
     std::function<int(int, int)> yToBinMapper;
+
+    void ensureBrushMaskImage();
+    void stampBrushAt(juce::Point<int> point);
+    void stampBrushLine(juce::Point<int> from, juce::Point<int> to);
 
     /**
      * Convert Y-pixel to bin index (reverse of SpectralView::freqToY).

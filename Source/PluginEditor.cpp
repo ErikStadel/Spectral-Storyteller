@@ -100,7 +100,104 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             }
         }
     });
+    spectralSelector->setOnBrushComplete([this](const juce::Image& brushMask)
+    {
+        auto* db = processor.getObjectDatabase();
+        if (db == nullptr || spectralView == nullptr || !brushMask.isValid())
+            return;
+
+        std::vector<double> frameTimesSec;
+        std::vector<std::array<bool, SpectralFrameBuffer::NUM_BINS>> frameMasks;
+        std::array<bool, SpectralFrameBuffer::NUM_BINS> combinedMask{};
+        combinedMask.fill(false);
+
+        if (!spectralView->buildTimeFrequencyMaskFromBrushMask(brushMask, frameTimesSec, frameMasks, combinedMask))
+            return;
+
+        int minBin = SpectralFrameBuffer::NUM_BINS - 1;
+        int maxBin = 0;
+        for (int bin = 0; bin < SpectralFrameBuffer::NUM_BINS; ++bin)
+        {
+            if (!combinedMask[static_cast<size_t>(bin)])
+                continue;
+            minBin = juce::jmin(minBin, bin);
+            maxBin = juce::jmax(maxBin, bin);
+        }
+
+        if (minBin > maxBin)
+            return;
+
+        constexpr float nyquist = 24000.0f;
+        constexpr float binWidthHz = nyquist / static_cast<float>(ObjectDatabase::NUM_BINS - 1);
+
+        auto formatFreq = [](float freqHz)
+        {
+            if (freqHz >= 1000.0f)
+            {
+                const float kHz = freqHz / 1000.0f;
+                if (kHz >= 10.0f)
+                    return juce::String(static_cast<int>(std::round(kHz))) + "kHz";
+
+                return juce::String(kHz, 1) + "kHz";
+            }
+
+            return juce::String(static_cast<int>(std::round(freqHz))) + "Hz";
+        };
+
+        const std::string objName = ("Brush [" + formatFreq(minBin * binWidthHz) + " - "
+                                   + formatFreq(maxBin * binWidthHz) + "]").toStdString();
+
+        if (!db->addObject(objName))
+            return;
+
+        const int newIndex = db->getNumObjects() - 1;
+        const int newObjectId = db->getObjectIdAtIndex(newIndex);
+        if (newObjectId < 0)
+            return;
+
+        db->setObjectTimeFrequencyMask(newObjectId, frameTimesSec, frameMasks, combinedMask);
+
+        ObjectDatabase::ObjectMask created;
+        if (db->getObjectCopy(newIndex, created))
+            processor.calibrateDensityAnchor(created);
+
+        processor.setSelectedObjectId(newObjectId);
+
+        if (objectSidebar)
+            objectSidebar->refresh();
+        if (storyTimeline)
+            storyTimeline->refresh();
+        if (modulationPanel)
+            modulationPanel->refresh();
+    });
     addAndMakeVisible(*spectralSelector);
+
+    for (auto* button : { &rectSelectButton, &lassoSelectButton })
+    {
+        button->setClickingTogglesState(true);
+        button->setRadioGroupId(9001);
+        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF2D3440));
+        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF4A76B7));
+        button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE8E8E8));
+        button->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
+        addAndMakeVisible(*button);
+    }
+
+    rectSelectButton.setToggleState(true, juce::dontSendNotification);
+    rectSelectButton.setTooltip("Rechteck-Auswahl: erzeugt die bisherige 1D-Frequenzmaske");
+    lassoSelectButton.setTooltip("Pinsel-Auswahl: erzeugt eine echte 2D-Zeit-Frequenz-Maske; Shift+Scroll aendert den Durchmesser");
+
+    rectSelectButton.onClick = [this]()
+    {
+        if (spectralSelector)
+            spectralSelector->setToolMode(SpectralSelector::ToolMode::Rectangle);
+    };
+
+    lassoSelectButton.onClick = [this]()
+    {
+        if (spectralSelector)
+            spectralSelector->setToolMode(SpectralSelector::ToolMode::Brush);
+    };
 
     // Create object sidebar
     objectSidebar = std::make_unique<ObjectSidebar>(
@@ -329,6 +426,14 @@ void PluginEditor::resized()
     layoutMeterCol(outCol, outputLabel, outputGainSlider, outputMeter);
     layoutSliderCol(dryCol,  dryWetLabel, dryWetSlider);
     layoutSliderCol(gateCol, gateLabel,   gateSlider);
+
+    const int toolButtonW = 56;
+    const int toolButtonH = 24;
+    auto toolBarArea = area.removeFromTop(toolButtonH);
+    rectSelectButton.setBounds(toolBarArea.removeFromLeft(toolButtonW));
+    toolBarArea.removeFromLeft(6);
+    lassoSelectButton.setBounds(toolBarArea.removeFromLeft(toolButtonW));
+    area.removeFromTop(6);
 
     // Spectrogram fills remaining area
     if (spectralView)

@@ -41,6 +41,10 @@ public:
                                                             std::array<float, SpectralFrameBuffer::NUM_BINS>&,
                                                             std::array<float, SpectralFrameBuffer::NUM_BINS>&)> provider);
     int getBinForY(int y) const;
+    bool buildTimeFrequencyMaskFromBrushMask(const juce::Image& brushMask,
+                                             std::vector<double>& frameTimesSec,
+                                             std::vector<std::array<bool, SpectralFrameBuffer::NUM_BINS>>& frameMasks,
+                                             std::array<bool, SpectralFrameBuffer::NUM_BINS>& combinedMask) const;
 
 private:
     // -------------------------------------------------------------------------
@@ -78,6 +82,8 @@ private:
     std::array<juce::Colour, LUT_SIZE> colourLut{};
 
     int64_t lastRenderedSampleIndex = -1;
+    std::vector<double> visibleColumnTimesSec;
+    std::vector<bool> visibleColumnHasData;
 
     // Physikalische Konstanten
     static constexpr float kSampleRate       = 48000.0f;

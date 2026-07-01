@@ -5,12 +5,13 @@ SpectralFrameBuffer::SpectralFrameBuffer()
     frames.resize(MAX_FRAMES);
 }
 
-void SpectralFrameBuffer::writeFrame(const float* fftData, int64_t sampleIndex)
+void SpectralFrameBuffer::writeFrame(const float* fftData, int64_t sampleIndex, double transportTimeSec)
 {
     juce::ScopedLock lock_(lock);
 
     Frame& frame = frames[writePos];
     frame.sampleIndex = sampleIndex;
+    frame.transportTimeSec = transportTimeSec;
 
     // JUCE real-only FFT output is interleaved complex values:
     //   re(k) = fftData[2*k], im(k) = fftData[2*k+1]

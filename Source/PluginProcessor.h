@@ -159,6 +159,7 @@ private:
 
     std::atomic<double> transportSeconds{ 0.0 };
     std::atomic<bool> transportPlaying{ false };
+    double currentAnalysisFrameTimeSec = 0.0;
 
     int64_t totalSamplesProcessed = 0;
 

@@ -20,6 +20,7 @@ public:
         std::vector<float> magnitude;
         std::vector<float> phase;
         int64_t sampleIndex = 0;
+        double transportTimeSec = 0.0;
 
         Frame() : magnitude(NUM_BINS, 0.0f), phase(NUM_BINS, 0.0f) {}
     };
@@ -31,7 +32,7 @@ public:
      * Write a frame of complex FFT data (real-only format).
      * Automatically computes magnitude and phase.
      */
-    void writeFrame(const float* fftData, int64_t sampleIndex);
+    void writeFrame(const float* fftData, int64_t sampleIndex, double transportTimeSec);
 
     /**
      * Read magnitude frame at index (oldest to newest).
