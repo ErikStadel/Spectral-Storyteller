@@ -258,6 +258,9 @@ private:
         float thresholdLin = 0.0f;
         float centerBin = 1.0f;
         float tiltExp = 0.0f;
+        int lowBin = 0;
+        int highBin = 0;
+        float brightnessCompensation = 1.0f;
     };
 
     std::unordered_map<int, TransformSettings> transformSettingsByObject;

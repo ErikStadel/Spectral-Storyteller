@@ -336,6 +336,7 @@ void PluginProcessor::updateTargetBinGains()
 
             int lowBin = -1;
             int highBin = -1;
+            float framePeakMag = 0.0f;
             for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
             {
                 if (!item.mask[static_cast<size_t>(bin)])
@@ -344,22 +345,43 @@ void PluginProcessor::updateTargetBinGains()
                 if (lowBin < 0)
                     lowBin = bin;
                 highBin = bin;
+
+                framePeakMag = juce::jmax(framePeakMag, currentAnalysisMagnitudes[static_cast<size_t>(bin)]);
             }
 
             const float anchorDb = item.densityAnchorValid ? item.densityAnchorDb : -60.0f;
+            const float peakDb = juce::Decibels::gainToDecibels(framePeakMag, -120.0f);
+            const float denseMinDb = juce::jmax(anchorDb + 18.0f, peakDb - 6.0f);
+            // Mid-field emphasis: use a concave curve so Density changes are clearer around 0.7..0.4.
+            const float midCurve = 0.62f;
             const float thresholdDb = (density >= 0.5f)
-                                          ? juce::jmap((1.0f - density) * 2.0f, -120.0f, anchorDb)
-                                          : juce::jmap((0.5f - density) * 2.0f, anchorDb, 0.0f);
+                                          ? juce::jmap(std::pow((1.0f - density) * 2.0f, midCurve), -120.0f, anchorDb)
+                                          : juce::jmap(std::pow((0.5f - density) * 2.0f, midCurve), anchorDb, denseMinDb);
 
             SpectralFxSettings spectralSettings;
             spectralSettings.density = density;
             spectralSettings.brightness = brightness;
             spectralSettings.thresholdLin = juce::Decibels::decibelsToGain(thresholdDb, -120.0f);
+            spectralSettings.lowBin = juce::jmax(0, lowBin);
+            spectralSettings.highBin = juce::jmax(spectralSettings.lowBin, highBin);
             spectralSettings.centerBin = juce::jmax(1.0f,
                                                     (lowBin >= 0 && highBin >= lowBin)
                                                         ? 0.5f * static_cast<float>(lowBin + highBin)
                                                         : 1.0f);
             spectralSettings.tiltExp = brightness * 2.0f;
+
+            float maxTiltBoost = 1.0f;
+            if (lowBin >= 0 && highBin >= lowBin && std::abs(spectralSettings.brightness) > 1.0e-6f)
+            {
+                const float lowRatio = juce::jmax(1.0e-3f, static_cast<float>(lowBin) / spectralSettings.centerBin);
+                const float highRatio = juce::jmax(1.0e-3f, static_cast<float>(highBin) / spectralSettings.centerBin);
+                const float lowTilt = std::pow(lowRatio, spectralSettings.tiltExp);
+                const float highTilt = std::pow(highRatio, spectralSettings.tiltExp);
+                maxTiltBoost = juce::jmax(1.0f, juce::jmax(lowTilt, highTilt));
+            }
+
+            // Keep brightness as a redistribution rather than broad gain boost.
+            spectralSettings.brightnessCompensation = 0.92f / maxTiltBoost;
             spectralFxByObject[item.id] = spectralSettings;
 
             timelineObjectGains[static_cast<size_t>(obj)] = juce::jlimit(0.0f, 2.0f, volumeNorm * 2.0f);
@@ -710,7 +732,7 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
             {
                 const float ratio = static_cast<float>(bin) / spectral.centerBin;
                 const float factor = std::pow(ratio, spectral.tiltExp);
-                spectralFactor = juce::jlimit(0.125f, 8.0f, factor);
+                spectralFactor = juce::jlimit(0.125f, 8.0f, factor) * spectral.brightnessCompensation;
             }
         }
 
