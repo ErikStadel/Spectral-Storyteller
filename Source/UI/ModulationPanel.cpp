@@ -360,12 +360,20 @@ void ModulationPanel::itemDropped(const SourceDetails& d)
 void ModulationPanel::paint(juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
-    g.setColour(juce::Colour(0xFF1F2227));
-    g.fillRoundedRectangle(r, 6.0f);
-    g.setColour(juce::Colour(0xFF2A2E36));
-    g.drawRoundedRectangle(r.reduced(0.5f), 6.0f, 1.0f);
+    g.setColour(juce::Colour(0xCC292524));
+    g.fillRoundedRectangle(r, 0.0f);
+    g.setColour(juce::Colour(0xFF44403C));
+    g.drawRect(r, 1.0f);
 
-    const auto headerBounds = getLocalBounds().reduced(12, 6).removeFromTop(20);
+    // Header with accent colour
+    auto headerBounds = getLocalBounds().reduced(8, 6).removeFromTop(20);
+    g.setColour(juce::Colour(0xFFE0A96D));
+    g.setFont(juce::Font(10.0f, juce::Font::bold));
+    g.drawText("MODULATION HUB", headerBounds, juce::Justification::centredLeft, false);
+
+    // Separator
+    g.setColour(juce::Colour(0xFF44403C));
+    g.drawHorizontalLine(headerBounds.getBottom() + 2, r.getX() + 6.0f, r.getRight() - 6.0f);
 
     juce::String headerText;
     bool hasTarget = false;
@@ -388,14 +396,10 @@ void ModulationPanel::paint(juce::Graphics& g)
         headerText = "X: " + xText + "   Y: " + yText;
     }
 
-    g.setColour(hasTarget ? juce::Colours::white : juce::Colours::grey);
-    g.setFont(juce::Font(14.0f, juce::Font::bold));
-    g.drawText(headerText, headerBounds, juce::Justification::centredLeft, true);
-
     if (isDragOver)
     {
-        g.setColour(juce::Colour(0xFF4CA8FF).withAlpha(0.25f));
-        g.fillRoundedRectangle(r.reduced(2.0f), 6.0f);
+        g.setColour(juce::Colour(0xFFE0A96D).withAlpha(0.20f));
+        g.fillRoundedRectangle(r.reduced(2.0f), 0.0f);
     }
 }
 
@@ -456,7 +460,7 @@ void ModulationPanel::resized()
 void ModulationPanel::LFOScope::paint(juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
-    g.setColour(juce::Colour(0xFF111418));
+    g.setColour(juce::Colour(0xFF0C0A09));
     g.fillRoundedRectangle(r, 4.0f);
 
     juce::Path p;
@@ -481,7 +485,7 @@ void ModulationPanel::LFOScope::paint(juce::Graphics& g)
             p.lineTo(r.getX() + static_cast<float>(i), y);
     }
 
-    g.setColour(juce::Colour(0xFF4CA8FF));
+    g.setColour(juce::Colour(0xFFE0A96D));
     g.strokePath(p, juce::PathStrokeType(1.5f));
 
     if (getValue)

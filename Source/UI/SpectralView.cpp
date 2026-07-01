@@ -367,7 +367,7 @@ void SpectralView::drawGrid(juce::Graphics& g)
 
 void SpectralView::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF080810));
+    g.fillAll(juce::Colour(0xFF0C0A09));
 
     if (spectrogramImage.isValid())
         g.drawImageAt(spectrogramImage, 0, 0);

@@ -73,6 +73,23 @@ target_compile_definitions(SpectralStoryteller PRIVATE
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
+# Linux: add GTK/WebKit include paths needed by juce_gui_extra
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(GTK3 gtk+-3.0)
+        if(GTK3_FOUND)
+            target_include_directories(SpectralStoryteller PRIVATE ${GTK3_INCLUDE_DIRS})
+            target_link_libraries(SpectralStoryteller PRIVATE ${GTK3_LIBRARIES})
+        endif()
+        pkg_check_modules(WEBKIT webkit2gtk-4.0)
+        if(WEBKIT_FOUND)
+            target_include_directories(SpectralStoryteller PRIVATE ${WEBKIT_INCLUDE_DIRS})
+            target_link_libraries(SpectralStoryteller PRIVATE ${WEBKIT_LIBRARIES})
+        endif()
+    endif()
+endif()
+
 # Die Quellcodedateien (C++ Quelltexte und Header)
 target_sources(SpectralStoryteller PRIVATE
     Source/PluginProcessor.cpp
@@ -97,4 +114,6 @@ target_sources(SpectralStoryteller PRIVATE
     Source/UI/ModulationPanel.h
     Source/UI/StoryTimelineComponent.cpp
     Source/UI/StoryTimelineComponent.h
+    Source/UI/FxRackPanel.cpp
+    Source/UI/FxRackPanel.h
 )
