@@ -2,6 +2,37 @@
 #include "../PluginProcessor.h"
 #include "ModulationPanel.h"
 
+namespace
+{
+juce::Colour laneAccentForEffect(const juce::String& effectName)
+{
+    const auto n = effectName.toLowerCase();
+    if (n.contains("base") || n.contains("density") || n.contains("brightness") || n.contains("gain") || n.contains("pitch"))
+        return juce::Colour(0xFFA78BFA);
+    if (n.contains("delay") || n.contains("echo"))
+        return juce::Colour(0xFF10B981);
+    if (n.contains("space") || n.contains("blur") || n.contains("reverb"))
+        return juce::Colour(0xFF0EA5E9);
+    if (n.contains("filter") || n.contains("shade"))
+        return juce::Colour(0xFFF59E0B);
+    if (n.contains("compress") || n.contains("mass"))
+        return juce::Colour(0xFF3B82F6);
+    if (n.contains("satur") || n.contains("heat"))
+        return juce::Colour(0xFFF97316);
+    if (n.contains("dist") || n.contains("grit"))
+        return juce::Colour(0xFFF43F5E);
+    if (n.contains("contrast") || n.contains("prism"))
+        return juce::Colour(0xFFD946EF);
+    if (n.contains("freeze") || n.contains("stasis"))
+        return juce::Colour(0xFF06B6D4);
+    if (n.contains("perlin") || n.contains("fluid"))
+        return juce::Colour(0xFF84CC16);
+    if (n.contains("brown") || n.contains("chaos"))
+        return juce::Colour(0xFF8B5CF6);
+    return juce::Colour(0xFFA78BFA);
+}
+}
+
 StoryTimelineComponent::StoryTimelineComponent(PluginProcessor& processorRef)
     : processor(processorRef)
 {
@@ -49,23 +80,40 @@ std::vector<StoryTimelineComponent::LaneView> StoryTimelineComponent::getVisible
     if (selectedObjectId < 0)
         return lanes;
 
+    // The timeline shows ONLY the parameter currently selected in the FX rack.
+    const juce::String activeEffect = processor.getActiveFxEffectName();
+    const juce::String activeParam = processor.getActiveFxParameterName();
+    if (activeEffect.isEmpty() || activeParam.isEmpty())
+        return lanes;
+
     const auto fxChain = processor.getFxChainForObject(selectedObjectId);
     for (const auto& fx : fxChain)
     {
         if (!fx.enabled)
             continue;
 
+        if (!activeEffect.equalsIgnoreCase(juce::String(fx.name)))
+            continue;
+
+        bool hasParam = false;
+        for (const auto& param : fx.parameters)
+        {
+            if (activeParam.equalsIgnoreCase(juce::String(param.name)))
+            {
+                hasParam = true;
+                break;
+            }
+        }
+
+        if (!hasParam)
+            continue;
+
         LaneView lane;
         lane.effectName = fx.name;
-        lane.selectedParameter = fx.selectedParameterIndex;
-        for (const auto& param : fx.parameters)
-            lane.parameterNames.add(param.name);
-
-        if (lane.parameterNames.isEmpty())
-            lane.parameterNames.add("Amount");
-
-        lane.selectedParameter = juce::jlimit(0, lane.parameterNames.size() - 1, lane.selectedParameter);
+        lane.parameterNames.add(activeParam);
+        lane.selectedParameter = 0;
         lanes.push_back(std::move(lane));
+        break;
     }
 
     return lanes;
@@ -620,13 +668,13 @@ void StoryTimelineComponent::mouseDoubleClick(const juce::MouseEvent& event)
 void StoryTimelineComponent::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds();
-    g.fillAll(juce::Colour(0xFF15151A));
+    g.fillAll(juce::Colour(0xFF18181B));
     updateScrollBar();
 
     const int selectedObjectId = processor.getSelectedObjectId();
     if (selectedObjectId < 0)
     {
-        g.setColour(juce::Colour(0x66FFFFFF));
+        g.setColour(juce::Colour(0x66A8A29E));
         g.drawText("Select an object in the sidebar to edit FX automation.",
                    bounds, juce::Justification::centred, false);
         return;
@@ -635,7 +683,7 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
     const auto lanes = getVisibleLanes();
     if (lanes.empty())
     {
-        g.setColour(juce::Colour(0x66FFFFFF));
+        g.setColour(juce::Colour(0x66A8A29E));
         g.drawText("No active FX lanes for selected object.",
                    bounds, juce::Justification::centred, false);
         return;
@@ -647,10 +695,10 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
     const int timelineRight = getTimelineRightX();
 
     auto ruler = bounds.removeFromTop(rulerHeight);
-    g.setColour(juce::Colour(0xFF2A2A32));
+    g.setColour(juce::Colour(0xFF27272A));
     g.fillRect(ruler.withTrimmedRight(getWidth() - timelineRight));
 
-    g.setColour(juce::Colour(0x88FFFFFF));
+    g.setColour(juce::Colour(0x88A8A29E));
     for (int sec = 0; sec <= static_cast<int>(maxTimeSec); sec += 5)
     {
         const int x = static_cast<int>(timeToX(static_cast<double>(sec)));
@@ -664,19 +712,20 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
         const int y = rulerHeight + displayRow * laneHeight;
         const auto& lane = lanes[static_cast<size_t>(laneIndex)];
 
-        g.setColour((displayRow % 2 == 0) ? juce::Colour(0xFF1B1B22) : juce::Colour(0xFF202028));
+        g.setColour((displayRow % 2 == 0) ? juce::Colour(0xFF18181B) : juce::Colour(0xFF27272A));
         g.fillRect(0, y, timelineRight, laneHeight);
 
-        g.setColour(juce::Colour(0xFF23232D));
+        g.setColour(juce::Colour(0xFF27272A));
         g.fillRect(0, y, nameColumnWidth, laneHeight);
 
         g.setColour(juce::Colour(0x66FFFFFF));
         g.drawHorizontalLine(y, 0.0f, static_cast<float>(timelineRight));
 
         const auto objectName = processor.getTimelineTrackName(processor.getObjectDatabase()->getObjectIndexById(selectedObjectId));
-        g.setColour(juce::Colour(0xFFAAAAAA));
+        g.setColour(juce::Colour(0xFFD6D3D1));
         g.drawText(objectName + " / " + lane.effectName, 8, y + 2, nameColumnWidth - 12, 18, juce::Justification::centredLeft, true);
 
+        const auto accent = laneAccentForEffect(lane.effectName);
         const auto tabArea = getLaneParameterTabArea(y, laneHeight);
         const int tabCount = juce::jmax(1, lane.parameterNames.size());
         const int tabW = juce::jmax(22, tabArea.getWidth() / tabCount);
@@ -684,19 +733,19 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
         {
             juce::Rectangle<int> tab(tabArea.getX() + p * tabW, tabArea.getY(), tabW - 2, tabArea.getHeight());
             const bool isSelected = (p == lane.selectedParameter);
-            g.setColour(isSelected ? juce::Colour(0xFF4A76B7) : juce::Colour(0xFF2D2D38));
+            g.setColour(isSelected ? accent : juce::Colour(0xFF3F3F46));
             g.fillRoundedRectangle(tab.toFloat(), 3.0f);
-            g.setColour(isSelected ? juce::Colour(0xFFEAF3FF) : juce::Colour(0xFFB8B8C6));
+            g.setColour(isSelected ? juce::Colour(0xFFF5F5F4) : juce::Colour(0xFFA1A1AA));
             g.drawText(lane.parameterNames[p], tab, juce::Justification::centred, true);
         }
 
-        g.setColour(juce::Colour(0x335E5E72));
+        g.setColour(juce::Colour(0x3344403C));
         g.drawVerticalLine(nameColumnWidth, static_cast<float>(y), static_cast<float>(y + laneHeight));
 
         if (lane.effectName.equalsIgnoreCase("Pitch"))
         {
             const float zeroY = valueToYInRow(0.5f, y);
-            g.setColour(juce::Colour(0x66D9E6FF));
+            g.setColour(accent.withAlpha(0.45f));
             g.drawLine(static_cast<float>(nameColumnWidth), zeroY, static_cast<float>(timelineRight), zeroY, 1.0f);
         }
 
@@ -705,7 +754,7 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
                                                              lane.parameterNames[lane.selectedParameter]);
         if (keys.size() >= 2)
         {
-            g.setColour(juce::Colour(0xFF6CB4FF));
+            g.setColour(accent);
             for (size_t i = 0; i + 1 < keys.size(); ++i)
             {
                 const auto& a = keys[i];
@@ -737,22 +786,22 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
             const juce::Point<float> p(x, ky);
             const bool isHovered = (laneIndex == hoveredLaneIndex && std::abs(k.timeSec - hoveredKeyTime) < 1.0e-3);
 
-            g.setColour(isHovered ? juce::Colour(0xFFFFD96B) : juce::Colour(0xFFE8F1FF));
+            g.setColour(isHovered ? juce::Colour(0xFFE0A96D) : juce::Colour(0xFFF5F5F4));
             g.fillEllipse(p.x - keyRadiusPx, p.y - keyRadiusPx, keyRadiusPx * 2.0f, keyRadiusPx * 2.0f);
-            g.setColour(isHovered ? juce::Colour(0xFFFFD96B) : juce::Colour(0xAA14324A));
+            g.setColour(isHovered ? juce::Colour(0xFFE0A96D) : accent.withAlpha(0.6f));
             g.drawEllipse(p.x - keyRadiusPx, p.y - keyRadiusPx, keyRadiusPx * 2.0f, keyRadiusPx * 2.0f, isHovered ? 2.0f : 1.0f);
 
             const auto label = formatLaneValue(lane.effectName, k.value);
             juce::Rectangle<int> labelBounds(static_cast<int>(p.x) + 8, static_cast<int>(p.y) - 8, 54, 16);
-            g.setColour(juce::Colour(0xAA0F1116));
+            g.setColour(juce::Colour(0xAA0C0A09));
             g.fillRoundedRectangle(labelBounds.toFloat(), 3.0f);
-            g.setColour(isHovered ? juce::Colour(0xFFFFF4CC) : juce::Colour(0xFFCFD6E6));
+            g.setColour(isHovered ? juce::Colour(0xFFE0A96D) : juce::Colour(0xFFD6D3D1));
             g.drawText(label, labelBounds, juce::Justification::centredLeft, false);
         }
     }
 
     const double t = processor.getTransportSeconds();
     const int playX = static_cast<int>(timeToX(t));
-    g.setColour(processor.isTransportPlaying() ? juce::Colour(0xFFFF5A5A) : juce::Colour(0x66FF5A5A));
+    g.setColour(processor.isTransportPlaying() ? juce::Colour(0xFFFF5252) : juce::Colour(0x66FF5252));
     g.drawVerticalLine(playX, 0.0f, static_cast<float>(getHeight()));
 }

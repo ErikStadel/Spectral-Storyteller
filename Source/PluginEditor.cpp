@@ -97,6 +97,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
                 if (modulationPanel)
                     modulationPanel->refresh();
+
+                if (fxRackPanel)
+                    fxRackPanel->refresh();
             }
         }
     });
@@ -176,9 +179,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         button->setClickingTogglesState(true);
         button->setRadioGroupId(9001);
-        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF2D3440));
-        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF4A76B7));
-        button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE8E8E8));
+        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF27272A));
+        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF3F3F46));
+        button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
         button->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         addAndMakeVisible(*button);
     }
@@ -219,6 +222,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
                 storyTimeline->refresh();
             if (modulationPanel)
                 modulationPanel->refresh();
+            if (fxRackPanel)
+                fxRackPanel->refresh();
         },
         [this](const juce::String& presetName, const juce::File& file)
         {
@@ -236,6 +241,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
                     storyTimeline->refresh();
                 if (modulationPanel)
                     modulationPanel->refresh();
+                if (fxRackPanel)
+                    fxRackPanel->refresh();
             }
         },
         [this]() -> int
@@ -249,6 +256,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
                     storyTimeline->refresh();
                 if (modulationPanel)
                     modulationPanel->refresh();
+                if (fxRackPanel)
+                    fxRackPanel->refresh();
             }
 
             return objectId;
@@ -274,22 +283,103 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     addAndMakeVisible(*modulationPanel);
     modulationPanel->refresh();
 
-    // Dry/Wet slider
-    dryWetSlider.setSliderStyle(juce::Slider::LinearVertical);
-    dryWetSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 62, 20);
+    // FX Rack panel
+    fxRackPanel = std::make_unique<FxRackPanel>(processor);
+    addAndMakeVisible(*fxRackPanel);
+
+    // Editor-centered FX browser popup (hidden by default)
+    fxBrowserOverlay = std::make_unique<FxBrowserOverlay>();
+    fxBrowserOverlay->onEffectChosen = [this](const juce::String& fxName)
+    {
+        const int objId = processor.getSelectedObjectId();
+        if (objId > 0)
+        {
+            processor.addOrEnableObjectFx(objId, fxName);
+            if (fxRackPanel)
+                fxRackPanel->refresh();
+            if (storyTimeline)
+                storyTimeline->refresh();
+        }
+    };
+    fxBrowserOverlay->onClose = [this]
+    {
+        if (fxBrowserOverlay)
+            fxBrowserOverlay->setVisible(false);
+    };
+    addChildComponent(*fxBrowserOverlay);
+
+    fxRackPanel->onAddFxRequested = [this]
+    {
+        if (fxBrowserOverlay)
+        {
+            fxBrowserOverlay->setBounds(getLocalBounds());
+            fxBrowserOverlay->setVisible(true);
+            fxBrowserOverlay->toFront(true);
+            fxBrowserOverlay->grabKeyboardFocus();
+        }
+    };
+
+    // Input gain slider (rotary for meter strip)
+    inputGainSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    inputGainSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    inputGainSlider.setRange(-24.0, 24.0, 0.1);
+    inputGainSlider.setValue(0.0);
+    inputGainSlider.setTextValueSuffix(" dB");
+    inputGainSlider.setTooltip("Input Gain");
+    inputGainSlider.setLookAndFeel(&knobLookAndFeel);
+    addAndMakeVisible(inputGainSlider);
+
+    inputLabel.setText("In", juce::dontSendNotification);
+    inputLabel.setJustificationType(juce::Justification::centred);
+    inputLabel.setFont(juce::Font(9.0f, juce::Font::bold));
+    inputLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF71717A));
+    addAndMakeVisible(inputLabel);
+
+    inputMeter.setSource(&processor.getInputPeakDb());
+    addAndMakeVisible(inputMeter);
+
+    // Output gain slider (rotary for meter strip)
+    outputGainSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    outputGainSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    outputGainSlider.setRange(-24.0, 24.0, 0.1);
+    outputGainSlider.setValue(0.0);
+    outputGainSlider.setTextValueSuffix(" dB");
+    outputGainSlider.setTooltip("Output Gain");
+    outputGainSlider.setLookAndFeel(&knobLookAndFeel);
+    addAndMakeVisible(outputGainSlider);
+
+    outputLabel.setText("Out", juce::dontSendNotification);
+    outputLabel.setJustificationType(juce::Justification::centred);
+    outputLabel.setFont(juce::Font(9.0f, juce::Font::bold));
+    outputLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF71717A));
+    addAndMakeVisible(outputLabel);
+
+    outputMeter.setSource(&processor.getOutputPeakDb());
+    addAndMakeVisible(outputMeter);
+
+    // Dry/Wet slider (compact rotary in header area)
+    dryWetSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    dryWetSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     dryWetSlider.setRange(0.0, 1.0, 0.001);
     dryWetSlider.setValue(1.0);
+    dryWetSlider.setTooltip("Dry/Wet Mix");
     addAndMakeVisible(dryWetSlider);
 
-    dryWetLabel.setText("Dry/Wet", juce::dontSendNotification);
+    dryWetLabel.setText("D/W", juce::dontSendNotification);
     dryWetLabel.setJustificationType(juce::Justification::centred);
+    dryWetLabel.setFont(juce::Font(9.0f, juce::Font::bold));
+    dryWetLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF71717A));
     addAndMakeVisible(dryWetLabel);
 
-    // Gate slider
-    gateSlider.setSliderStyle(juce::Slider::LinearVertical);
-    gateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 62, 20);
+    // Gate slider (compact rotary in header area)
+    gateSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    gateSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     gateSlider.setRange(-180.0, 6.0, 1.0);
     gateSlider.setValue(-96.0);
+    gateSlider.setTooltip("Gate (dB)");
+    gateSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xFFE0A96D));
+    gateSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xFFE0A96D));
+    gateSlider.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF27272A));
     gateSlider.onValueChange = [this]
     {
         if (spectralView)
@@ -297,155 +387,174 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     };
     addAndMakeVisible(gateSlider);
 
-    gateLabel.setText("Gate (dB)", juce::dontSendNotification);
+    gateLabel.setText("View", juce::dontSendNotification);
     gateLabel.setJustificationType(juce::Justification::centred);
+    gateLabel.setFont(juce::Font(9.0f, juce::Font::bold));
+    gateLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFA1A1AA));
     addAndMakeVisible(gateLabel);
 
-        // Input gain + meter
-    inputGainSlider.setSliderStyle(juce::Slider::LinearVertical);
-    inputGainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 56, 18);
-    inputGainSlider.setRange(-24.0, 24.0, 0.1);
-    inputGainSlider.setValue(0.0);
-    inputGainSlider.setTextValueSuffix(" dB");
-    addAndMakeVisible(inputGainSlider);
-
-    inputLabel.setText("Input", juce::dontSendNotification);
-    inputLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(inputLabel);
-
-    inputMeter.setSource(&processor.getInputPeakDb());
-    addAndMakeVisible(inputMeter);
-
-    // Output gain + meter
-    outputGainSlider.setSliderStyle(juce::Slider::LinearVertical);
-    outputGainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 56, 18);
-    outputGainSlider.setRange(-24.0, 24.0, 0.1);
-    outputGainSlider.setValue(0.0);
-    outputGainSlider.setTextValueSuffix(" dB");
-    addAndMakeVisible(outputGainSlider);
-
-    outputLabel.setText("Output", juce::dontSendNotification);
-    outputLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(outputLabel);
-
-    outputMeter.setSource(&processor.getOutputPeakDb());
-    addAndMakeVisible(outputMeter);
-
-
-    // Attachment for Dry/Wet parameter (audio processing)
+    // Attachments for parameter binding
     dryWetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.getValueTreeState(), "dryWet", dryWetSlider);
-            inputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+    inputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.getValueTreeState(), "inputGain", inputGainSlider);
     outputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.getValueTreeState(), "outputGain", outputGainSlider);
 
-
-    // Version info
+    // Version info (hidden, used for state only)
     versionLabel.setText(processor.getBuildInfo(), juce::dontSendNotification);
     versionLabel.setJustificationType(juce::Justification::bottomRight);
+    versionLabel.setVisible(false);
     addAndMakeVisible(versionLabel);
 
-    setSize(1550, 700);
+    setResizable(true, true);
+    setResizeLimits(960, 540, 1920, 1080);
+    setSize(1600, 900);
 }
 
-PluginEditor::~PluginEditor() = default;
+PluginEditor::~PluginEditor()
+{
+    inputGainSlider.setLookAndFeel(nullptr);
+    outputGainSlider.setLookAndFeel(nullptr);
+}
+
+void PluginEditor::paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area)
+{
+    g.setColour(juce::Colour(0xE527272A));
+    g.fillRect(area.toFloat());
+
+    g.setColour(juce::Colour(0xFF3F3F46));
+    g.drawHorizontalLine(area.getBottom() - 1, static_cast<float>(area.getX()), static_cast<float>(area.getRight()));
+
+    // Plugin name with gradient
+    g.setFont(juce::Font(13.0f, juce::Font::bold));
+    juce::ColourGradient nameGrad(juce::Colour(0xFFE4E4E7), static_cast<float>(area.getX() + 16), 0.0f,
+                                   juce::Colour(0xFFA1A1AA), static_cast<float>(area.getX() + 260), 0.0f, false);
+    g.setGradientFill(nameGrad);
+    g.drawText("SPCTRL /\\ ARC", area.withTrimmedLeft(16).withTrimmedRight(area.getWidth() / 2),
+               juce::Justification::centredLeft, false);
+
+    // Preset selector look
+    auto presetArea = juce::Rectangle<int>(area.getX() + 260, area.getY() + 10, 160, area.getHeight() - 20);
+    g.setColour(juce::Colour(0xFF18181B));
+    g.fillRoundedRectangle(presetArea.toFloat(), 3.0f);
+    g.setColour(juce::Colour(0xFF3F3F46));
+    g.drawRoundedRectangle(presetArea.toFloat(), 3.0f, 1.0f);
+    g.setColour(juce::Colour(0xFFE4E4E7));
+    g.setFont(juce::Font(10.0f));
+    g.drawText("Default Preset", presetArea.reduced(8, 0), juce::Justification::centredLeft, false);
+
+    // Right side status
+    g.setFont(juce::Font(10.0f));
+    g.setColour(juce::Colour(0xFFA1A1AA));
+    auto rightArea = area.withTrimmedLeft(area.getWidth() - 200).reduced(8, 0);
+    g.drawText("CPU: --", rightArea.removeFromLeft(70), juce::Justification::centredRight, false);
+    g.drawText(processor.getBuildInfo(), rightArea, juce::Justification::centredRight, false);
+}
+
+void PluginEditor::paintMeterStrip(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& label)
+{
+    juce::ignoreUnused(label);
+    g.setColour(juce::Colour(0xB31C1917));
+    g.fillRect(area.toFloat());
+    g.setColour(juce::Colour(0xFF3F3F46));
+    g.drawRect(area.toFloat(), 1.0f);
+}
 
 void PluginEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF1A1A1F));
+    g.fillAll(juce::Colour(0xFF18181B));
+
+    // Header bar
+    paintHeaderBar(g, getLocalBounds().removeFromTop(headerHeight));
+
+    // Footer separator
+    auto footerTop = getHeight() - footerHeight;
+    g.setColour(juce::Colour(0xFF3F3F46));
+    g.drawHorizontalLine(footerTop, 0.0f, static_cast<float>(getWidth()));
+
+    // Sidebar border
+    g.setColour(juce::Colour(0xFF3F3F46));
+    g.drawVerticalLine(sidebarWidth, static_cast<float>(headerHeight), static_cast<float>(getHeight()));
 }
 
 void PluginEditor::resized()
 {
-    auto area = getLocalBounds().reduced(12);
-    
-    // Top: version label (24px height)
-    auto topBar = area.removeFromTop(24);
-    versionLabel.setBounds(topBar);
-    area.removeFromTop(8);  // spacing
-    
-    // Reserve timeline strip; we will place it after side/center layout so the left object panel
-    // can extend downward by a few rows without shrinking the spectrogram area.
-    // Give the timeline enough vertical room for taller adaptive FX lanes.
-    auto timelineArea = area.removeFromBottom(320);
-    timelineArea.removeFromBottom(6);
-    const int modPanelWidth = 250 + 8;
-    auto modArea = timelineArea.removeFromRight(modPanelWidth);
-    
-    // Middle section: object sidebar + spectrogram + parameter sidebar
-    const int sidebarWidth = 280;
-    const int controlPanelWidth = 250;
-    const int innerGap = 8;
-    
-    auto sidebar = area.removeFromLeft(sidebarWidth);
-    area.removeFromLeft(innerGap);  // spacing
+    auto area = getLocalBounds();
 
-    auto controlPanel = area.removeFromRight(controlPanelWidth);
-    area.removeFromRight(innerGap); // spacing to spectrogram
-    
+    area.removeFromTop(headerHeight);
+
+    // Footer
+    auto footer = area.removeFromBottom(footerHeight);
+
+    // Center layout
+    auto center = area;
+
+    auto sidebar = center.removeFromLeft(sidebarWidth);
     if (objectSidebar)
         objectSidebar->setBounds(sidebar);
 
-        auto controls = controlPanel.reduced(2);
-    const int labelH       = 18;
-    const int meterW       = 10;   // schmaler Pegelmesser
-    const int meterGap     = 4;
+    auto inStrip = center.removeFromLeft(meterStripWidth);
+    auto outStrip = center.removeFromRight(meterStripWidth);
 
-    // Oben: 4 vertikale Slider (Input | Output | Dry/Wet | Gate)
-    auto topBlock = controls;
+    auto centerColumn = center;
+    auto timelineArea = centerColumn.removeFromBottom(timelineHeight).reduced(2, 2);
+    centerColumn.removeFromBottom(2);
+    auto spectralArea = centerColumn.reduced(2, 2);
 
-    const int colGap   = 6;
-    const int numCols  = 4;
-    const int colWidth = (topBlock.getWidth() - colGap * (numCols - 1)) / numCols;
-
-    auto layoutSliderCol = [&](juce::Rectangle<int> col, juce::Label& lbl, juce::Slider& sld)
-    {
-        lbl.setBounds(col.removeFromTop(labelH));
-        col.removeFromTop(2);
-        sld.setBounds(col.reduced(2, 2));
-    };
-
-    auto layoutMeterCol = [&](juce::Rectangle<int> col, juce::Label& lbl,
-                              juce::Slider& sld, LevelMeter& meter)
-    {
-        lbl.setBounds(col.removeFromTop(labelH));
-        col.removeFromTop(2);
-        auto meterArea = col.removeFromLeft(meterW);
-        col.removeFromLeft(meterGap);
-        meter.setBounds(meterArea.reduced(0, 2));
-        sld.setBounds(col.reduced(2, 2));
-    };
-
-    auto inCol  = topBlock.removeFromLeft(colWidth); topBlock.removeFromLeft(colGap);
-    auto outCol = topBlock.removeFromLeft(colWidth); topBlock.removeFromLeft(colGap);
-    auto dryCol = topBlock.removeFromLeft(colWidth); topBlock.removeFromLeft(colGap);
-    auto gateCol = topBlock;
-
-    layoutMeterCol(inCol,  inputLabel,  inputGainSlider,  inputMeter);
-    layoutMeterCol(outCol, outputLabel, outputGainSlider, outputMeter);
-    layoutSliderCol(dryCol,  dryWetLabel, dryWetSlider);
-    layoutSliderCol(gateCol, gateLabel,   gateSlider);
-
-    const int toolButtonW = 56;
-    const int toolButtonH = 24;
-    auto toolBarArea = area.removeFromTop(toolButtonH);
-    rectSelectButton.setBounds(toolBarArea.removeFromLeft(toolButtonW));
-    toolBarArea.removeFromLeft(6);
-    lassoSelectButton.setBounds(toolBarArea.removeFromLeft(toolButtonW));
-    area.removeFromTop(6);
-
-    // Spectrogram fills remaining area
+    const auto spectralBounds = spectralArea;
     if (spectralView)
-        spectralView->setBounds(area);
-    
-    // Selector overlays the spectrogram
+        spectralView->setBounds(spectralBounds);
     if (spectralSelector)
-        spectralSelector->setBounds(area);
-
-    if (modulationPanel)
-        modulationPanel->setBounds(modArea);
-
+        spectralSelector->setBounds(spectralBounds);
     if (storyTimeline)
         storyTimeline->setBounds(timelineArea);
+
+    // Rect/Brush tools in spectral view top-left
+    juce::Rectangle<int> toolArea(spectralBounds.getX() + 8, spectralBounds.getY() + 8, 116, 20);
+    rectSelectButton.setBounds(toolArea.removeFromLeft(54));
+    toolArea.removeFromLeft(6);
+    lassoSelectButton.setBounds(toolArea.removeFromLeft(56));
+
+    // View gain control in spectral view bottom-right
+    juce::Rectangle<int> viewGainArea(spectralBounds.getRight() - 140, spectralBounds.getBottom() - 30, 132, 20);
+    gateLabel.setBounds(viewGainArea.removeFromLeft(44));
+    gateSlider.setBounds(viewGainArea.reduced(3, 5));
+
+    // Dry/Wet remains attached but hidden from the mockup-centric surface
+    dryWetLabel.setBounds(0, 0, 0, 0);
+    dryWetSlider.setBounds(0, 0, 0, 0);
+
+    auto layoutMeterStrip = [](juce::Rectangle<int> stripArea,
+                               juce::Label& lbl,
+                               juce::Slider& gain,
+                               LevelMeter& meter)
+    {
+        auto strip = stripArea.reduced(6, 6);
+        lbl.setBounds(strip.removeFromTop(12));
+
+        auto knobArea = strip.removeFromBottom(34);
+        const int knobSize = juce::jmin(knobArea.getWidth(), knobArea.getHeight());
+        gain.setBounds(knobArea.withSizeKeepingCentre(knobSize, knobSize));
+
+        strip.removeFromBottom(4);
+        const int meterW = juce::jmin(12, strip.getWidth());
+        meter.setBounds(strip.withSizeKeepingCentre(meterW, strip.getHeight()));
+    };
+
+    layoutMeterStrip(inStrip, inputLabel, inputGainSlider, inputMeter);
+    layoutMeterStrip(outStrip, outputLabel, outputGainSlider, outputMeter);
+
+    // Footer layout: ModulationPanel (left) + FxRackPanel (right)
+    auto modArea = footer.removeFromLeft(sidebarWidth);
+    if (modulationPanel)
+        modulationPanel->setBounds(modArea.reduced(2));
+
+    if (fxRackPanel)
+        fxRackPanel->setBounds(footer.reduced(2));
+
+    if (fxBrowserOverlay && fxBrowserOverlay->isVisible())
+        fxBrowserOverlay->setBounds(getLocalBounds());
+
+    versionLabel.setBounds(0, 0, 0, 0);
 }

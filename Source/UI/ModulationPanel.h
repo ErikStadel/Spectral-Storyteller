@@ -61,8 +61,8 @@ private:
         void paint(juce::Graphics& g) override
         {
             auto r = getLocalBounds().toFloat();
-            g.setColour(juce::Colour(0xFF111418)); g.fillRoundedRectangle(r, 4.0f);
-            g.setColour(juce::Colour(0xFF2A2E36));
+            g.setColour(juce::Colour(0xFF0C0A09)); g.fillRoundedRectangle(r, 4.0f);
+            g.setColour(juce::Colour(0xFF44403C));
             for (int i = 1; i < 4; ++i)
             {
                 const float xv = r.getX() + r.getWidth()  * i / 4.0f;
@@ -75,7 +75,7 @@ private:
                 auto [x,y] = getXY();
                 const float px = r.getX() + x * r.getWidth();
                 const float py = r.getY() + (1.0f - y) * r.getHeight();
-                g.setColour(juce::Colour(0xFF4CA8FF));
+                g.setColour(juce::Colour(0xFFE0A96D));
                 g.fillEllipse(px - 7, py - 7, 14, 14);
                 g.setColour(juce::Colours::white.withAlpha(0.8f));
                 g.drawEllipse(px - 7, py - 7, 14, 14, 1.2f);

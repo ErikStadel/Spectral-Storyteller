@@ -34,6 +34,12 @@
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\FxRackPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\FxBrowserOverlay.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -109,6 +115,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\FxRackPanel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\FxBrowserOverlay.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\NeumorphicKnobLookAndFeel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

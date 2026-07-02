@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../DSP/ObjectDatabase.h"
+#include "NeumorphicKnobLookAndFeel.h"
 #include <memory>
 
 /**
@@ -46,16 +47,20 @@ private:
         std::unique_ptr<juce::TextButton> recordButton;
         std::unique_ptr<juce::TextButton> engageButton;
         std::unique_ptr<juce::Label> nameLabel;
-        std::unique_ptr<juce::Button> fxButton;
+        std::unique_ptr<juce::Slider> thresholdKnob;
+        std::unique_ptr<juce::Label> thresholdLabel;
         std::unique_ptr<juce::TextButton> soloButton;
         std::unique_ptr<juce::TextButton> muteButton;
         int objectId = -1;
         juce::String name;
+        bool isTransient = false;
+        bool allowRecord = false;
     };
 
     std::vector<ObjectRow> rows;
     std::unique_ptr<juce::TextButton> autoDetectButton;
     std::unique_ptr<juce::TextButton> transformButton;
+    NeumorphicKnobLookAndFeel thresholdKnobLnF { juce::Colour(0xFFFF5252) };
     std::unique_ptr<juce::FileChooser> transformFileChooser;
     std::unique_ptr<juce::Component> fxOverlay;
     uint64_t lastKnownRevision = 0;
@@ -66,7 +71,7 @@ private:
     juce::ScrollBar rowScrollBar { false };
 
     static constexpr int HEADER_BUTTON_HEIGHT = 26;
-    static constexpr int ROW_HEIGHT = 52;
+    static constexpr int ROW_HEIGHT = 68;
     static constexpr int RIGHT_BUTTON_W = 20;
     static constexpr int RIGHT_BUTTON_H = 13;
     static constexpr int FX_BUTTON_W = RIGHT_BUTTON_W;
@@ -77,6 +82,8 @@ private:
     void timerCallback() override;
     void scrollBarMoved(juce::ScrollBar* scrollBarThatHasMoved, double newRangeStart) override;
     void rebuildRows();
+    int getRowHeight(int index) const;
+    int getRowTopOffset(int index) const;
     void showTransformMenu();
     void showFxOverlay(int objectId);
     void hideFxOverlay();

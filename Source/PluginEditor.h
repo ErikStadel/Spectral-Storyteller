@@ -7,6 +7,9 @@
 #include "UI/ObjectSidebar.h"
 #include "UI/StoryTimelineComponent.h"
 #include "UI/ModulationPanel.h"
+#include "UI/FxRackPanel.h"
+#include "UI/FxBrowserOverlay.h"
+#include "UI/NeumorphicKnobLookAndFeel.h"
 #include <atomic>
 #include <memory>
 
@@ -21,8 +24,8 @@ public:
     void paint(juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat();
-        g.setColour(juce::Colour(0xFF111418));
-        g.fillRoundedRectangle(r, 2.0f);
+        g.setColour(juce::Colour(0xFF0C0A09));
+        g.fillRoundedRectangle(r, 4.0f);
 
         const float minDb = -60.0f;
         const float maxDb = 6.0f;
@@ -33,23 +36,18 @@ public:
 
         const float h = r.getHeight();
         const float lvlY = h - h * norm(currentDb);
-        auto bar = juce::Rectangle<float>(r.getX() + 1.0f,
-                                          r.getY() + lvlY,
-                                          r.getWidth() - 2.0f,
-                                          h - lvlY - 1.0f);
 
-        juce::Colour c = currentDb > 0.0f ? juce::Colours::red
-                       : currentDb > -6.0f ? juce::Colours::orange
-                       : juce::Colour(0xFF4CAF50);
-        g.setColour(c);
-        g.fillRect(bar);
+        juce::ColourGradient grad(juce::Colour(0xFF6A00A8), 0.0f, r.getBottom(),
+                                  juce::Colour(0xFFFFC400), 0.0f, r.getY(), false);
+        grad.addColour(0.5, juce::Colour(0xFFFF2A00));
+        g.setGradientFill(grad);
+        g.fillRect(juce::Rectangle<float>(r.getX() + 1.0f, r.getY() + lvlY,
+                                          r.getWidth() - 2.0f, h - lvlY - 1.0f));
 
         const float pkY = h - h * norm(peakHoldDb);
-        g.setColour(juce::Colours::white.withAlpha(0.8f));
-        g.fillRect(juce::Rectangle<float>(r.getX() + 1.0f,
-                                          r.getY() + pkY - 1.0f,
-                                          r.getWidth() - 2.0f,
-                                          1.5f));
+        g.setColour(juce::Colours::white.withAlpha(0.7f));
+        g.fillRect(juce::Rectangle<float>(r.getX() + 1.0f, r.getY() + pkY - 0.5f,
+                                          r.getWidth() - 2.0f, 1.0f));
     }
 
 private:
@@ -99,6 +97,8 @@ private:
     std::unique_ptr<ObjectSidebar> objectSidebar;
     std::unique_ptr<StoryTimelineComponent> storyTimeline;
     std::unique_ptr<ModulationPanel> modulationPanel;
+    std::unique_ptr<FxRackPanel> fxRackPanel;
+    std::unique_ptr<FxBrowserOverlay> fxBrowserOverlay;
 
     juce::Slider inputGainSlider;
     juce::Slider outputGainSlider;
@@ -119,6 +119,16 @@ private:
 
     juce::Label versionLabel;
     juce::TooltipWindow tooltipWindow;
+    NeumorphicKnobLookAndFeel knobLookAndFeel;
+
+    void paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area);
+    void paintMeterStrip(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& label);
+
+    static constexpr int headerHeight = 48;
+    static constexpr int sidebarWidth = 320;
+    static constexpr int meterStripWidth = 48;
+    static constexpr int footerHeight = 240;
+    static constexpr int timelineHeight = 112;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

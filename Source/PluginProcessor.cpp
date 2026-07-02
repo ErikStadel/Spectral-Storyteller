@@ -1377,6 +1377,25 @@ void PluginProcessor::setSelectedObjectId(int objectId)
         objectDatabase->setSelectedObjectId(objectId);
 }
 
+void PluginProcessor::setActiveFxSelection(const juce::String& effectName, const juce::String& parameterName)
+{
+    const juce::ScopedLock sl(activeFxLock);
+    activeFxEffectName = effectName;
+    activeFxParameterName = parameterName;
+}
+
+juce::String PluginProcessor::getActiveFxEffectName() const
+{
+    const juce::ScopedLock sl(activeFxLock);
+    return activeFxEffectName;
+}
+
+juce::String PluginProcessor::getActiveFxParameterName() const
+{
+    const juce::ScopedLock sl(activeFxLock);
+    return activeFxParameterName;
+}
+
 std::vector<ObjectDatabase::FXModule> PluginProcessor::getFxChainForObject(int objectId) const
 {
     if (objectDatabase == nullptr || objectId < 0)
