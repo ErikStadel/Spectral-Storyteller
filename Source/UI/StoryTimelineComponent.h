@@ -48,6 +48,9 @@ private:
     int hoveredLaneIndex = -1;
     double hoveredKeyTime = -1.0;
     juce::ScrollBar laneScrollBar { false };
+    std::unique_ptr<juce::TextEditor> keyframeValueEditor;
+    int editLaneIndex = -1;
+    double editKeyTimeSec = -1.0;
 
     struct LaneView
     {
@@ -81,6 +84,8 @@ private:
                             int& laneIndex,
                             double& segmentStartTimeSec,
                             float& segmentCurvature) const;
+    void beginKeyframeValueEdit(int laneIndex, double keyTimeSec, float currentValue, juce::Point<int> atPos);
+    void commitKeyframeValueEdit(bool cancel);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StoryTimelineComponent)
 };

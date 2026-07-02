@@ -13,7 +13,7 @@
 
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
-constexpr int VERSION_MINOR = 7;
+constexpr int VERSION_MINOR = 8;
 constexpr int VERSION_BUILD = 1;
 
 class PluginProcessor : public juce::AudioProcessor
@@ -96,6 +96,18 @@ public:
                                  double timeSec,
                                  float value,
                                  float curvature = 0.0f);
+    void setFxParameterFollowTimeline(int objectId,
+                                      const juce::String& effectName,
+                                      const juce::String& parameterName,
+                                      bool shouldFollowTimeline);
+    bool getFxParameterFollowTimeline(int objectId,
+                                      const juce::String& effectName,
+                                      const juce::String& parameterName,
+                                      bool fallback = true) const;
+    void setFxStaticParameterValue(int objectId,
+                                   const juce::String& effectName,
+                                   const juce::String& parameterName,
+                                   float value);
     void setFxAutomationSegmentCurvature(int objectId,
                                          const juce::String& effectName,
                                          const juce::String& parameterName,

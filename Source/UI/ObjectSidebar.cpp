@@ -267,13 +267,12 @@ void ObjectSidebar::paint(juce::Graphics& g)
 
         if (i == selectedRow)
         {
-            g.setColour(juce::Colour(0xFF323238));
+            g.setColour(juce::Colour(0xFF303036));
             g.fillRoundedRectangle(cardArea.toFloat(), 6.0f);
-            // Stronger persistent highlight for the selected object.
-            g.setColour(juce::Colour(0xFFE0A96D));
-            g.drawRoundedRectangle(cardArea.toFloat(), 6.0f, 2.0f);
-            g.setColour(juce::Colour(0x33E0A96D));
-            g.drawRoundedRectangle(cardArea.toFloat().expanded(1.5f), 7.0f, 1.5f);
+            g.setColour(juce::Colour(0xFFD6A472));
+            g.drawRoundedRectangle(cardArea.toFloat(), 6.0f, 1.3f);
+            g.setColour(juce::Colour(0x22D6A472));
+            g.drawRoundedRectangle(cardArea.toFloat().expanded(1.0f), 6.8f, 1.0f);
         }
         else
         {
@@ -281,6 +280,11 @@ void ObjectSidebar::paint(juce::Graphics& g)
             g.fillRoundedRectangle(cardArea.toFloat(), 6.0f);
             g.setColour(juce::Colour(0xCC3F3F46));
             g.drawRoundedRectangle(cardArea.toFloat(), 6.0f, 1.0f);
+
+            g.setColour(juce::Colour(0x2209090B));
+            g.fillRoundedRectangle(cardArea.toFloat(), 6.0f);
+            g.setColour(juce::Colour(0x1A000000));
+            g.drawRoundedRectangle(cardArea.toFloat().translated(0.0f, 1.0f), 6.0f, 1.0f);
         }
 
         // Status dot
@@ -484,6 +488,9 @@ void ObjectSidebar::resized()
 
         auto rowArea = juce::Rectangle<int>(contentArea.getX(), y, contentArea.getWidth(), rowH).reduced(4, 4);
         y += rowH;
+
+        row.nameLabel->setColour(juce::Label::textColourId,
+                     rowIndex == selectedRow ? juce::Colour(0xFFF5F5F4) : juce::Colour(0xFFB5B5BE));
 
         // Top line: dot space + name
         auto topLine = rowArea.removeFromTop(16);
@@ -914,6 +921,8 @@ void ObjectSidebar::mouseDown(const juce::MouseEvent& e)
             if (onSelectedObjectChanged)
                 onSelectedObjectChanged(objectId);
         }
+
+        resized();
 
         dragStartRow = row;
         dragHoverRow = row;

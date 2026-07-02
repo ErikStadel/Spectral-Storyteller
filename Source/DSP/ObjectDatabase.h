@@ -27,6 +27,8 @@ public:
     {
         std::string name;
         std::vector<AutomationKeyframe> keyframes;
+        bool followTimeline = true;
+        float staticValue = 0.5f;
     };
 
     struct FXModule
@@ -156,6 +158,18 @@ public:
                                        const std::string& parameterName,
                                        double segmentStartTimeSec,
                                        float curvature);
+    void setFxParameterFollowTimeline(int objectId,
+                                      const std::string& effectName,
+                                      const std::string& parameterName,
+                                      bool shouldFollowTimeline);
+    bool getFxParameterFollowTimeline(int objectId,
+                                      const std::string& effectName,
+                                      const std::string& parameterName,
+                                      bool fallback = true) const;
+    void setFxStaticParameterValue(int objectId,
+                                   const std::string& effectName,
+                                   const std::string& parameterName,
+                                   float value);
     void deleteAutomationKeyframe(int objectId, const std::string& effectName, const std::string& parameterName, double timeSec);
     std::vector<AutomationKeyframe> getAutomationKeyframes(int objectId, const std::string& effectName, const std::string& parameterName) const;
     float getInterpolatedAutomationValue(int objectId,

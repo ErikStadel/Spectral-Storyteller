@@ -48,6 +48,31 @@ void FxRackPanel::refresh()
     rebuildModules();
 }
 
+void FxRackPanel::showKnobContextMenu(const KnobView& knob, juce::Component* targetComponent)
+{
+    const int objId = processor.getSelectedObjectId();
+    if (objId <= 0)
+        return;
+
+    const bool followTimeline = processor.getFxParameterFollowTimeline(objId, knob.fxName, knob.paramName, true);
+
+    juce::PopupMenu menu;
+    menu.addSectionHeader("Mode");
+    menu.addItem(1, "Follow", true, followTimeline);
+    menu.addItem(2, "Static", true, !followTimeline);
+
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(targetComponent != nullptr ? targetComponent : this),
+                       [this, objId, fxName = knob.fxName, paramName = knob.paramName](int result)
+                       {
+                           if (result == 1)
+                               processor.setFxParameterFollowTimeline(objId, fxName, paramName, true);
+                           else if (result == 2)
+                               processor.setFxParameterFollowTimeline(objId, fxName, paramName, false);
+
+                           rebuildModules();
+                       });
+}
+
 void FxRackPanel::rebuildModules()
 {
     modules.clear();
@@ -427,6 +452,12 @@ void FxRackPanel::mouseDown(const juce::MouseEvent& event)
             if (objId <= 0)
                 return;
 
+            if (event.mods.isRightButtonDown())
+            {
+                showKnobContextMenu(knob, event.eventComponent);
+                return;
+            }
+
             processor.setActiveFxSelection(knob.fxName, knob.paramName);
             processor.setObjectFxSelectedParameter(objId, knob.fxName, knob.paramIndexInFx);
 
@@ -474,7 +505,16 @@ void FxRackPanel::mouseDrag(const juce::MouseEvent& event)
     if (objId <= 0)
         return;
 
-    processor.addFxAutomationKeyframe(objId, knob.fxName, knob.paramName, processor.getTransportSeconds(), norm);
+    const bool followTimeline = processor.getFxParameterFollowTimeline(objId, knob.fxName, knob.paramName, true);
+    if (followTimeline)
+    {
+        processor.addFxAutomationKeyframe(objId, knob.fxName, knob.paramName, processor.getTransportSeconds(), norm);
+    }
+    else
+    {
+        processor.setFxStaticParameterValue(objId, knob.fxName, knob.paramName, norm);
+    }
+
     rebuildModules();
 }
 

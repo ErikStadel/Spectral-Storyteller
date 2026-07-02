@@ -67,6 +67,30 @@ namespace
                 v /= maxMag;
         }
 
+        // Preset spectra are sparse and can sound too quiet compared to loaded files.
+        // Match to a practical RMS target while keeping peaks bounded.
+        double sumSq = 0.0;
+        for (float v : mags)
+            sumSq += static_cast<double>(v) * static_cast<double>(v);
+
+        const float rms = static_cast<float>(std::sqrt(sumSq / static_cast<double>(ObjectDatabase::NUM_BINS)));
+        if (rms > 1.0e-6f)
+        {
+            constexpr float targetRms = 0.20f;
+            float gain = targetRms / rms;
+
+            float peak = 0.0f;
+            for (float v : mags)
+                peak = juce::jmax(peak, std::abs(v));
+
+            constexpr float maxPeak = 3.0f;
+            if (peak * gain > maxPeak)
+                gain = maxPeak / juce::jmax(1.0e-6f, peak);
+
+            for (float& v : mags)
+                v *= gain;
+        }
+
         return mags;
     }
 
@@ -1459,6 +1483,48 @@ void PluginProcessor::addFxAutomationKeyframe(int objectId,
                                           timeSec,
                                           value,
                                           curvature);
+}
+
+void PluginProcessor::setFxParameterFollowTimeline(int objectId,
+                                                   const juce::String& effectName,
+                                                   const juce::String& parameterName,
+                                                   bool shouldFollowTimeline)
+{
+    if (objectDatabase == nullptr || objectId < 0)
+        return;
+
+    objectDatabase->setFxParameterFollowTimeline(objectId,
+                                                 effectName.toStdString(),
+                                                 parameterName.toStdString(),
+                                                 shouldFollowTimeline);
+}
+
+bool PluginProcessor::getFxParameterFollowTimeline(int objectId,
+                                                   const juce::String& effectName,
+                                                   const juce::String& parameterName,
+                                                   bool fallback) const
+{
+    if (objectDatabase == nullptr || objectId < 0)
+        return fallback;
+
+    return objectDatabase->getFxParameterFollowTimeline(objectId,
+                                                        effectName.toStdString(),
+                                                        parameterName.toStdString(),
+                                                        fallback);
+}
+
+void PluginProcessor::setFxStaticParameterValue(int objectId,
+                                                const juce::String& effectName,
+                                                const juce::String& parameterName,
+                                                float value)
+{
+    if (objectDatabase == nullptr || objectId < 0)
+        return;
+
+    objectDatabase->setFxStaticParameterValue(objectId,
+                                              effectName.toStdString(),
+                                              parameterName.toStdString(),
+                                              value);
 }
 
 void PluginProcessor::setFxAutomationSegmentCurvature(int objectId,

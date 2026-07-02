@@ -31,6 +31,35 @@ juce::Colour laneAccentForEffect(const juce::String& effectName)
         return juce::Colour(0xFF8B5CF6);
     return juce::Colour(0xFFA78BFA);
 }
+
+float parseManualKeyframeValue(const juce::String& effectName,
+                               const juce::String& input,
+                               float currentNormalized)
+{
+    auto text = input.trim();
+    if (text.isEmpty())
+        return juce::jlimit(0.0f, 1.0f, currentNormalized);
+
+    if (text.endsWithIgnoreCase("st"))
+    {
+        text = text.dropLastCharacters(2).trim();
+        const float semitones = static_cast<float>(text.getDoubleValue());
+        return juce::jlimit(0.0f, 1.0f, 0.5f + semitones / 4.0f);
+    }
+
+    if (text.endsWithChar('%'))
+    {
+        text = text.dropLastCharacters(1).trim();
+        const float percent = static_cast<float>(text.getDoubleValue());
+        return juce::jlimit(0.0f, 1.0f, percent / 200.0f);
+    }
+
+    const float raw = static_cast<float>(text.getDoubleValue());
+    if (effectName.equalsIgnoreCase("Pitch") && std::abs(raw) > 1.0f)
+        return juce::jlimit(0.0f, 1.0f, 0.5f + raw / 4.0f);
+
+    return juce::jlimit(0.0f, 1.0f, raw);
+}
 }
 
 StoryTimelineComponent::StoryTimelineComponent(PluginProcessor& processorRef)
@@ -281,6 +310,37 @@ void StoryTimelineComponent::mouseDown(const juce::MouseEvent& event)
     if (selectedObjectId < 0)
         return;
 
+    if (keyframeValueEditor)
+        commitKeyframeValueEdit(false);
+
+    if (event.mods.isRightButtonDown())
+    {
+        int laneIndex = -1;
+        double keyTimeSec = 0.0;
+        if (findNearestKeyframe(event.x, event.y, laneIndex, keyTimeSec))
+        {
+            const auto lanes = getVisibleLanes();
+            if (laneIndex >= 0 && laneIndex < static_cast<int>(lanes.size()))
+            {
+                const auto& lane = lanes[static_cast<size_t>(laneIndex)];
+                const auto paramName = lane.parameterNames[lane.selectedParameter];
+                const auto keys = processor.getFxAutomationKeyframes(selectedObjectId, lane.effectName, paramName);
+
+                float currentValue = 0.5f;
+                for (const auto& k : keys)
+                {
+                    if (std::abs(k.timeSec - keyTimeSec) < 1.0e-3)
+                    {
+                        currentValue = k.value;
+                        break;
+                    }
+                }
+                beginKeyframeValueEdit(laneIndex, keyTimeSec, currentValue, event.getPosition());
+            }
+        }
+        return;
+    }
+
     int laneForTab = -1;
     int parameterIndex = -1;
     if (hitTestParameterTab(event, laneForTab, parameterIndex))
@@ -339,6 +399,97 @@ void StoryTimelineComponent::mouseDown(const juce::MouseEvent& event)
     }
 
     updateHoverState(event);
+}
+
+void StoryTimelineComponent::beginKeyframeValueEdit(int laneIndex,
+                                                    double keyTimeSec,
+                                                    float currentValue,
+                                                    juce::Point<int> atPos)
+{
+    const auto lanes = getVisibleLanes();
+    if (laneIndex < 0 || laneIndex >= static_cast<int>(lanes.size()))
+        return;
+
+    keyframeValueEditor = std::make_unique<juce::TextEditor>();
+    keyframeValueEditor->setMultiLine(false);
+    keyframeValueEditor->setSelectAllWhenFocused(true);
+    keyframeValueEditor->setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xFF09090B));
+    keyframeValueEditor->setColour(juce::TextEditor::textColourId, juce::Colour(0xFFF5F5F4));
+    keyframeValueEditor->setColour(juce::TextEditor::outlineColourId, juce::Colour(0xFF52525B));
+    keyframeValueEditor->setColour(juce::CaretComponent::caretColourId, juce::Colour(0xFFE0A96D));
+
+    const auto& lane = lanes[static_cast<size_t>(laneIndex)];
+    keyframeValueEditor->setText(formatLaneValue(lane.effectName, currentValue), juce::dontSendNotification);
+
+    editLaneIndex = laneIndex;
+    editKeyTimeSec = keyTimeSec;
+
+    keyframeValueEditor->onReturnKey = [this]() { commitKeyframeValueEdit(false); };
+    keyframeValueEditor->onEscapeKey = [this]() { commitKeyframeValueEdit(true); };
+    keyframeValueEditor->onFocusLost = [this]() { commitKeyframeValueEdit(false); };
+
+    constexpr int editorW = 84;
+    constexpr int editorH = 22;
+    const int x = juce::jlimit(0, juce::jmax(0, getWidth() - editorW), atPos.x + 8);
+    const int y = juce::jlimit(rulerHeight, juce::jmax(rulerHeight, getHeight() - editorH), atPos.y - editorH / 2);
+
+    addAndMakeVisible(*keyframeValueEditor);
+    keyframeValueEditor->setBounds(x, y, editorW, editorH);
+    keyframeValueEditor->grabKeyboardFocus();
+    keyframeValueEditor->selectAll();
+}
+
+void StoryTimelineComponent::commitKeyframeValueEdit(bool cancel)
+{
+    if (!keyframeValueEditor)
+        return;
+
+    const auto text = keyframeValueEditor->getText();
+    removeChildComponent(keyframeValueEditor.get());
+    keyframeValueEditor.reset();
+
+    if (cancel)
+    {
+        editLaneIndex = -1;
+        editKeyTimeSec = -1.0;
+        repaint();
+        return;
+    }
+
+    const int selectedObjectId = processor.getSelectedObjectId();
+    const auto lanes = getVisibleLanes();
+    if (selectedObjectId < 0 || editLaneIndex < 0 || editLaneIndex >= static_cast<int>(lanes.size()))
+    {
+        editLaneIndex = -1;
+        editKeyTimeSec = -1.0;
+        repaint();
+        return;
+    }
+
+    const auto& lane = lanes[static_cast<size_t>(editLaneIndex)];
+    const auto paramName = lane.parameterNames[lane.selectedParameter];
+    const auto keys = processor.getFxAutomationKeyframes(selectedObjectId, lane.effectName, paramName);
+
+    float currentValue = 0.5f;
+    for (const auto& k : keys)
+    {
+        if (std::abs(k.timeSec - editKeyTimeSec) < 1.0e-3)
+        {
+            currentValue = k.value;
+            break;
+        }
+    }
+
+    const float newValue = parseManualKeyframeValue(lane.effectName, text, currentValue);
+    processor.addFxAutomationKeyframe(selectedObjectId,
+                                      lane.effectName,
+                                      paramName,
+                                      editKeyTimeSec,
+                                      newValue);
+
+    editLaneIndex = -1;
+    editKeyTimeSec = -1.0;
+    repaint();
 }
 
 void StoryTimelineComponent::mouseDrag(const juce::MouseEvent& event)

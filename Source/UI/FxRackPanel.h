@@ -72,6 +72,7 @@ private:
 
     void timerCallback() override;
     void rebuildModules();
+    void showKnobContextMenu(const KnobView& knob, juce::Component* targetComponent);
 
     std::vector<ModuleLayout> computeLayouts() const;
     bool isKnobSelected(const KnobView& knob) const;

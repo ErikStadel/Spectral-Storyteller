@@ -39,21 +39,27 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
     {
         fx.parameters.push_back({ "Gain", {} });
         fx.parameters[0].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        fx.parameters[0].staticValue = 0.5f;
     }
     else if (fx.name == "Pitch")
     {
         fx.parameters.push_back({ "Semitones", {} });
         fx.parameters[0].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        fx.parameters[0].staticValue = 0.5f;
     }
     else if (fx.name == "Delay")
     {
         fx.parameters.push_back({ "Time", {} });
         fx.parameters.push_back({ "Feedback", {} });
+        fx.parameters[0].staticValue = 0.5f;
+        fx.parameters[1].staticValue = 0.5f;
     }
     else if (fx.name == "Filter")
     {
         fx.parameters.push_back({ "Cutoff", {} });
         fx.parameters.push_back({ "Resonance", {} });
+        fx.parameters[0].staticValue = 0.5f;
+        fx.parameters[1].staticValue = 0.5f;
     }
     else if (fx.name == "Transform")
     {
@@ -62,22 +68,27 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
         fx.parameters.push_back({ "Smooth", {} });
         fx.parameters[0].keyframes.push_back({ 0.0, 1.0f, 0.0f });
         fx.parameters[1].keyframes.push_back({ 0.0, 0.0f, 0.0f });
+        fx.parameters[0].staticValue = 1.0f;
+        fx.parameters[1].staticValue = 0.0f;
         fx.sourceObjectId = -1;
     }
     else if (fx.name == "Density")
     {
         fx.parameters.push_back({ "Density", {} });
         fx.parameters[0].keyframes.push_back({ 0.0, 1.0f, 0.0f });
+        fx.parameters[0].staticValue = 1.0f;
     }
     else if (fx.name == "Brightness")
     {
         // Stored as 0..1 where 0.5 maps to neutral (0.0 in DSP bipolar domain).
         fx.parameters.push_back({ "Brightness", {} });
         fx.parameters[0].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        fx.parameters[0].staticValue = 0.5f;
     }
     else
     {
         fx.parameters.push_back({ "Amount", {} });
+        fx.parameters[0].staticValue = 0.5f;
     }
 
     return fx;
@@ -116,6 +127,7 @@ void ObjectDatabase::ensureBaseFx(ObjectMask& object)
             density.parameters.push_back({ "Density", {} });
         if (density.parameters[0].keyframes.empty())
             density.parameters[0].keyframes.push_back({ 0.0, 1.0f, 0.0f });
+        density.parameters[0].staticValue = density.parameters[0].keyframes.empty() ? 1.0f : density.parameters[0].keyframes.front().value;
     }
 
     const int brightnessIdx = findFxIndexByName(object, "Brightness");
@@ -127,6 +139,7 @@ void ObjectDatabase::ensureBaseFx(ObjectMask& object)
             brightness.parameters.push_back({ "Brightness", {} });
         if (brightness.parameters[0].keyframes.empty())
             brightness.parameters[0].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        brightness.parameters[0].staticValue = brightness.parameters[0].keyframes.empty() ? 0.5f : brightness.parameters[0].keyframes.front().value;
     }
 
     const int volIdx = findFxIndexByName(object, "Volume");
@@ -143,6 +156,7 @@ void ObjectDatabase::ensureBaseFx(ObjectMask& object)
             volume.parameters.push_back({ "Gain", {} });
         if (volume.parameters[0].keyframes.empty())
             volume.parameters[0].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        volume.parameters[0].staticValue = volume.parameters[0].keyframes.empty() ? 0.5f : volume.parameters[0].keyframes.front().value;
     }
 
     const int pitchIdx = findFxIndexByName(object, "Pitch");
@@ -159,6 +173,7 @@ void ObjectDatabase::ensureBaseFx(ObjectMask& object)
             pitch.parameters.push_back({ "Semitones", {} });
         if (pitch.parameters[0].keyframes.empty())
             pitch.parameters[0].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        pitch.parameters[0].staticValue = pitch.parameters[0].keyframes.empty() ? 0.5f : pitch.parameters[0].keyframes.front().value;
     }
 }
 
@@ -775,6 +790,7 @@ void ObjectDatabase::addAutomationKeyframe(int objectId,
         auto& keys = fx.parameters[static_cast<size_t>(paramIndex)].keyframes;
         value = juce::jlimit(0.0f, 1.0f, value);
         curvature = juce::jlimit(-1.0f, 1.0f, curvature);
+        fx.parameters[static_cast<size_t>(paramIndex)].followTimeline = true;
 
         for (auto& k : keys)
         {
@@ -791,6 +807,97 @@ void ObjectDatabase::addAutomationKeyframe(int objectId,
         {
             return a.timeSec < b.timeSec;
         });
+        ++revision;
+        return;
+    }
+}
+
+void ObjectDatabase::setFxParameterFollowTimeline(int objectId,
+                                                  const std::string& effectName,
+                                                  const std::string& parameterName,
+                                                  bool shouldFollowTimeline)
+{
+    juce::ScopedLock lock_(lock);
+
+    for (auto& object : objects)
+    {
+        if (object.id != objectId)
+            continue;
+
+        const int fxIndex = findFxIndexByName(object, effectName);
+        if (fxIndex < 0)
+            return;
+
+        auto& fx = object.fxChain[static_cast<size_t>(fxIndex)];
+        const int paramIndex = findParameterIndexByName(fx, parameterName);
+        if (paramIndex < 0)
+            return;
+
+        auto& parameter = fx.parameters[static_cast<size_t>(paramIndex)];
+        if (parameter.followTimeline == shouldFollowTimeline)
+            return;
+
+        parameter.followTimeline = shouldFollowTimeline;
+        ++revision;
+        return;
+    }
+}
+
+bool ObjectDatabase::getFxParameterFollowTimeline(int objectId,
+                                                  const std::string& effectName,
+                                                  const std::string& parameterName,
+                                                  bool fallback) const
+{
+    juce::ScopedLock lock_(lock);
+
+    for (const auto& object : objects)
+    {
+        if (object.id != objectId)
+            continue;
+
+        const int fxIndex = findFxIndexByName(object, effectName);
+        if (fxIndex < 0)
+            return fallback;
+
+        const auto& fx = object.fxChain[static_cast<size_t>(fxIndex)];
+        const int paramIndex = findParameterIndexByName(fx, parameterName);
+        if (paramIndex < 0)
+            return fallback;
+
+        return fx.parameters[static_cast<size_t>(paramIndex)].followTimeline;
+    }
+
+    return fallback;
+}
+
+void ObjectDatabase::setFxStaticParameterValue(int objectId,
+                                               const std::string& effectName,
+                                               const std::string& parameterName,
+                                               float value)
+{
+    juce::ScopedLock lock_(lock);
+
+    value = juce::jlimit(0.0f, 1.0f, value);
+
+    for (auto& object : objects)
+    {
+        if (object.id != objectId)
+            continue;
+
+        const int fxIndex = findFxIndexByName(object, effectName);
+        if (fxIndex < 0)
+            return;
+
+        auto& fx = object.fxChain[static_cast<size_t>(fxIndex)];
+        const int paramIndex = findParameterIndexByName(fx, parameterName);
+        if (paramIndex < 0)
+            return;
+
+        auto& parameter = fx.parameters[static_cast<size_t>(paramIndex)];
+        if (std::abs(parameter.staticValue - value) < 1.0e-6f)
+            return;
+
+        parameter.staticValue = value;
         ++revision;
         return;
     }
@@ -923,8 +1030,15 @@ float ObjectDatabase::getInterpolatedAutomationValue(int objectId,
             return fallback;
 
         const auto& keys = fx.parameters[static_cast<size_t>(paramIndex)].keyframes;
+        const auto& parameter = fx.parameters[static_cast<size_t>(paramIndex)];
+
+        // Static mode: no timeline interaction while only the default key exists.
+        // As soon as a lane has explicit automation points (>1), keyframes take priority.
+        if (!parameter.followTimeline && keys.size() <= 1)
+            return juce::jlimit(0.0f, 1.0f, parameter.staticValue);
+
         if (keys.empty())
-            return fallback;
+            return juce::jlimit(0.0f, 1.0f, parameter.staticValue);
 
         if (timeSec <= keys.front().timeSec)
             return keys.front().value;
@@ -976,8 +1090,12 @@ float ObjectDatabase::getObjectFxParameterValue(int objectId,
             return fallback;
 
         const auto& keys = fx.parameters[static_cast<size_t>(paramIndex)].keyframes;
+        const auto& parameter = fx.parameters[static_cast<size_t>(paramIndex)];
         if (keys.empty())
-            return fallback;
+            return juce::jlimit(0.0f, 1.0f, parameter.staticValue);
+
+        if (!parameter.followTimeline && keys.size() <= 1)
+            return juce::jlimit(0.0f, 1.0f, parameter.staticValue);
 
         // Non-automated read: use the canonical setup value at the first keyframe.
         return keys.front().value;
@@ -1067,6 +1185,8 @@ juce::ValueTree ObjectDatabase::toValueTree() const
             {
                 juce::ValueTree paramNode("Param");
                 paramNode.setProperty("name", juce::String(parameter.name), nullptr);
+                paramNode.setProperty("followTimeline", parameter.followTimeline, nullptr);
+                paramNode.setProperty("staticValue", parameter.staticValue, nullptr);
 
                 for (const auto& keyframe : parameter.keyframes)
                 {
@@ -1182,6 +1302,9 @@ void ObjectDatabase::fromValueTree(const juce::ValueTree& tree)
 
                     FXParameter parameter;
                     parameter.name = paramNode.getProperty("name", "Amount").toString().toStdString();
+                    parameter.followTimeline = static_cast<bool>(paramNode.getProperty("followTimeline", true));
+                    const bool hasStaticValue = paramNode.hasProperty("staticValue");
+                    parameter.staticValue = static_cast<float>(paramNode.getProperty("staticValue", 0.5f));
 
                     for (int k = 0; k < paramNode.getNumChildren(); ++k)
                     {
@@ -1201,6 +1324,8 @@ void ObjectDatabase::fromValueTree(const juce::ValueTree& tree)
                               {
                                   return a.timeSec < b.timeSec;
                               });
+                    if (!hasStaticValue && !parameter.keyframes.empty())
+                        parameter.staticValue = parameter.keyframes.front().value;
                     fx.parameters.push_back(std::move(parameter));
                 }
 
