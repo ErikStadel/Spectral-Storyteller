@@ -8,6 +8,8 @@
 #include "UI/StoryTimelineComponent.h"
 #include "UI/ModulationPanel.h"
 #include "UI/FxRackPanel.h"
+#include "UI/FxBrowserOverlay.h"
+#include "UI/NeumorphicKnobLookAndFeel.h"
 #include <atomic>
 #include <memory>
 
@@ -96,6 +98,7 @@ private:
     std::unique_ptr<StoryTimelineComponent> storyTimeline;
     std::unique_ptr<ModulationPanel> modulationPanel;
     std::unique_ptr<FxRackPanel> fxRackPanel;
+    std::unique_ptr<FxBrowserOverlay> fxBrowserOverlay;
 
     juce::Slider inputGainSlider;
     juce::Slider outputGainSlider;
@@ -116,15 +119,16 @@ private:
 
     juce::Label versionLabel;
     juce::TooltipWindow tooltipWindow;
+    NeumorphicKnobLookAndFeel knobLookAndFeel;
 
     void paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area);
     void paintMeterStrip(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& label);
 
-    static constexpr int headerHeight = 44;
-    static constexpr int sidebarWidth = 290;
-    static constexpr int meterStripWidth = 44;
-    static constexpr int footerHeight = 230;
-    static constexpr int timelineHeight = 110;
+    static constexpr int headerHeight = 48;
+    static constexpr int sidebarWidth = 320;
+    static constexpr int meterStripWidth = 48;
+    static constexpr int footerHeight = 240;
+    static constexpr int timelineHeight = 112;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

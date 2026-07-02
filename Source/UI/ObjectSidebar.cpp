@@ -12,11 +12,11 @@ public:
         auto bounds = getLocalBounds().toFloat();
         const auto base = shouldDrawButtonAsDown ? juce::Colour(0xFFE0A96D).withAlpha(0.4f)
                          : shouldDrawButtonAsHighlighted ? juce::Colour(0xFFE0A96D).withAlpha(0.2f)
-                         : juce::Colour(0xFF292524);
+                         : juce::Colour(0xFF27272A);
 
         g.setColour(base);
         g.fillRoundedRectangle(bounds, 3.0f);
-        g.setColour(juce::Colour(0xFF44403C));
+        g.setColour(juce::Colour(0xFF3F3F46));
         g.drawRoundedRectangle(bounds, 3.0f, 1.0f);
         g.setColour(juce::Colour(0xFFE0A96D));
         g.setFont(juce::Font(9.0f, juce::Font::bold));
@@ -89,7 +89,7 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(juce::Colour(0xFF1C1917));
+        g.fillAll(juce::Colour(0xFF18181B));
         g.setColour(juce::Colour(0xAAE0A96D));
         g.drawRect(getLocalBounds(), 1);
     }
@@ -193,9 +193,9 @@ ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
 
     autoDetectButton = std::make_unique<juce::TextButton>("Auto-Detect");
     autoDetectButton->setClickingTogglesState(true);
-    autoDetectButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF44403C));
+    autoDetectButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF3F3F46));
     autoDetectButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFFFA333));
-    autoDetectButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE7E5E3));
+    autoDetectButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE4E4E7));
     autoDetectButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF111111));
     autoDetectButton->setTooltip("Neu-Detection fuer Record-aktive Objekte starten");
     autoDetectButton->onClick = [this]()
@@ -206,9 +206,9 @@ ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
     addAndMakeVisible(*autoDetectButton);
 
     transformButton = std::make_unique<juce::TextButton>("+");
-    transformButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF44403C));
+    transformButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF3F3F46));
     transformButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF4A76B7));
-    transformButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE7E5E3));
+    transformButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE4E4E7));
     transformButton->setTooltip("Objekt-Menue (Transform / Transient)");
     transformButton->onClick = [this]()
     {
@@ -226,72 +226,64 @@ ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
 
 ObjectSidebar::~ObjectSidebar()
 {
+    for (auto& row : rows)
+        if (row.thresholdKnob)
+            row.thresholdKnob->setLookAndFeel(nullptr);
+
     rowScrollBar.removeListener(this);
 }
 
 void ObjectSidebar::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0x99292524));
+    g.fillAll(juce::Colour(0xFF27272A));
 
     // Header area
     auto headerArea = getLocalBounds().removeFromTop(HEADER_BUTTON_HEIGHT + PADDING * 2);
-    g.setColour(juce::Colour(0xFF292524));
+    g.setColour(juce::Colour(0xFF27272A));
     g.fillRect(headerArea);
 
-    g.setColour(juce::Colour(0xFF44403C));
+    g.setColour(juce::Colour(0xFF3F3F46));
     g.drawHorizontalLine(headerArea.getBottom() - 1,
                           static_cast<float>(headerArea.getX()),
                           static_cast<float>(headerArea.getRight()));
 
-    g.setColour(juce::Colour(0xFFA8A29E));
+    g.setColour(juce::Colour(0xFFA1A1AA));
     g.setFont(juce::Font(10.0f, juce::Font::bold));
     g.drawText("OBJEKT-DATENBANK", 10, PADDING, getWidth() - 20, HEADER_BUTTON_HEIGHT,
                juce::Justification::centredLeft, false);
 
-    // Draw object cards
+    // Draw object cards (variable height: transient rows are twice as tall)
     auto rowsArea = getRowsArea(false);
 
-    if (selectedRow >= 0 && selectedRow < static_cast<int>(rows.size()))
+    int y = rowsArea.getY();
+    for (int i = rowScrollOffset; i < static_cast<int>(rows.size()); ++i)
     {
-        const int visibleRow = selectedRow - rowScrollOffset;
-        if (visibleRow >= 0 && visibleRow < getMaxVisibleRows())
-        {
-            auto sel = rowsArea.withTrimmedTop(visibleRow * ROW_HEIGHT).removeFromTop(ROW_HEIGHT).reduced(2, 2);
-            g.setColour(juce::Colour(0xFF292524));
-            g.fillRoundedRectangle(sel.toFloat(), 6.0f);
-            g.setColour(juce::Colour(0x4DE0A96D));
-            g.drawRoundedRectangle(sel.toFloat(), 6.0f, 1.0f);
-        }
-    }
+        const int rowH = getRowHeight(i);
+        if (y >= rowsArea.getBottom())
+            break;
 
-    // Unselected card backgrounds
-    const int visibleRows = getMaxVisibleRows();
-    for (int i = 0; i < static_cast<int>(rows.size()); ++i)
-    {
-        const int visibleRow = i - rowScrollOffset;
-        if (visibleRow < 0 || visibleRow >= visibleRows)
-            continue;
+        auto cardArea = juce::Rectangle<int>(rowsArea.getX(), y, rowsArea.getWidth(), rowH).reduced(2, 2);
+        const auto& row = rows[static_cast<size_t>(i)];
+
         if (i == selectedRow)
-            continue;
-
-        auto cardArea = rowsArea.withTrimmedTop(visibleRow * ROW_HEIGHT).removeFromTop(ROW_HEIGHT).reduced(2, 2);
-        g.setColour(juce::Colour(0xB3292524));
-        g.fillRoundedRectangle(cardArea.toFloat(), 6.0f);
-        g.setColour(juce::Colour(0xCC44403C));
-        g.drawRoundedRectangle(cardArea.toFloat(), 6.0f, 1.0f);
-    }
-
-    // Object status dots and IDs
-    for (int i = 0; i < static_cast<int>(rows.size()); ++i)
-    {
-        const int visibleRow = i - rowScrollOffset;
-        if (visibleRow < 0 || visibleRow >= visibleRows)
-            continue;
-
-        auto cardArea = rowsArea.withTrimmedTop(visibleRow * ROW_HEIGHT).removeFromTop(ROW_HEIGHT).reduced(2, 2);
+        {
+            g.setColour(juce::Colour(0xFF323238));
+            g.fillRoundedRectangle(cardArea.toFloat(), 6.0f);
+            // Stronger persistent highlight for the selected object.
+            g.setColour(juce::Colour(0xFFE0A96D));
+            g.drawRoundedRectangle(cardArea.toFloat(), 6.0f, 2.0f);
+            g.setColour(juce::Colour(0x33E0A96D));
+            g.drawRoundedRectangle(cardArea.toFloat().expanded(1.5f), 7.0f, 1.5f);
+        }
+        else
+        {
+            g.setColour(juce::Colour(0xFF2E2E33));
+            g.fillRoundedRectangle(cardArea.toFloat(), 6.0f);
+            g.setColour(juce::Colour(0xCC3F3F46));
+            g.drawRoundedRectangle(cardArea.toFloat(), 6.0f, 1.0f);
+        }
 
         // Status dot
-        const auto& row = rows[static_cast<size_t>(i)];
         juce::Colour dotColour;
         const juce::String nameLower = row.name.toLowerCase();
         if (nameLower.contains("transient"))
@@ -301,7 +293,7 @@ void ObjectSidebar::paint(juce::Graphics& g)
         else if (nameLower.contains("noise"))
             dotColour = juce::Colour(0xFF4FD16A);
         else
-            dotColour = juce::Colour(0xFFA8A29E);
+            dotColour = juce::Colour(0xFFA1A1AA);
 
         const float dotX = static_cast<float>(cardArea.getX()) + 10.0f;
         const float dotY = static_cast<float>(cardArea.getY()) + 12.0f;
@@ -309,21 +301,18 @@ void ObjectSidebar::paint(juce::Graphics& g)
         g.fillEllipse(dotX - 3.0f, dotY - 3.0f, 6.0f, 6.0f);
 
         // Object ID
-        g.setColour(juce::Colour(0xFF78716C));
+        g.setColour(juce::Colour(0xFF71717A));
         g.setFont(juce::Font(9.0f));
         g.drawText("ID: #" + juce::String(row.objectId).paddedLeft('0', 2),
                    cardArea.withTrimmedRight(6), juce::Justification::topRight, false);
-    }
 
-    if (dragHoverRow >= 0 && dragHoverRow < static_cast<int>(rows.size()))
-    {
-        const int visibleRow = dragHoverRow - rowScrollOffset;
-        if (visibleRow >= 0 && visibleRow < getMaxVisibleRows())
+        if (i == dragHoverRow && i != selectedRow)
         {
-            auto hover = rowsArea.withTrimmedTop(visibleRow * ROW_HEIGHT).removeFromTop(ROW_HEIGHT).reduced(3, 1);
             g.setColour(juce::Colour(0x88FFA333));
-            g.drawRoundedRectangle(hover.toFloat(), 5.0f, 1.0f);
+            g.drawRoundedRectangle(cardArea.toFloat().reduced(1, -1), 5.0f, 1.0f);
         }
+
+        y += rowH;
     }
 }
 
@@ -471,45 +460,61 @@ void ObjectSidebar::resized()
         contentArea.removeFromRight(2);
     }
 
-    const int visibleRows = getMaxVisibleRows();
+    int y = contentArea.getY();
     for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex)
     {
         auto& row = rows[static_cast<size_t>(rowIndex)];
-        const int visibleRow = rowIndex - rowScrollOffset;
-        const bool rowIsVisible = visibleRow >= 0 && visibleRow < visibleRows;
+        const int rowH = getRowHeight(rowIndex);
+        const bool rowIsVisible = rowIndex >= rowScrollOffset && y < contentArea.getBottom();
 
-        row.recordButton->setVisible(rowIsVisible);
         row.engageButton->setVisible(rowIsVisible);
         row.nameLabel->setVisible(rowIsVisible);
-        row.fxButton->setVisible(rowIsVisible);
+        if (row.thresholdKnob) row.thresholdKnob->setVisible(rowIsVisible && row.isTransient);
+        if (row.thresholdLabel) row.thresholdLabel->setVisible(rowIsVisible && row.isTransient);
         row.soloButton->setVisible(rowIsVisible);
         row.muteButton->setVisible(rowIsVisible);
+        row.recordButton->setVisible(rowIsVisible && row.allowRecord);
 
         if (!rowIsVisible)
+        {
+            if (rowIndex >= rowScrollOffset)
+                y += rowH;
             continue;
+        }
 
-        auto rowArea = contentArea.withTrimmedTop(visibleRow * ROW_HEIGHT).removeFromTop(ROW_HEIGHT).reduced(4, 4);
+        auto rowArea = juce::Rectangle<int>(contentArea.getX(), y, contentArea.getWidth(), rowH).reduced(4, 4);
+        y += rowH;
 
-        // Card layout: top line has status dot space + name, bottom line has buttons
+        // Top line: dot space + name
         auto topLine = rowArea.removeFromTop(16);
-        topLine.removeFromLeft(18); // space for dot
+        topLine.removeFromLeft(18);
         row.nameLabel->setBounds(topLine);
 
-        rowArea.removeFromTop(4);
-        auto bottomLine = rowArea.removeFromTop(LEFT_TOGGLE_H);
+        // Bottom line: Eng / (Rec) ... S / M
+        auto bottomLine = rowArea.removeFromBottom(LEFT_TOGGLE_H);
+        {
+            auto controls = bottomLine;
+            row.engageButton->setBounds(controls.removeFromLeft(LEFT_TOGGLE_W));
+            controls.removeFromLeft(3);
+            if (row.allowRecord)
+            {
+                row.recordButton->setBounds(controls.removeFromLeft(LEFT_TOGGLE_W));
+                controls.removeFromLeft(3);
+            }
 
-        // Left buttons: Eng, Rec, FX
-        row.engageButton->setBounds(bottomLine.removeFromLeft(LEFT_TOGGLE_W));
-        bottomLine.removeFromLeft(3);
-        row.recordButton->setBounds(bottomLine.removeFromLeft(LEFT_TOGGLE_W));
-        bottomLine.removeFromLeft(3);
-        row.fxButton->setBounds(bottomLine.removeFromLeft(FX_BUTTON_W));
+            row.muteButton->setBounds(controls.removeFromRight(RIGHT_BUTTON_W + 2).removeFromTop(RIGHT_BUTTON_H));
+            controls.removeFromRight(3);
+            row.soloButton->setBounds(controls.removeFromRight(RIGHT_BUTTON_W + 2).removeFromTop(RIGHT_BUTTON_H));
+        }
 
-        // Right buttons: S, M
-        auto rightPart = bottomLine;
-        row.muteButton->setBounds(rightPart.removeFromRight(RIGHT_BUTTON_W + 2).removeFromTop(RIGHT_BUTTON_H));
-        rightPart.removeFromRight(3);
-        row.soloButton->setBounds(rightPart.removeFromRight(RIGHT_BUTTON_W + 2).removeFromTop(RIGHT_BUTTON_H));
+        // Transient: centered neumorphic threshold knob between name and controls
+        if (row.isTransient && row.thresholdKnob != nullptr && row.thresholdLabel != nullptr)
+        {
+            rowArea.removeFromTop(2);
+            row.thresholdLabel->setBounds(rowArea.removeFromTop(12));
+            const int knobSize = juce::jmin(48, juce::jmin(rowArea.getWidth(), rowArea.getHeight()));
+            row.thresholdKnob->setBounds(rowArea.withSizeKeepingCentre(knobSize, knobSize));
+        }
     }
 
     if (fxOverlay)
@@ -555,6 +560,21 @@ void ObjectSidebar::scrollBarMoved(juce::ScrollBar* scrollBarThatHasMoved, doubl
     }
 }
 
+int ObjectSidebar::getRowHeight(int index) const
+{
+    if (index >= 0 && index < static_cast<int>(rows.size()) && rows[static_cast<size_t>(index)].isTransient)
+        return ROW_HEIGHT * 2;
+    return ROW_HEIGHT;
+}
+
+int ObjectSidebar::getRowTopOffset(int index) const
+{
+    int offset = 0;
+    for (int i = rowScrollOffset; i < index && i < static_cast<int>(rows.size()); ++i)
+        offset += getRowHeight(i);
+    return offset;
+}
+
 int ObjectSidebar::getMaxVisibleRows() const
 {
     const auto rowsArea = getRowsArea(false);
@@ -563,7 +583,26 @@ int ObjectSidebar::getMaxVisibleRows() const
 
 int ObjectSidebar::getMaxRowScrollOffset() const
 {
-    return juce::jmax(0, static_cast<int>(rows.size()) - getMaxVisibleRows());
+    const int available = getRowsArea(false).getHeight();
+    int total = 0;
+    for (int i = 0; i < static_cast<int>(rows.size()); ++i)
+        total += getRowHeight(i);
+
+    if (total <= available)
+        return 0;
+
+    // Find smallest offset whose remaining rows still fill the viewport.
+    int maxOffset = 0;
+    int heightFromOffset = total;
+    for (int i = 0; i < static_cast<int>(rows.size()); ++i)
+    {
+        if (heightFromOffset <= available)
+            break;
+        heightFromOffset -= getRowHeight(i);
+        maxOffset = i + 1;
+    }
+
+    return maxOffset;
 }
 
 juce::Rectangle<int> ObjectSidebar::getRowsArea(bool includeScrollBarSpace) const
@@ -604,7 +643,12 @@ void ObjectSidebar::rebuildRows()
         if (row.recordButton) removeChildComponent(row.recordButton.get());
         if (row.engageButton) removeChildComponent(row.engageButton.get());
         if (row.nameLabel) removeChildComponent(row.nameLabel.get());
-        if (row.fxButton) removeChildComponent(row.fxButton.get());
+        if (row.thresholdKnob)
+        {
+            row.thresholdKnob->setLookAndFeel(nullptr);
+            removeChildComponent(row.thresholdKnob.get());
+        }
+        if (row.thresholdLabel) removeChildComponent(row.thresholdLabel.get());
         if (row.soloButton) removeChildComponent(row.soloButton.get());
         if (row.muteButton) removeChildComponent(row.muteButton.get());
     }
@@ -622,14 +666,17 @@ void ObjectSidebar::rebuildRows()
         ObjectRow row;
         row.objectId = obj.id;
         row.name = obj.name;
+        const juce::String objectNameLower = juce::String(obj.name).toLowerCase();
+        row.isTransient = objectNameLower.contains("transient");
+        row.allowRecord = objectNameLower.contains("tonal") || objectNameLower.contains("noise") || objectNameLower.contains("ambience");
 
         // Eng button
         row.engageButton = std::make_unique<juce::TextButton>("Eng");
         row.engageButton->setClickingTogglesState(true);
         row.engageButton->setToggleState(obj.engaged, juce::dontSendNotification);
-        row.engageButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF292524));
+        row.engageButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF27272A));
         row.engageButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0x6622D3EE));
-        row.engageButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA8A29E));
+        row.engageButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
         row.engageButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF22D3EE));
         row.engageButton->setTooltip("Objekt auf den Sound anwenden");
         row.engageButton->onClick = [this, objectId = obj.id, button = row.engageButton.get()]()
@@ -645,9 +692,9 @@ void ObjectSidebar::rebuildRows()
         row.recordButton = std::make_unique<juce::TextButton>("Rec");
         row.recordButton->setClickingTogglesState(true);
         row.recordButton->setToggleState(obj.recordEnabled, juce::dontSendNotification);
-        row.recordButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF292524));
+        row.recordButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF27272A));
         row.recordButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFDD5555));
-        row.recordButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA8A29E));
+        row.recordButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
         row.recordButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         row.recordButton->setTooltip("Objekt bei Auto-Detect neu berechnen");
         row.recordButton->onClick = [this, objectId = obj.id, button = row.recordButton.get()]()
@@ -664,7 +711,7 @@ void ObjectSidebar::rebuildRows()
         row.nameLabel->setJustificationType(juce::Justification::centredLeft);
         row.nameLabel->setEditable(false, true, false);
         row.nameLabel->setColour(juce::Label::textColourId, juce::Colour(0xFFF5F5F4));
-        row.nameLabel->setFont(juce::Font(11.0f, juce::Font::bold));
+        row.nameLabel->setFont(juce::Font(row.isTransient ? 11.5f : 10.5f, juce::Font::bold));
         row.nameLabel->setTooltip(row.name);
         row.nameLabel->onTextChange = [this, objectId = obj.id, label = row.nameLabel.get()]
         {
@@ -680,14 +727,31 @@ void ObjectSidebar::rebuildRows()
         row.nameLabel->addMouseListener(this, true);
         addAndMakeVisible(*row.nameLabel);
 
-        row.fxButton = std::make_unique<FxRowButton>();
-        row.fxButton->setTooltip("Effekte fuer dieses Objekt");
-        row.fxButton->onClick = [this, objectId = obj.id]
+        if (row.isTransient)
         {
-            showFxOverlay(objectId);
-        };
-        row.fxButton->addMouseListener(this, true);
-        addAndMakeVisible(*row.fxButton);
+            row.thresholdLabel = std::make_unique<juce::Label>();
+            row.thresholdLabel->setText("Threshold", juce::dontSendNotification);
+            row.thresholdLabel->setJustificationType(juce::Justification::centredLeft);
+            row.thresholdLabel->setFont(juce::Font(8.0f));
+            row.thresholdLabel->setColour(juce::Label::textColourId, juce::Colour(0xFFA1A1AA));
+            addAndMakeVisible(*row.thresholdLabel);
+
+            row.thresholdKnob = std::make_unique<juce::Slider>();
+            row.thresholdKnob->setSliderStyle(juce::Slider::RotaryVerticalDrag);
+            row.thresholdKnob->setRotaryParameters(juce::MathConstants<float>::pi * 1.25f,
+                                                   juce::MathConstants<float>::pi * 2.75f, true);
+            row.thresholdKnob->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+            row.thresholdKnob->setRange(-60.0, 0.0, 0.1);
+            row.thresholdKnob->setLookAndFeel(&thresholdKnobLnF);
+            if (getTransientThresholdDb)
+                row.thresholdKnob->setValue(getTransientThresholdDb(), juce::dontSendNotification);
+            row.thresholdKnob->onValueChange = [this, knob = row.thresholdKnob.get()]
+            {
+                if (setTransientThresholdDb)
+                    setTransientThresholdDb(static_cast<float>(knob->getValue()));
+            };
+            addAndMakeVisible(*row.thresholdKnob);
+        }
 
         // Solo button
         row.soloButton = std::make_unique<juce::TextButton>("S");
@@ -696,7 +760,7 @@ void ObjectSidebar::rebuildRows()
         row.soloButton->setToggleState(obj.solo, juce::dontSendNotification);
         row.soloButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF0C0A09));
         row.soloButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF4AA3FF));
-        row.soloButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA8A29E));
+        row.soloButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
         row.soloButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         row.soloButton->setTooltip("Solo");
         row.soloButton->onClick = [this, objectId = obj.id, button = row.soloButton.get()]()
@@ -715,7 +779,7 @@ void ObjectSidebar::rebuildRows()
         row.muteButton->setToggleState(obj.mute, juce::dontSendNotification);
         row.muteButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF0C0A09));
         row.muteButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFFF5252));
-        row.muteButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA8A29E));
+        row.muteButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
         row.muteButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         row.muteButton->setTooltip("Mute");
         row.muteButton->onClick = [this, objectId = obj.id, button = row.muteButton.get()]()
@@ -775,9 +839,18 @@ int ObjectSidebar::rowFromPoint(juce::Point<int> p) const
     if (!area.contains(p))
         return -1;
 
-    const int localY = p.y - area.getY();
-    const int idx = (localY / ROW_HEIGHT) + rowScrollOffset;
-    return (idx >= 0 && idx < static_cast<int>(rows.size())) ? idx : -1;
+    int y = area.getY();
+    for (int i = rowScrollOffset; i < static_cast<int>(rows.size()); ++i)
+    {
+        const int rowH = getRowHeight(i);
+        if (p.y >= y && p.y < y + rowH)
+            return i;
+        y += rowH;
+        if (y >= area.getBottom())
+            break;
+    }
+
+    return -1;
 }
 
 int ObjectSidebar::rowFromComponent(const juce::Component* c) const
@@ -789,7 +862,7 @@ int ObjectSidebar::rowFromComponent(const juce::Component* c) const
     {
         const auto& row = rows[static_cast<size_t>(i)];
         if (c == row.recordButton.get() || c == row.engageButton.get() || c == row.nameLabel.get()
-            || c == row.fxButton.get() || c == row.soloButton.get() || c == row.muteButton.get())
+            || c == row.soloButton.get() || c == row.muteButton.get())
             return i;
     }
 
@@ -819,7 +892,7 @@ void ObjectSidebar::mouseDown(const juce::MouseEvent& e)
         for (const auto& row : rows)
         {
             if (clickedComponent == row.recordButton.get() || clickedComponent == row.engageButton.get()
-                || clickedComponent == row.fxButton.get() || clickedComponent == row.soloButton.get()
+                || clickedComponent == row.soloButton.get()
                 || clickedComponent == row.muteButton.get())
                 return true;
         }

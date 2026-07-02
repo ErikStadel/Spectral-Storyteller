@@ -76,6 +76,12 @@ public:
     void setTimelineTrackName(int objectIndex, const std::string& newName);
     int getSelectedObjectId() const;
     void setSelectedObjectId(int objectId);
+
+    // UI-only shared selection of the currently active FX parameter (rack <-> timeline).
+    void setActiveFxSelection(const juce::String& effectName, const juce::String& parameterName);
+    juce::String getActiveFxEffectName() const;
+    juce::String getActiveFxParameterName() const;
+
     std::vector<ObjectDatabase::FXModule> getFxChainForObject(int objectId) const;
     std::vector<ObjectDatabase::FXModule> getFxChainForSelectedObject() const;
     void setObjectFxEnabled(int objectId, const juce::String& effectName, bool enabled);
@@ -222,6 +228,9 @@ private:
     int autoDetectTransientFrameCount = 0;
     int autoDetectNonTransientFrameCount = 0;
     std::atomic<int> selectedObjectId{ -1 };
+    mutable juce::CriticalSection activeFxLock;
+    juce::String activeFxEffectName;
+    juce::String activeFxParameterName;
 
     struct PhaseVocoderObjectState
     {

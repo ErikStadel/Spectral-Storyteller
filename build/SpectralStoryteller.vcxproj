@@ -374,6 +374,11 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\ModulationPanel.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.cpp" />
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\StoryTimelineComponent.h" />
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\FxRackPanel.cpp" />
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\FxRackPanel.h" />
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\FxBrowserOverlay.cpp" />
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\FxBrowserOverlay.h" />
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\NeumorphicKnobLookAndFeel.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors.cpp" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors_ara.cpp" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\build\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors_lv2_libs.cpp" />

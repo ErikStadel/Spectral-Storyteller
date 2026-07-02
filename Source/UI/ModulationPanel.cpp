@@ -17,6 +17,11 @@ bool targetMatches(const ModulationMatrix::Target& t, const juce::String& text)
 ModulationPanel::ModulationPanel(PluginProcessor& p) : processor(p)
 {
     addAndMakeVisible(slotCombo);
+    slotCombo.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF18181B));
+    slotCombo.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xFF3F3F46));
+    slotCombo.setColour(juce::ComboBox::textColourId, juce::Colour(0xFFD4D4D8));
+    slotCombo.setColour(juce::ComboBox::arrowColourId, juce::Colour(0xFFA1A1AA));
+    slotCombo.setJustificationType(juce::Justification::centredRight);
     for (int i = 0; i < ModulationMatrix::NUM_LFOS; ++i)
         slotCombo.addItem("LFO " + juce::String(i + 1), 1 + i);
     for (int i = 0; i < ModulationMatrix::NUM_XY; ++i)
@@ -58,12 +63,23 @@ ModulationPanel::ModulationPanel(PluginProcessor& p) : processor(p)
     lfoShapeCombo.addItem("Saw", 3);
     lfoShapeCombo.addItem("Square", 4);
 
+    for (auto* cb : { &lfoRateCombo, &lfoShapeCombo, &lfoTargetCombo, &xyTargetXCombo, &xyTargetYCombo })
+    {
+        cb->setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF18181B));
+        cb->setColour(juce::ComboBox::outlineColourId, juce::Colour(0xFF3F3F46));
+        cb->setColour(juce::ComboBox::textColourId, juce::Colour(0xFFD4D4D8));
+        cb->setColour(juce::ComboBox::arrowColourId, juce::Colour(0xFFA1A1AA));
+    }
+
     auto setupValueField = [](juce::Slider& s)
     {
         s.setSliderStyle(juce::Slider::LinearHorizontal);
-        s.setTextBoxStyle(juce::Slider::TextBoxRight, false, 46, 16);
+        s.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         s.setRange(0.0, 1.0, 0.001);
         s.setNumDecimalPlacesToDisplay(3);
+        s.setColour(juce::Slider::thumbColourId, juce::Colour(0xFFE0A96D));
+        s.setColour(juce::Slider::trackColourId, juce::Colour(0xFFE0A96D));
+        s.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF27272A));
     };
 
     setupValueField(lfoAmountValue);
@@ -72,9 +88,16 @@ ModulationPanel::ModulationPanel(PluginProcessor& p) : processor(p)
     for (auto* label : { &lfoAmountTextLabel, &lfoOffsetTextLabel })
     {
         label->setJustificationType(juce::Justification::centredLeft);
-        label->setFont(juce::Font(11.0f));
-        label->setColour(juce::Label::textColourId, juce::Colour(0xFFCFD6E6));
+        label->setFont(juce::Font(10.0f));
+        label->setColour(juce::Label::textColourId, juce::Colour(0xFFA1A1AA));
     }
+
+    lfoTargetLabel.setFont(juce::Font(9.0f, juce::Font::bold));
+    lfoTargetLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFE0A96D));
+    xyTargetXLabel.setFont(juce::Font(8.5f, juce::Font::bold));
+    xyTargetYLabel.setFont(juce::Font(8.5f, juce::Font::bold));
+    xyTargetXLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFE0A96D));
+    xyTargetYLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFE0A96D));
 
     lfoRateCombo.onChange = [this]
     {
@@ -360,9 +383,9 @@ void ModulationPanel::itemDropped(const SourceDetails& d)
 void ModulationPanel::paint(juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
-    g.setColour(juce::Colour(0xCC292524));
+    g.setColour(juce::Colour(0xCC27272A));
     g.fillRoundedRectangle(r, 0.0f);
-    g.setColour(juce::Colour(0xFF44403C));
+    g.setColour(juce::Colour(0xFF3F3F46));
     g.drawRect(r, 1.0f);
 
     // Header with accent colour
@@ -372,7 +395,7 @@ void ModulationPanel::paint(juce::Graphics& g)
     g.drawText("MODULATION HUB", headerBounds, juce::Justification::centredLeft, false);
 
     // Separator
-    g.setColour(juce::Colour(0xFF44403C));
+    g.setColour(juce::Colour(0xFF3F3F46));
     g.drawHorizontalLine(headerBounds.getBottom() + 2, r.getX() + 6.0f, r.getRight() - 6.0f);
 
     juce::String headerText;
@@ -406,54 +429,55 @@ void ModulationPanel::paint(juce::Graphics& g)
 void ModulationPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
-    area.removeFromTop(22);
-
-    auto top = area.removeFromTop(28);
-    slotCombo.setBounds(top.removeFromLeft(120));
+    auto header = area.removeFromTop(20);
+    slotCombo.setBounds(header.removeFromRight(94).reduced(0, 1));
 
     area.removeFromTop(8);
 
     if (currentKind == SlotKind::LFO)
     {
-        auto row = area.removeFromTop(60);
-        auto rate = row.removeFromLeft(110);
-        lfoRateCombo.setBounds(rate.removeFromTop(24));
+        auto scopeArea = area.removeFromTop(84);
+        lfoScope.setBounds(scopeArea.reduced(2));
 
-        row.removeFromLeft(8);
-        auto shape = row.removeFromLeft(110);
-        lfoShapeCombo.setBounds(shape.removeFromTop(24));
+        area.removeFromTop(4);
+        auto row = area.removeFromTop(20);
+        auto rate = row.removeFromLeft((row.getWidth() - 6) / 2);
+        row.removeFromLeft(6);
+        lfoRateCombo.setBounds(rate);
+        lfoShapeCombo.setBounds(row);
 
-        area.removeFromTop(6);
-        auto tgtRow = area.removeFromTop(24);
-        lfoTargetLabel.setBounds(tgtRow.removeFromLeft(60));
+        area.removeFromTop(4);
+        auto slidersArea = area.removeFromTop(42);
+        auto amountCol = slidersArea.removeFromLeft((slidersArea.getWidth() - 10) / 2);
+        slidersArea.removeFromLeft(10);
+        auto offsetCol = slidersArea;
+
+        lfoAmountTextLabel.setBounds(amountCol.removeFromTop(14));
+        lfoAmountValue.setBounds(amountCol.reduced(0, 3));
+        lfoOffsetTextLabel.setBounds(offsetCol.removeFromTop(14));
+        lfoOffsetValue.setBounds(offsetCol.reduced(0, 3));
+
+        auto tgtRow = getLocalBounds().reduced(10).removeFromBottom(22);
+        lfoTargetLabel.setBounds(tgtRow.removeFromLeft(64));
         lfoTargetCombo.setBounds(tgtRow);
-
-        area.removeFromTop(8);
-        auto scopeArea = area;
-        auto valueArea = scopeArea.removeFromBottom(52);
-        lfoScope.setBounds(scopeArea);
-
-        auto amountRow = valueArea.removeFromTop(24).reduced(2, 2);
-        auto offsetRow = valueArea.removeFromTop(24).reduced(2, 2);
-
-        lfoAmountTextLabel.setBounds(amountRow.removeFromLeft(56));
-        lfoAmountValue.setBounds(amountRow);
-
-        lfoOffsetTextLabel.setBounds(offsetRow.removeFromLeft(56));
-        lfoOffsetValue.setBounds(offsetRow);
     }
     else
     {
-        auto tgtX = area.removeFromTop(22);
-        xyTargetXLabel.setBounds(tgtX.removeFromLeft(36));
-        xyTargetXCombo.setBounds(tgtX);
+        auto bottomTargets = getLocalBounds().reduced(10).removeFromBottom(46);
+        auto targetCols = bottomTargets;
 
-        auto tgtY = area.removeFromTop(22);
-        xyTargetYLabel.setBounds(tgtY.removeFromLeft(36));
-        xyTargetYCombo.setBounds(tgtY);
+        const int padSize = juce::jmax(64, juce::jmin(128, juce::jmin(area.getWidth(), area.getHeight() - 54)));
+        auto padZone = area.removeFromTop(padSize + 6);
+        xyPad.setBounds(padZone.withSizeKeepingCentre(padSize, padSize));
 
-        area.removeFromTop(6);
-        xyPad.setBounds(area);
+        auto left = targetCols.removeFromLeft((targetCols.getWidth() - 6) / 2);
+        targetCols.removeFromLeft(6);
+        auto right = targetCols;
+
+        xyTargetXLabel.setBounds(left.removeFromTop(10));
+        xyTargetXCombo.setBounds(left.removeFromTop(18));
+        xyTargetYLabel.setBounds(right.removeFromTop(10));
+        xyTargetYCombo.setBounds(right.removeFromTop(18));
     }
 }
 

@@ -138,27 +138,26 @@ bool SpectralView::buildTimeFrequencyMaskFromBrushMask(const juce::Image& brushM
 void SpectralView::rebuildLookupTables()
 {
     // -------------------------------------------------------------------------
-    // 1. Cockos-thermische Farbpalette (8 Ankerpunkte, linear interpoliert)
+    // 1. Spectral Storyteller Palette (Tailwind target)
     //
-    //  t=0.00  Schwarz     (  0,   0,   0)  Stille / unterhalb Gate
-    //  t=0.14  Navy        (  0,   0,  80)
-    //  t=0.28  Blau        (  0,   0, 220)
-    //  t=0.42  Cyan        (  0, 210, 210)
-    //  t=0.57  Grün        (  0, 210,   0)
-    //  t=0.71  Gelb        (220, 220,   0)
-    //  t=0.85  Orange      (255, 120,   0)
-    //  t=1.00  Weiß        (255, 255, 255)  Vollpegel
+    //  silence/background: #000000 -> #0B0B2E
+    //  very low energy:    #0B0B2E -> #2B0A7A
+    //  low energy:         #2B0A7A -> #6A00A8
+    //  mid energy:         #6A00A8 -> #CE0E7A
+    //  high energy:        #CE0E7A -> #FF2A00
+    //  very high energy:   #FF2A00 -> #FF6A00
+    //  peak/transients:    #FFC400 -> #FFF4B0
     // -------------------------------------------------------------------------
     struct Anchor { float t; uint8_t r, g, b; };
     static constexpr std::array<Anchor, 8> anchors = {{
         { 0.00f,   0,   0,   0 },
-        { 0.14f,   0,   0,  80 },
-        { 0.28f,   0,   0, 220 },
-        { 0.42f,   0, 210, 210 },
-        { 0.57f,   0, 210,   0 },
-        { 0.71f, 220, 220,   0 },
-        { 0.85f, 255, 120,   0 },
-        { 1.00f, 255, 255, 255 },
+        { 0.12f,  11,  11,  46 },
+        { 0.26f,  43,  10, 122 },
+        { 0.42f, 106,   0, 168 },
+        { 0.62f, 206,  14, 122 },
+        { 0.78f, 255,  42,   0 },
+        { 0.90f, 255, 106,   0 },
+        { 1.00f, 255, 244, 176 },
     }};
 
     for (int i = 0; i < LUT_SIZE; ++i)
@@ -331,7 +330,10 @@ void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
         float& smooth = smoothedRowDb[static_cast<size_t>(y)];
         smooth = smooth + temporalSmoothing * (emphasizedDb - smooth);
 
-        const float clippedDb = juce::jlimit(magnitudeMin, magnitudeMax, smooth);
+        const bool underGate = rawDb <= gateDb + 1.0f;
+        const float clippedDb = underGate
+            ? magnitudeMin
+            : juce::jlimit(magnitudeMin, magnitudeMax, smooth);
         auto pixel = magnitudeToColour(clippedDb);
 
         if (hasOverlay)

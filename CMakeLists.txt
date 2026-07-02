@@ -122,4 +122,7 @@ target_sources(SpectralStoryteller PRIVATE
     Source/UI/StoryTimelineComponent.h
     Source/UI/FxRackPanel.cpp
     Source/UI/FxRackPanel.h
+    Source/UI/FxBrowserOverlay.cpp
+    Source/UI/FxBrowserOverlay.h
+    Source/UI/NeumorphicKnobLookAndFeel.h
 )
