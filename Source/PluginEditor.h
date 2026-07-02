@@ -90,6 +90,8 @@ private:
 
     std::unique_ptr<SpectralView> spectralView;
     std::unique_ptr<SpectralSelector> spectralSelector;
+    juce::TextButton rectSelectButton { "Rect" };
+    juce::TextButton lassoSelectButton { "Brush" };
     std::unique_ptr<ObjectSidebar> objectSidebar;
     std::unique_ptr<StoryTimelineComponent> storyTimeline;
     std::unique_ptr<ModulationPanel> modulationPanel;

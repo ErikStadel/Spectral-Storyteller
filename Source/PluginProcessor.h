@@ -159,6 +159,7 @@ private:
 
     std::atomic<double> transportSeconds{ 0.0 };
     std::atomic<bool> transportPlaying{ false };
+    double currentAnalysisFrameTimeSec = 0.0;
 
     int64_t totalSamplesProcessed = 0;
 
@@ -258,6 +259,9 @@ private:
         float thresholdLin = 0.0f;
         float centerBin = 1.0f;
         float tiltExp = 0.0f;
+        int lowBin = 0;
+        int highBin = 0;
+        float brightnessCompensation = 1.0f;
     };
 
     std::unordered_map<int, TransformSettings> transformSettingsByObject;

@@ -691,6 +691,33 @@ bool ObjectDatabase::setObjectDensityAnchor(int objectId, float anchorDb, bool v
     return false;
 }
 
+bool ObjectDatabase::setObjectTimeFrequencyMask(int objectId,
+                                                const std::vector<double>& frameTimesSec,
+                                                const std::vector<std::array<bool, NUM_BINS>>& frameMasks,
+                                                const std::array<bool, NUM_BINS>& combinedMask)
+{
+    juce::ScopedLock lock_(lock);
+
+    if (frameTimesSec.size() != frameMasks.size())
+        return false;
+
+    for (auto& object : objects)
+    {
+        if (object.id != objectId)
+            continue;
+
+        object.hasTimeFrequencyMask = !frameMasks.empty();
+        object.timeMaskFrameTimesSec = frameTimesSec;
+        object.timeMaskFrameMasks = frameMasks;
+        object.mask = combinedMask;
+        ensureBaseFx(object);
+        ++revision;
+        return true;
+    }
+
+    return false;
+}
+
 std::string ObjectDatabase::getObjectFxSelectedParameterName(int objectId, const std::string& effectName) const
 {
     juce::ScopedLock lock_(lock);
@@ -999,12 +1026,33 @@ juce::ValueTree ObjectDatabase::toValueTree() const
         objNode.setProperty("color", object.color, nullptr);
         objNode.setProperty("densityAnchorDb", object.densityAnchorDb, nullptr);
         objNode.setProperty("densityAnchorValid", object.densityAnchorValid, nullptr);
+        objNode.setProperty("hasTimeFrequencyMask", object.hasTimeFrequencyMask, nullptr);
 
         juce::String maskBits;
         maskBits.preallocateBytes(NUM_BINS + 1);
         for (int i = 0; i < NUM_BINS; ++i)
             maskBits << (object.mask[static_cast<size_t>(i)] ? '1' : '0');
         objNode.setProperty("mask", maskBits, nullptr);
+
+        if (object.hasTimeFrequencyMask && object.timeMaskFrameTimesSec.size() == object.timeMaskFrameMasks.size())
+        {
+            juce::ValueTree tfRoot("TimeFrequencyMask");
+            for (size_t frameIndex = 0; frameIndex < object.timeMaskFrameMasks.size(); ++frameIndex)
+            {
+                juce::ValueTree frameNode("FrameMask");
+                frameNode.setProperty("timeSec", object.timeMaskFrameTimesSec[frameIndex], nullptr);
+
+                juce::String frameBits;
+                frameBits.preallocateBytes(NUM_BINS + 1);
+                for (int bin = 0; bin < NUM_BINS; ++bin)
+                    frameBits << (object.timeMaskFrameMasks[frameIndex][static_cast<size_t>(bin)] ? '1' : '0');
+
+                frameNode.setProperty("mask", frameBits, nullptr);
+                tfRoot.appendChild(frameNode, nullptr);
+            }
+
+            objNode.appendChild(tfRoot, nullptr);
+        }
 
         juce::ValueTree fxRoot("FxChain");
         for (const auto& fx : object.fxChain)
@@ -1070,12 +1118,45 @@ void ObjectDatabase::fromValueTree(const juce::ValueTree& tree)
         object.color = static_cast<int>(objNode.getProperty("color", static_cast<int>(0xFF00AA00)));
         object.densityAnchorDb = static_cast<float>(objNode.getProperty("densityAnchorDb", -60.0f));
         object.densityAnchorValid = static_cast<bool>(objNode.getProperty("densityAnchorValid", false));
+        object.hasTimeFrequencyMask = static_cast<bool>(objNode.getProperty("hasTimeFrequencyMask", false));
         object.mask.fill(false);
 
         const auto maskBits = objNode.getProperty("mask", juce::String()).toString();
         const int maskLen = juce::jmin(NUM_BINS, maskBits.length());
         for (int bin = 0; bin < maskLen; ++bin)
             object.mask[static_cast<size_t>(bin)] = (maskBits[bin] == '1');
+
+        const auto tfRoot = objNode.getChildWithName("TimeFrequencyMask");
+        if (tfRoot.isValid())
+        {
+            object.timeMaskFrameTimesSec.clear();
+            object.timeMaskFrameMasks.clear();
+
+            for (int frameIdx = 0; frameIdx < tfRoot.getNumChildren(); ++frameIdx)
+            {
+                const auto frameNode = tfRoot.getChild(frameIdx);
+                if (!frameNode.hasType("FrameMask"))
+                    continue;
+
+                std::array<bool, NUM_BINS> frameMask{};
+                frameMask.fill(false);
+
+                const auto frameBits = frameNode.getProperty("mask", juce::String()).toString();
+                const int frameMaskLen = juce::jmin(NUM_BINS, static_cast<int>(frameBits.length()));
+                for (int bin = 0; bin < frameMaskLen; ++bin)
+                    frameMask[static_cast<size_t>(bin)] = (frameBits[bin] == '1');
+
+                object.timeMaskFrameTimesSec.push_back(static_cast<double>(frameNode.getProperty("timeSec", 0.0)));
+                object.timeMaskFrameMasks.push_back(std::move(frameMask));
+            }
+
+            if (object.timeMaskFrameTimesSec.size() != object.timeMaskFrameMasks.size())
+            {
+                object.timeMaskFrameTimesSec.clear();
+                object.timeMaskFrameMasks.clear();
+                object.hasTimeFrequencyMask = false;
+            }
+        }
 
         const auto fxRoot = objNode.getChildWithName("FxChain");
         if (fxRoot.isValid())

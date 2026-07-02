@@ -52,6 +52,9 @@ public:
         int color = 0xFF00AA00;  // Default: green
         float densityAnchorDb = -60.0f;
         bool densityAnchorValid = false;
+        bool hasTimeFrequencyMask = false;
+        std::vector<double> timeMaskFrameTimesSec;
+        std::vector<std::array<bool, NUM_BINS>> timeMaskFrameMasks;
         std::vector<FXModule> fxChain;
 
         ObjectMask() : name("Object_"), mask{} {}
@@ -137,6 +140,10 @@ public:
     bool setObjectFxSourceObjectId(int objectId, const std::string& effectName, int sourceObjectId);
     int getObjectFxSourceObjectId(int objectId, const std::string& effectName) const;
     bool setObjectDensityAnchor(int objectId, float anchorDb, bool valid);
+    bool setObjectTimeFrequencyMask(int objectId,
+                                    const std::vector<double>& frameTimesSec,
+                                    const std::vector<std::array<bool, NUM_BINS>>& frameMasks,
+                                    const std::array<bool, NUM_BINS>& combinedMask);
 
     void addAutomationKeyframe(int objectId,
                                const std::string& effectName,

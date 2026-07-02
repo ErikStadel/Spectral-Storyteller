@@ -25,6 +25,8 @@ void SpectralView::setFrameBuffer(SpectralFrameBuffer* buffer)
 {
     frameBuffer = buffer;
     lastRenderedSampleIndex = -1;
+    std::fill(visibleColumnHasData.begin(), visibleColumnHasData.end(), false);
+    std::fill(visibleColumnTimesSec.begin(), visibleColumnTimesSec.end(), 0.0);
 }
 
 void SpectralView::setMagnitudeRange(float minDb, float maxDb)
@@ -81,6 +83,52 @@ int SpectralView::getBinForY(int y) const
     const float binF = yToBinF[static_cast<size_t>(clampedY)];
     return juce::jlimit(0, SpectralFrameBuffer::NUM_BINS - 1,
         static_cast<int>(std::round(binF)));
+}
+
+bool SpectralView::buildTimeFrequencyMaskFromBrushMask(const juce::Image& brushMask,
+                                                       std::vector<double>& frameTimesSec,
+                                                       std::vector<std::array<bool, SpectralFrameBuffer::NUM_BINS>>& frameMasks,
+                                                       std::array<bool, SpectralFrameBuffer::NUM_BINS>& combinedMask) const
+{
+    frameTimesSec.clear();
+    frameMasks.clear();
+    combinedMask.fill(false);
+
+    if (frameBuffer == nullptr || !brushMask.isValid() || getWidth() <= 0 || getHeight() <= 0)
+        return false;
+
+    const int width = juce::jmin(getWidth(), brushMask.getWidth());
+    const int height = juce::jmin(getHeight(), brushMask.getHeight());
+    juce::Image::BitmapData maskData(brushMask, juce::Image::BitmapData::readOnly);
+
+    for (int x = 0; x < width; ++x)
+    {
+        if (x >= static_cast<int>(visibleColumnHasData.size()) || !visibleColumnHasData[static_cast<size_t>(x)])
+            continue;
+
+        std::array<bool, SpectralFrameBuffer::NUM_BINS> frameMask{};
+        frameMask.fill(false);
+        bool anySelected = false;
+
+        for (int y = 0; y < height; ++y)
+        {
+            if (maskData.getPixelColour(x, y).getAlpha() <= 0)
+                continue;
+
+            const int bin = getBinForY(y);
+            frameMask[static_cast<size_t>(bin)] = true;
+            combinedMask[static_cast<size_t>(bin)] = true;
+            anySelected = true;
+        }
+
+        if (!anySelected)
+            continue;
+
+        frameTimesSec.push_back(visibleColumnTimesSec[static_cast<size_t>(x)]);
+        frameMasks.push_back(std::move(frameMask));
+    }
+
+    return !frameMasks.empty();
 }
 
 // =============================================================================
@@ -251,6 +299,18 @@ void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
     // Bild um 1 Pixel nach links scrollen
     spectrogramImage.moveImageSection(0, 0, 1, 0, w - 1, h);
 
+    if (visibleColumnTimesSec.size() == static_cast<size_t>(w) && visibleColumnHasData.size() == static_cast<size_t>(w))
+    {
+        for (int i = 0; i < w - 1; ++i)
+        {
+            visibleColumnTimesSec[static_cast<size_t>(i)] = visibleColumnTimesSec[static_cast<size_t>(i + 1)];
+            visibleColumnHasData[static_cast<size_t>(i)] = visibleColumnHasData[static_cast<size_t>(i + 1)];
+        }
+
+        visibleColumnTimesSec[static_cast<size_t>(w - 1)] = frame.transportTimeSec;
+        visibleColumnHasData[static_cast<size_t>(w - 1)] = true;
+    }
+
     const int x = w - 1;
 
     // BitmapData nach moveImageSection: readWrite nötig, da moveImageSection
@@ -382,6 +442,8 @@ void SpectralView::resized()
     const int h = juce::jmax(1, getHeight());
 
     spectrogramImage = juce::Image(juce::Image::RGB, w, h, true);
+    visibleColumnTimesSec.assign(static_cast<size_t>(w), 0.0);
+    visibleColumnHasData.assign(static_cast<size_t>(w), false);
     rebuildLookupTables();
 }
 

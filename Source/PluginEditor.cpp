@@ -103,7 +103,104 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             }
         }
     });
+    spectralSelector->setOnBrushComplete([this](const juce::Image& brushMask)
+    {
+        auto* db = processor.getObjectDatabase();
+        if (db == nullptr || spectralView == nullptr || !brushMask.isValid())
+            return;
+
+        std::vector<double> frameTimesSec;
+        std::vector<std::array<bool, SpectralFrameBuffer::NUM_BINS>> frameMasks;
+        std::array<bool, SpectralFrameBuffer::NUM_BINS> combinedMask{};
+        combinedMask.fill(false);
+
+        if (!spectralView->buildTimeFrequencyMaskFromBrushMask(brushMask, frameTimesSec, frameMasks, combinedMask))
+            return;
+
+        int minBin = SpectralFrameBuffer::NUM_BINS - 1;
+        int maxBin = 0;
+        for (int bin = 0; bin < SpectralFrameBuffer::NUM_BINS; ++bin)
+        {
+            if (!combinedMask[static_cast<size_t>(bin)])
+                continue;
+            minBin = juce::jmin(minBin, bin);
+            maxBin = juce::jmax(maxBin, bin);
+        }
+
+        if (minBin > maxBin)
+            return;
+
+        constexpr float nyquist = 24000.0f;
+        constexpr float binWidthHz = nyquist / static_cast<float>(ObjectDatabase::NUM_BINS - 1);
+
+        auto formatFreq = [](float freqHz)
+        {
+            if (freqHz >= 1000.0f)
+            {
+                const float kHz = freqHz / 1000.0f;
+                if (kHz >= 10.0f)
+                    return juce::String(static_cast<int>(std::round(kHz))) + "kHz";
+
+                return juce::String(kHz, 1) + "kHz";
+            }
+
+            return juce::String(static_cast<int>(std::round(freqHz))) + "Hz";
+        };
+
+        const std::string objName = ("Brush [" + formatFreq(minBin * binWidthHz) + " - "
+                                   + formatFreq(maxBin * binWidthHz) + "]").toStdString();
+
+        if (!db->addObject(objName))
+            return;
+
+        const int newIndex = db->getNumObjects() - 1;
+        const int newObjectId = db->getObjectIdAtIndex(newIndex);
+        if (newObjectId < 0)
+            return;
+
+        db->setObjectTimeFrequencyMask(newObjectId, frameTimesSec, frameMasks, combinedMask);
+
+        ObjectDatabase::ObjectMask created;
+        if (db->getObjectCopy(newIndex, created))
+            processor.calibrateDensityAnchor(created);
+
+        processor.setSelectedObjectId(newObjectId);
+
+        if (objectSidebar)
+            objectSidebar->refresh();
+        if (storyTimeline)
+            storyTimeline->refresh();
+        if (modulationPanel)
+            modulationPanel->refresh();
+    });
     addAndMakeVisible(*spectralSelector);
+
+    for (auto* button : { &rectSelectButton, &lassoSelectButton })
+    {
+        button->setClickingTogglesState(true);
+        button->setRadioGroupId(9001);
+        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF2D3440));
+        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF4A76B7));
+        button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE8E8E8));
+        button->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
+        addAndMakeVisible(*button);
+    }
+
+    rectSelectButton.setToggleState(true, juce::dontSendNotification);
+    rectSelectButton.setTooltip("Rechteck-Auswahl: erzeugt die bisherige 1D-Frequenzmaske");
+    lassoSelectButton.setTooltip("Pinsel-Auswahl: erzeugt eine echte 2D-Zeit-Frequenz-Maske; Shift+Scroll aendert den Durchmesser");
+
+    rectSelectButton.onClick = [this]()
+    {
+        if (spectralSelector)
+            spectralSelector->setToolMode(SpectralSelector::ToolMode::Rectangle);
+    };
+
+    lassoSelectButton.onClick = [this]()
+    {
+        if (spectralSelector)
+            spectralSelector->setToolMode(SpectralSelector::ToolMode::Brush);
+    };
 
     // Create object sidebar
     objectSidebar = std::make_unique<ObjectSidebar>(
@@ -365,27 +462,53 @@ void PluginEditor::resized()
     if (objectSidebar)
         objectSidebar->setBounds(sidebar);
 
-    // Input meter strip
-    auto inStrip = area.removeFromLeft(meterStripWidth);
-    inputLabel.setBounds(inStrip.removeFromTop(16));
-    auto inKnob = inStrip.removeFromBottom(36);
-    inputGainSlider.setBounds(inKnob.reduced(4));
-    inputMeter.setBounds(inStrip.reduced(14, 4));
+        auto controls = controlPanel.reduced(2);
+    const int labelH       = 18;
+    const int meterW       = 10;   // schmaler Pegelmesser
+    const int meterGap     = 4;
 
-    // Output meter strip
-    auto outStrip = area.removeFromRight(meterStripWidth);
-    outputLabel.setBounds(outStrip.removeFromTop(16));
-    auto outKnob = outStrip.removeFromBottom(36);
-    outputGainSlider.setBounds(outKnob.reduced(4));
-    outputMeter.setBounds(outStrip.reduced(14, 4));
+    // Oben: 4 vertikale Slider (Input | Output | Dry/Wet | Gate)
+    auto topBlock = controls;
 
-    // Center area: spectral view + timeline
-    auto centerArea = area;
+    const int colGap   = 6;
+    const int numCols  = 4;
+    const int colWidth = (topBlock.getWidth() - colGap * (numCols - 1)) / numCols;
 
-    // Timeline at bottom of center
-    auto timelineArea = centerArea.removeFromBottom(timelineHeight);
-    if (storyTimeline)
-        storyTimeline->setBounds(timelineArea.reduced(2, 0));
+    auto layoutSliderCol = [&](juce::Rectangle<int> col, juce::Label& lbl, juce::Slider& sld)
+    {
+        lbl.setBounds(col.removeFromTop(labelH));
+        col.removeFromTop(2);
+        sld.setBounds(col.reduced(2, 2));
+    };
+
+    auto layoutMeterCol = [&](juce::Rectangle<int> col, juce::Label& lbl,
+                              juce::Slider& sld, LevelMeter& meter)
+    {
+        lbl.setBounds(col.removeFromTop(labelH));
+        col.removeFromTop(2);
+        auto meterArea = col.removeFromLeft(meterW);
+        col.removeFromLeft(meterGap);
+        meter.setBounds(meterArea.reduced(0, 2));
+        sld.setBounds(col.reduced(2, 2));
+    };
+
+    auto inCol  = topBlock.removeFromLeft(colWidth); topBlock.removeFromLeft(colGap);
+    auto outCol = topBlock.removeFromLeft(colWidth); topBlock.removeFromLeft(colGap);
+    auto dryCol = topBlock.removeFromLeft(colWidth); topBlock.removeFromLeft(colGap);
+    auto gateCol = topBlock;
+
+    layoutMeterCol(inCol,  inputLabel,  inputGainSlider,  inputMeter);
+    layoutMeterCol(outCol, outputLabel, outputGainSlider, outputMeter);
+    layoutSliderCol(dryCol,  dryWetLabel, dryWetSlider);
+    layoutSliderCol(gateCol, gateLabel,   gateSlider);
+
+    const int toolButtonW = 56;
+    const int toolButtonH = 24;
+    auto toolBarArea = area.removeFromTop(toolButtonH);
+    rectSelectButton.setBounds(toolBarArea.removeFromLeft(toolButtonW));
+    toolBarArea.removeFromLeft(6);
+    lassoSelectButton.setBounds(toolBarArea.removeFromLeft(toolButtonW));
+    area.removeFromTop(6);
 
     // Spectral view fills remaining center
     auto spectralArea = centerArea.reduced(2, 2);

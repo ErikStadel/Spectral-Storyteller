@@ -272,9 +272,48 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
 
 void PluginProcessor::updateTargetBinGains()
 {
-    const double nowSec = transportSeconds.load();
+    const double nowSec = currentAnalysisFrameTimeSec;
     transformSettingsByObject.clear();
     spectralFxByObject.clear();
+
+    const auto buildActiveMaskForTime = [nowSec](const ObjectDatabase::ObjectMask& item)
+    {
+        std::array<bool, ObjectDatabase::NUM_BINS> activeMask{};
+        activeMask.fill(false);
+
+        if (!item.hasTimeFrequencyMask || item.timeMaskFrameTimesSec.empty()
+            || item.timeMaskFrameTimesSec.size() != item.timeMaskFrameMasks.size())
+        {
+            return item.mask;
+        }
+
+        auto lower = std::lower_bound(item.timeMaskFrameTimesSec.begin(), item.timeMaskFrameTimesSec.end(), nowSec);
+        size_t selectedIndex = 0;
+        if (lower == item.timeMaskFrameTimesSec.end())
+            selectedIndex = item.timeMaskFrameTimesSec.size() - 1;
+        else if (lower == item.timeMaskFrameTimesSec.begin())
+            selectedIndex = 0;
+        else
+        {
+            const size_t hi = static_cast<size_t>(std::distance(item.timeMaskFrameTimesSec.begin(), lower));
+            const size_t lo = hi - 1;
+            selectedIndex = (std::abs(item.timeMaskFrameTimesSec[hi] - nowSec) < std::abs(nowSec - item.timeMaskFrameTimesSec[lo])) ? hi : lo;
+        }
+
+        double maxDistance = 0.03;
+        if (item.timeMaskFrameTimesSec.size() > 1)
+        {
+            if (selectedIndex > 0)
+                maxDistance = juce::jmax(maxDistance, 0.5 * (item.timeMaskFrameTimesSec[selectedIndex] - item.timeMaskFrameTimesSec[selectedIndex - 1]));
+            if (selectedIndex + 1 < item.timeMaskFrameTimesSec.size())
+                maxDistance = juce::jmax(maxDistance, 0.5 * (item.timeMaskFrameTimesSec[selectedIndex + 1] - item.timeMaskFrameTimesSec[selectedIndex]));
+        }
+
+        if (std::abs(item.timeMaskFrameTimesSec[selectedIndex] - nowSec) > maxDistance)
+            return activeMask;
+
+        return item.timeMaskFrameMasks[selectedIndex];
+    };
 
     const auto getModulatedNorm = [this, nowSec](int objectId,
                                                  const juce::String& fxName,
@@ -304,6 +343,8 @@ void PluginProcessor::updateTargetBinGains()
             ObjectDatabase::ObjectMask item;
             if (!objectDatabase->getObjectCopy(obj, item))
                 continue;
+
+            const auto activeMask = buildActiveMaskForTime(item);
 
             if (!item.densityAnchorValid)
                 calibrateDensityAnchor(item);
@@ -336,30 +377,52 @@ void PluginProcessor::updateTargetBinGains()
 
             int lowBin = -1;
             int highBin = -1;
+            float framePeakMag = 0.0f;
             for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
             {
-                if (!item.mask[static_cast<size_t>(bin)])
+                if (!activeMask[static_cast<size_t>(bin)])
                     continue;
 
                 if (lowBin < 0)
                     lowBin = bin;
                 highBin = bin;
+
+                framePeakMag = juce::jmax(framePeakMag, currentAnalysisMagnitudes[static_cast<size_t>(bin)]);
             }
 
             const float anchorDb = item.densityAnchorValid ? item.densityAnchorDb : -60.0f;
+            const float peakDb = juce::Decibels::gainToDecibels(framePeakMag, -120.0f);
+            const float denseMinDb = juce::jmax(anchorDb + 18.0f, peakDb - 6.0f);
+            // Mid-field emphasis: use a concave curve so Density changes are clearer around 0.7..0.4.
+            const float midCurve = 0.62f;
             const float thresholdDb = (density >= 0.5f)
-                                          ? juce::jmap((1.0f - density) * 2.0f, -120.0f, anchorDb)
-                                          : juce::jmap((0.5f - density) * 2.0f, anchorDb, 0.0f);
+                                          ? juce::jmap(std::pow((1.0f - density) * 2.0f, midCurve), -120.0f, anchorDb)
+                                          : juce::jmap(std::pow((0.5f - density) * 2.0f, midCurve), anchorDb, denseMinDb);
 
             SpectralFxSettings spectralSettings;
             spectralSettings.density = density;
             spectralSettings.brightness = brightness;
             spectralSettings.thresholdLin = juce::Decibels::decibelsToGain(thresholdDb, -120.0f);
+            spectralSettings.lowBin = juce::jmax(0, lowBin);
+            spectralSettings.highBin = juce::jmax(spectralSettings.lowBin, highBin);
             spectralSettings.centerBin = juce::jmax(1.0f,
                                                     (lowBin >= 0 && highBin >= lowBin)
                                                         ? 0.5f * static_cast<float>(lowBin + highBin)
                                                         : 1.0f);
             spectralSettings.tiltExp = brightness * 2.0f;
+
+            float maxTiltBoost = 1.0f;
+            if (lowBin >= 0 && highBin >= lowBin && std::abs(spectralSettings.brightness) > 1.0e-6f)
+            {
+                const float lowRatio = juce::jmax(1.0e-3f, static_cast<float>(lowBin) / spectralSettings.centerBin);
+                const float highRatio = juce::jmax(1.0e-3f, static_cast<float>(highBin) / spectralSettings.centerBin);
+                const float lowTilt = std::pow(lowRatio, spectralSettings.tiltExp);
+                const float highTilt = std::pow(highRatio, spectralSettings.tiltExp);
+                maxTiltBoost = juce::jmax(1.0f, juce::jmax(lowTilt, highTilt));
+            }
+
+            // Keep brightness as a redistribution rather than broad gain boost.
+            spectralSettings.brightnessCompensation = 0.92f / maxTiltBoost;
             spectralFxByObject[item.id] = spectralSettings;
 
             timelineObjectGains[static_cast<size_t>(obj)] = juce::jlimit(0.0f, 2.0f, volumeNorm * 2.0f);
@@ -412,6 +475,8 @@ void PluginProcessor::updateTargetBinGains()
         if (!objectDatabase->getObjectCopy(obj, item))
             continue;
 
+        const auto activeMask = buildActiveMaskForTime(item);
+
         if (!item.engaged)
             continue;
 
@@ -423,7 +488,7 @@ void PluginProcessor::updateTargetBinGains()
             tonalObjectMuted = true;
             for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
             {
-                if (item.mask[static_cast<size_t>(bin)])
+                if (activeMask[static_cast<size_t>(bin)])
                     tonalMuteMask[static_cast<size_t>(bin)] = true;
             }
         }
@@ -433,7 +498,7 @@ void PluginProcessor::updateTargetBinGains()
             ambientObjectMuted = true;
             for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
             {
-                if (item.mask[static_cast<size_t>(bin)])
+                if (activeMask[static_cast<size_t>(bin)])
                     ambientMuteMask[static_cast<size_t>(bin)] = true;
             }
         }
@@ -455,6 +520,8 @@ void PluginProcessor::updateTargetBinGains()
             if (!objectDatabase->getObjectCopy(obj, item))
                 continue;
 
+            const auto activeMask = buildActiveMaskForTime(item);
+
             if (!item.engaged)
                 continue;
 
@@ -470,7 +537,7 @@ void PluginProcessor::updateTargetBinGains()
 
             for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
             {
-                if (item.mask[static_cast<size_t>(bin)])
+                if (activeMask[static_cast<size_t>(bin)])
                 {
                     raw[static_cast<size_t>(bin)] = juce::jmax(raw[static_cast<size_t>(bin)], objectGain);
                     pitchSum[static_cast<size_t>(bin)] += objectSemitones;
@@ -495,6 +562,8 @@ void PluginProcessor::updateTargetBinGains()
             if (!objectDatabase->getObjectCopy(obj, item))
                 continue;
 
+            const auto activeMask = buildActiveMaskForTime(item);
+
             if (!item.engaged)
                 continue;
 
@@ -510,7 +579,7 @@ void PluginProcessor::updateTargetBinGains()
 
             for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
             {
-                if (item.mask[static_cast<size_t>(bin)])
+                if (activeMask[static_cast<size_t>(bin)])
                 {
                     raw[static_cast<size_t>(bin)] *= objectGain;
                     pitchSum[static_cast<size_t>(bin)] += objectSemitones;
@@ -535,6 +604,8 @@ void PluginProcessor::updateTargetBinGains()
         if (!objectDatabase->getObjectCopy(obj, item) || !item.mute)
             continue;
 
+        const auto activeMask = buildActiveMaskForTime(item);
+
         if (!item.engaged)
             continue;
 
@@ -545,7 +616,7 @@ void PluginProcessor::updateTargetBinGains()
 
         for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
         {
-            if (item.mask[static_cast<size_t>(bin)])
+            if (activeMask[static_cast<size_t>(bin)])
                 raw[static_cast<size_t>(bin)] *= 0.0f;
         }
     }
@@ -628,16 +699,59 @@ void PluginProcessor::calibrateDensityAnchor(ObjectDatabase::ObjectMask& obj)
     double sum = 0.0;
     int count = 0;
 
-    for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
+    if (obj.hasTimeFrequencyMask
+        && spectralFrameBuffer != nullptr
+        && obj.timeMaskFrameTimesSec.size() == obj.timeMaskFrameMasks.size()
+        && !obj.timeMaskFrameTimesSec.empty())
     {
-        if (!obj.mask[static_cast<size_t>(bin)])
-            continue;
-
-        const float mag = currentAnalysisMagnitudes[static_cast<size_t>(bin)];
-        if (mag > 1.0e-7f)
+        const int numFrames = spectralFrameBuffer->getNumFrames();
+        for (size_t selectedIndex = 0; selectedIndex < obj.timeMaskFrameMasks.size(); ++selectedIndex)
         {
-            sum += mag;
-            ++count;
+            SpectralFrameBuffer::Frame frame;
+            bool matchedFrame = false;
+            for (int frameIndex = 0; frameIndex < numFrames; ++frameIndex)
+            {
+                if (!spectralFrameBuffer->copyFrame(frameIndex, frame))
+                    continue;
+
+                if (std::abs(frame.transportTimeSec - obj.timeMaskFrameTimesSec[selectedIndex]) > 1.0e-4)
+                    continue;
+
+                matchedFrame = true;
+                for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
+                {
+                    if (!obj.timeMaskFrameMasks[selectedIndex][static_cast<size_t>(bin)])
+                        continue;
+
+                    const float mag = juce::Decibels::decibelsToGain(frame.magnitude[static_cast<size_t>(bin)], -120.0f);
+                    if (mag > 1.0e-7f)
+                    {
+                        sum += mag;
+                        ++count;
+                    }
+                }
+
+                break;
+            }
+
+            if (!matchedFrame)
+                continue;
+        }
+    }
+
+    if (count == 0)
+    {
+        for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
+        {
+            if (!obj.mask[static_cast<size_t>(bin)])
+                continue;
+
+            const float mag = currentAnalysisMagnitudes[static_cast<size_t>(bin)];
+            if (mag > 1.0e-7f)
+            {
+                sum += mag;
+                ++count;
+            }
         }
     }
 
@@ -673,10 +787,14 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
         currentAnalysisMagnitudes[static_cast<size_t>(bin)] = std::sqrt(re * re + im * im);
     }
 
+    const double blockTransportSec = transportSeconds.load();
+    currentAnalysisFrameTimeSec = blockTransportSec
+                                + (static_cast<double>(currentSampleIndex - totalSamplesProcessed) / juce::jmax(1.0, currentSampleRate));
+
     // Write frame to spectral buffer for visualisation (first channel only)
     if (channel == 0)
     {
-        spectralFrameBuffer->writeFrame(fftData.data(), currentSampleIndex);
+        spectralFrameBuffer->writeFrame(fftData.data(), currentSampleIndex, currentAnalysisFrameTimeSec);
         analyseSegmentationFrame(fftData.data(), currentSampleIndex);
     }
 
@@ -710,7 +828,7 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
             {
                 const float ratio = static_cast<float>(bin) / spectral.centerBin;
                 const float factor = std::pow(ratio, spectral.tiltExp);
-                spectralFactor = juce::jlimit(0.125f, 8.0f, factor);
+                spectralFactor = juce::jlimit(0.125f, 8.0f, factor) * spectral.brightnessCompensation;
             }
         }
 
