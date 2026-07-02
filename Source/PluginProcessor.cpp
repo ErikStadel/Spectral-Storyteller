@@ -241,6 +241,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         currentBinGains[ch].fill(1.0f);
         phaseVocoderStates[ch].clear();
         transformSmoothStates[ch].clear();
+        echoBleedStateByChannel[ch].clear();
     }
 
     targetBinGains.fill(1.0f);
@@ -248,6 +249,11 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     targetBinDominantObjectIds.fill(-1);
     transformSettingsByObject.clear();
     spectralFxByObject.clear();
+    filterFxByObject.clear();
+    compressorFxByObject.clear();
+    compressorStateByObject.clear();
+    compressorGainByObject.clear();
+    delayFxByObject.clear();
     timelineObjectGains.fill(1.0f);
     currentTimelineObjectGains.fill(1.0f);
     previousMagnitudes.fill(0.0f);
@@ -299,6 +305,10 @@ void PluginProcessor::updateTargetBinGains()
     const double nowSec = currentAnalysisFrameTimeSec;
     transformSettingsByObject.clear();
     spectralFxByObject.clear();
+    filterFxByObject.clear();
+    compressorFxByObject.clear();
+    compressorGainByObject.clear();
+    delayFxByObject.clear();
 
     const auto buildActiveMaskForTime = [nowSec](const ObjectDatabase::ObjectMask& item)
     {
@@ -367,6 +377,17 @@ void PluginProcessor::updateTargetBinGains()
             ObjectDatabase::ObjectMask item;
             if (!objectDatabase->getObjectCopy(obj, item))
                 continue;
+
+            const auto isFxEnabled = [&item](const juce::String& fxName)
+            {
+                for (const auto& fx : item.fxChain)
+                {
+                    if (juce::String(fx.name).equalsIgnoreCase(fxName) && fx.enabled)
+                        return true;
+                }
+
+                return false;
+            };
 
             const auto activeMask = buildActiveMaskForTime(item);
 
@@ -449,6 +470,131 @@ void PluginProcessor::updateTargetBinGains()
             spectralSettings.brightnessCompensation = 0.92f / maxTiltBoost;
             spectralFxByObject[item.id] = spectralSettings;
 
+            if (isFxEnabled("Filter"))
+            {
+                // Shade Contour (Filter): frequency-domain HP/LP shaping per object.
+                // Low Cut is mapped in Hz, High Cut in kHz range, both with musical log spacing.
+                const float lowCutNorm = getModulatedNorm(item.id,
+                                                          "Filter",
+                                                          "Low Cut",
+                                                          getModulatedNorm(item.id, "Filter", "Cutoff", 0.0f));
+                const float highCutNorm = getModulatedNorm(item.id,
+                                                           "Filter",
+                                                           "High Cut",
+                                                           getModulatedNorm(item.id, "Filter", "Resonance", 1.0f));
+
+                FilterSettings filterSettings;
+                filterSettings.lowCutHz = 20.0f * std::pow(10.0f, lowCutNorm * 2.0f);        // 20..2000 Hz
+                filterSettings.highCutHz = 1000.0f * std::pow(10.0f, highCutNorm * 1.30103f); // 1k..20k Hz
+                if (filterSettings.highCutHz < filterSettings.lowCutHz + 40.0f)
+                    filterSettings.highCutHz = filterSettings.lowCutHz + 40.0f;
+                filterFxByObject[item.id] = filterSettings;
+            }
+
+            if (isFxEnabled("Compressor"))
+            {
+                // Mass Forge (Adaptive Compressor): threshold + hybrid forge/auto-gain + response + parallel mix.
+                const float compThresholdNorm = getModulatedNorm(item.id, "Compressor", "Threshold", 0.70f);
+                const float compForgeNorm = getModulatedNorm(item.id, "Compressor", "Forge", 0.25f);
+                const float compResponseNorm = getModulatedNorm(item.id, "Compressor", "Response", 0.35f);
+                const float compMixNorm = getModulatedNorm(item.id, "Compressor", "Mix", 0.75f);
+
+                AdaptiveCompressorSettings compSettings;
+                compSettings.thresholdDb = juce::jmap(compThresholdNorm, -48.0f, -6.0f);
+                compSettings.forge = juce::jlimit(0.0f, 1.0f, compForgeNorm);
+                compSettings.response = juce::jlimit(0.0f, 1.0f, compResponseNorm);
+                compSettings.mix = juce::jlimit(0.0f, 1.0f, compMixNorm);
+                compressorFxByObject[item.id] = compSettings;
+
+                float objectEnergy = 0.0f;
+                int objectWeight = 0;
+                for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
+                {
+                    if (!activeMask[static_cast<size_t>(bin)])
+                        continue;
+
+                    const float mag = currentAnalysisMagnitudes[static_cast<size_t>(bin)];
+                    objectEnergy += mag * mag;
+                    ++objectWeight;
+                }
+
+                const float objectRms = objectWeight > 0
+                                            ? std::sqrt(objectEnergy / static_cast<float>(objectWeight))
+                                            : 0.0f;
+                const float inputDb = juce::Decibels::gainToDecibels(objectRms, -120.0f);
+                const float ratio = juce::jmap(compSettings.forge, 1.0f, 12.0f);
+                const float overDb = juce::jmax(0.0f, inputDb - compSettings.thresholdDb);
+                const float reducedOverDb = overDb / juce::jmax(1.0f, ratio);
+                const float gainReductionDb = -(overDb - reducedOverDb);
+                const float targetGain = juce::Decibels::decibelsToGain(gainReductionDb);
+
+                const float frameDt = static_cast<float>(hopSize / juce::jmax(1.0, currentSampleRate));
+                const float attackMs = juce::jmap(compSettings.response, 2.0f, 60.0f);
+                const float releaseMs = juce::jmap(compSettings.response, 30.0f, 600.0f);
+                const float attackCoeff = std::exp(-frameDt / juce::jmax(1.0e-4f, attackMs * 0.001f));
+                const float releaseCoeff = std::exp(-frameDt / juce::jmax(1.0e-4f, releaseMs * 0.001f));
+
+                auto& compState = compressorStateByObject[item.id];
+                const float coeff = (targetGain < compState.smoothedGain) ? attackCoeff : releaseCoeff;
+                compState.smoothedGain = coeff * compState.smoothedGain + (1.0f - coeff) * targetGain;
+
+                const float adaptiveMakeupDb = (-gainReductionDb) * (0.20f + 0.65f * compSettings.forge);
+                const float adaptiveMakeup = juce::Decibels::decibelsToGain(adaptiveMakeupDb);
+                const float wetCompGain = compState.smoothedGain * adaptiveMakeup;
+                const float mixedCompGain = (1.0f - compSettings.mix) + compSettings.mix * wetCompGain;
+                compressorGainByObject[item.id] = juce::jlimit(0.05f, 3.5f, mixedCompGain);
+            }
+
+            if (isFxEnabled("Delay"))
+            {
+                // Echo Bleed (Delay): always DAW-synced.
+                // 12 o'clock = 1/1. Turning right selects straight values, turning left selects dotted values.
+                const float delayTimeNorm = getModulatedNorm(item.id, "Delay", "Time", 0.5f);
+                const float delayFeedbackNorm = getModulatedNorm(item.id, "Delay", "Feedback", 0.35f);
+                const float delayBleedNorm = getModulatedNorm(item.id, "Delay", "Bleed", 0.30f);
+                const float delayMixNorm = getModulatedNorm(item.id, "Delay", "Mix", 0.30f);
+
+                EchoBleedSettings delaySettings;
+                const float bpm = juce::jmax(40.0f, currentTempoBpm.load());
+                const float quarterSec = 60.0f / bpm;
+                static constexpr std::array<float, 5> straightQuarterMultipliers = {
+                    4.0f,                    // 1/1
+                    2.0f,                    // 1/2
+                    1.0f,                    // 1/4
+                    0.5f,                    // 1/8
+                    0.25f                    // 1/16
+                };
+                static constexpr std::array<float, 5> dottedQuarterMultipliers = {
+                    6.0f,                    // 1/1.
+                    3.0f,                    // 1/2.
+                    1.5f,                    // 1/4.
+                    0.75f,                   // 1/8.
+                    0.375f                   // 1/16.
+                };
+
+                if (delayTimeNorm >= 0.5f)
+                {
+                    const float t = juce::jlimit(0.0f, 1.0f, (delayTimeNorm - 0.5f) / 0.5f);
+                    const int idx = juce::jlimit(0,
+                                                 static_cast<int>(straightQuarterMultipliers.size()) - 1,
+                                                 static_cast<int>(std::round(t * static_cast<float>(straightQuarterMultipliers.size() - 1))));
+                    delaySettings.timeSeconds = quarterSec * straightQuarterMultipliers[static_cast<size_t>(idx)];
+                }
+                else
+                {
+                    const float t = juce::jlimit(0.0f, 1.0f, (0.5f - delayTimeNorm) / 0.5f);
+                    const int idx = juce::jlimit(0,
+                                                 static_cast<int>(dottedQuarterMultipliers.size()) - 1,
+                                                 static_cast<int>(std::round(t * static_cast<float>(dottedQuarterMultipliers.size() - 1))));
+                    delaySettings.timeSeconds = quarterSec * dottedQuarterMultipliers[static_cast<size_t>(idx)];
+                }
+
+                delaySettings.feedback = juce::jlimit(0.0f, 0.92f, delayFeedbackNorm * 0.92f);
+                delaySettings.bleed = juce::jlimit(0.0f, 1.0f, delayBleedNorm);
+                delaySettings.mix = juce::jlimit(0.0f, 1.0f, delayMixNorm);
+                delayFxByObject[item.id] = delaySettings;
+            }
+
             timelineObjectGains[static_cast<size_t>(obj)] = juce::jlimit(0.0f, 2.0f, volumeNorm * 2.0f);
         }
     }
@@ -468,6 +614,11 @@ void PluginProcessor::updateTargetBinGains()
         targetBinGains.fill(1.0f);
         targetBinPitchSemitones.fill(0.0f);
         spectralFxByObject.clear();
+        filterFxByObject.clear();
+        compressorFxByObject.clear();
+        compressorStateByObject.clear();
+        compressorGainByObject.clear();
+        delayFxByObject.clear();
         transientMuteCompressorGain = 1.0f;
         return;
     }
@@ -837,6 +988,8 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
         smoothGain = maskSmoothAlpha * targetBinGains[static_cast<size_t>(bin)] + (1.0f - maskSmoothAlpha) * smoothGain;
 
         float spectralFactor = 1.0f;
+        float filterFactor = 1.0f;
+        float compressorFactor = 1.0f;
         const int objectId = targetBinDominantObjectIds[static_cast<size_t>(bin)];
         const auto fxIt = spectralFxByObject.find(objectId);
         if (fxIt != spectralFxByObject.end())
@@ -856,7 +1009,25 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
             }
         }
 
-        const float appliedGain = smoothGain * spectralFactor;
+        const auto filterIt = filterFxByObject.find(objectId);
+        if (filterIt != filterFxByObject.end())
+        {
+            const float freq = static_cast<float>(bin) * static_cast<float>(currentSampleRate) / static_cast<float>(fftSize);
+            const float lowHz = juce::jmax(20.0f, filterIt->second.lowCutHz);
+            const float highHz = juce::jmax(lowHz + 40.0f, filterIt->second.highCutHz);
+
+            const float lowRatio = juce::jmax(1.0e-3f, freq / lowHz);
+            const float highRatio = juce::jmax(1.0e-3f, freq / highHz);
+            const float highPass = 1.0f / std::sqrt(1.0f + std::pow(1.0f / lowRatio, 4.0f));
+            const float lowPass = 1.0f / std::sqrt(1.0f + std::pow(highRatio, 4.0f));
+            filterFactor = juce::jlimit(0.0f, 1.0f, highPass * lowPass);
+        }
+
+        const auto compGainIt = compressorGainByObject.find(objectId);
+        if (compGainIt != compressorGainByObject.end())
+            compressorFactor = compGainIt->second;
+
+        const float appliedGain = smoothGain * spectralFactor * filterFactor * compressorFactor;
         const int reIdx = 2 * bin;
         const int imIdx = reIdx + 1;
         fftData[reIdx] *= appliedGain;
@@ -870,6 +1041,7 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
 
     applyTransformCrossSynthesis(channel);
     applyPhaseVocoderPitchShift(channel);
+    applyEchoBleedDelay(channel);
 
     fft.performRealOnlyInverseTransform(fftData.data());
 
@@ -1092,6 +1264,81 @@ void PluginProcessor::applyPhaseVocoderPitchShift(int channel)
         fftData[static_cast<size_t>(i)] = shifted[static_cast<size_t>(i)];
 }
 
+void PluginProcessor::applyEchoBleedDelay(int channel)
+{
+    constexpr int nyquistBin = fftSize / 2;
+    constexpr int maxDelayFrames = 256;
+    const float hopSeconds = static_cast<float>(hopSize / juce::jmax(1.0, currentSampleRate));
+
+    auto& channelStates = echoBleedStateByChannel[channel];
+    std::vector<int> touchedObjects;
+    touchedObjects.reserve(8);
+
+    for (int bin = 0; bin <= nyquistBin; ++bin)
+    {
+        const int objectId = targetBinDominantObjectIds[static_cast<size_t>(bin)];
+        if (objectId < 0)
+            continue;
+
+        const auto settingsIt = delayFxByObject.find(objectId);
+        if (settingsIt == delayFxByObject.end())
+            continue;
+
+        const auto& settings = settingsIt->second;
+        if (settings.mix <= 1.0e-4f)
+            continue;
+
+        auto& state = channelStates[objectId];
+        if (state.historyFrames.empty())
+        {
+            state.historyFrames.resize(maxDelayFrames);
+            for (auto& frame : state.historyFrames)
+                frame.fill(0.0f);
+            state.writeIndex = 0;
+        }
+
+        if (std::find(touchedObjects.begin(), touchedObjects.end(), objectId) == touchedObjects.end())
+        {
+            state.historyFrames[static_cast<size_t>(state.writeIndex)].fill(0.0f);
+            touchedObjects.push_back(objectId);
+        }
+
+        const int delayFrames = juce::jlimit(1,
+                                             maxDelayFrames - 1,
+                                             static_cast<int>(std::round(settings.timeSeconds / juce::jmax(1.0e-4f, hopSeconds))));
+        const int readIndex = (state.writeIndex - delayFrames + maxDelayFrames) % maxDelayFrames;
+
+        const int reIdx = 2 * bin;
+        const int imIdx = reIdx + 1;
+        const float inRe = fftData[reIdx];
+        const float inIm = fftData[imIdx];
+
+        float delayedRe = state.historyFrames[static_cast<size_t>(readIndex)][static_cast<size_t>(reIdx)];
+        float delayedIm = state.historyFrames[static_cast<size_t>(readIndex)][static_cast<size_t>(imIdx)];
+
+        const float binNorm = static_cast<float>(bin) / static_cast<float>(juce::jmax(1, nyquistBin));
+        const float toneLoss = std::pow(juce::jlimit(0.05f, 1.0f, 1.0f - settings.bleed * 0.85f), 1.0f + 3.0f * binNorm);
+        delayedRe *= toneLoss;
+        delayedIm *= toneLoss;
+
+        const float satDrive = 1.0f + settings.bleed * 3.5f;
+        delayedRe = std::tanh(delayedRe * satDrive);
+        delayedIm = std::tanh(delayedIm * satDrive);
+
+        fftData[reIdx] = (1.0f - settings.mix) * inRe + settings.mix * delayedRe;
+        fftData[imIdx] = (1.0f - settings.mix) * inIm + settings.mix * delayedIm;
+
+        state.historyFrames[static_cast<size_t>(state.writeIndex)][static_cast<size_t>(reIdx)] = inRe + delayedRe * settings.feedback;
+        state.historyFrames[static_cast<size_t>(state.writeIndex)][static_cast<size_t>(imIdx)] = inIm + delayedIm * settings.feedback;
+    }
+
+    for (const int objectId : touchedObjects)
+    {
+        auto& state = channelStates[objectId];
+        state.writeIndex = (state.writeIndex + 1) % maxDelayFrames;
+    }
+}
+
 void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -1118,6 +1365,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
         bpm = pos.bpm > 0.0 ? pos.bpm : 120.0;
         playing = pos.isPlaying;
     }
+    currentTempoBpm.store(static_cast<float>(bpm));
     modMatrix.setTransport(ppq, bpm, playing);
 
 

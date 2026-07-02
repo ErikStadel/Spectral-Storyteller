@@ -64,7 +64,9 @@ private:
     int getTimelineRightX() const;
     void updateScrollBar();
     juce::Rectangle<int> getLaneParameterTabArea(int rowTop, int laneHeight) const;
-    juce::String formatLaneValue(const juce::String& effectName, float normalizedValue) const;
+    juce::String formatLaneValue(const juce::String& effectName,
+                                 const juce::String& parameterName,
+                                 float normalizedValue) const;
     void updateHoverState(const juce::MouseEvent& event);
     bool hitTestParameterTab(const juce::MouseEvent& event, int& laneIndex, int& parameterIndex) const;
     float applyCurvatureToT(float t, float curvature) const;

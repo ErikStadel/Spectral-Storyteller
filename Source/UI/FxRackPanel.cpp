@@ -1,5 +1,6 @@
 #include "FxRackPanel.h"
 #include "../PluginProcessor.h"
+#include <array>
 
 FxRackPanel::FxRackPanel(PluginProcessor& p)
     : processor(p)
@@ -54,7 +55,7 @@ void FxRackPanel::showKnobContextMenu(const KnobView& knob, juce::Component* tar
     if (objId <= 0)
         return;
 
-    const bool followTimeline = processor.getFxParameterFollowTimeline(objId, knob.fxName, knob.paramName, true);
+    const bool followTimeline = processor.getFxParameterFollowTimeline(objId, knob.fxName, knob.paramName, false);
 
     juce::PopupMenu menu;
     menu.addSectionHeader("Mode");
@@ -173,6 +174,93 @@ bool FxRackPanel::isKnobSelected(const KnobView& knob) const
         && processor.getActiveFxParameterName().equalsIgnoreCase(knob.paramName);
 }
 
+bool FxRackPanel::useTwoByTwoLayout(const ModuleView& mod) const
+{
+    if (mod.isCore)
+        return true;
+
+    if (mod.knobs.size() != 4)
+        return false;
+
+    return mod.name.equalsIgnoreCase("Compressor") || mod.name.equalsIgnoreCase("Delay");
+}
+
+juce::String FxRackPanel::getModuleDisplayName(const ModuleView& mod) const
+{
+    if (mod.isCore)
+        return "Base";
+    if (mod.name.equalsIgnoreCase("Filter"))
+        return "Shade Contour";
+    if (mod.name.equalsIgnoreCase("Compressor"))
+        return "Mass Forge";
+    if (mod.name.equalsIgnoreCase("Delay"))
+        return "Echo Bleed";
+    return mod.name;
+}
+
+juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
+{
+    const float v = juce::jlimit(0.0f, 1.0f, knob.value);
+
+    if (knob.fxName.equalsIgnoreCase("Pitch") || knob.paramName.equalsIgnoreCase("Semitones"))
+        return juce::String((v - 0.5f) * 4.0f, 1) + " st";
+
+    if (knob.fxName.equalsIgnoreCase("Volume") || knob.paramName.equalsIgnoreCase("Gain"))
+        return juce::String(static_cast<int>(std::round(v * 200.0f))) + "%";
+
+    if (knob.fxName.equalsIgnoreCase("Compressor") && knob.paramName.equalsIgnoreCase("Threshold"))
+        return juce::String(juce::jmap(v, -48.0f, -6.0f), 1) + " dB";
+
+    if (knob.fxName.equalsIgnoreCase("Compressor") && knob.paramName.equalsIgnoreCase("Forge"))
+        return juce::String(juce::jmap(v, 1.0f, 12.0f), 1) + ":1";
+
+    if (knob.fxName.equalsIgnoreCase("Compressor") && knob.paramName.equalsIgnoreCase("Mix"))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
+
+    if (knob.fxName.equalsIgnoreCase("Filter") && knob.paramName.equalsIgnoreCase("Low Cut"))
+    {
+        const float hz = 20.0f * std::pow(10.0f, v * 2.0f);
+        return hz >= 1000.0f ? juce::String(hz / 1000.0f, 2) + " kHz" : juce::String(static_cast<int>(std::round(hz))) + " Hz";
+    }
+
+    if (knob.fxName.equalsIgnoreCase("Filter") && knob.paramName.equalsIgnoreCase("High Cut"))
+    {
+        const float hz = 1000.0f * std::pow(10.0f, v * 1.30103f);
+        return hz >= 1000.0f ? juce::String(hz / 1000.0f, 2) + " kHz" : juce::String(static_cast<int>(std::round(hz))) + " Hz";
+    }
+
+    if (knob.fxName.equalsIgnoreCase("Delay") && knob.paramName.equalsIgnoreCase("Time"))
+    {
+        static const std::array<juce::String, 5> straight = { "1/1", "1/2", "1/4", "1/8", "1/16" };
+        static const std::array<juce::String, 5> dotted = { "1/1.", "1/2.", "1/4.", "1/8.", "1/16." };
+        if (v >= 0.5f)
+        {
+            const float t = juce::jlimit(0.0f, 1.0f, (v - 0.5f) / 0.5f);
+            const int idx = juce::jlimit(0, static_cast<int>(straight.size()) - 1,
+                                         static_cast<int>(std::round(t * static_cast<float>(straight.size() - 1))));
+            return straight[static_cast<size_t>(idx)];
+        }
+
+        const float t = juce::jlimit(0.0f, 1.0f, (0.5f - v) / 0.5f);
+        const int idx = juce::jlimit(0, static_cast<int>(dotted.size()) - 1,
+                                     static_cast<int>(std::round(t * static_cast<float>(dotted.size() - 1))));
+        return dotted[static_cast<size_t>(idx)];
+    }
+
+    if (knob.fxName.equalsIgnoreCase("Delay") && (knob.paramName.equalsIgnoreCase("Feedback")
+                                                 || knob.paramName.equalsIgnoreCase("Bleed")
+                                                 || knob.paramName.equalsIgnoreCase("Mix")))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
+
+    if (knob.fxName.equalsIgnoreCase("Density"))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
+
+    if (knob.fxName.equalsIgnoreCase("Brightness"))
+        return juce::String(static_cast<int>(std::round((v - 0.5f) * 200.0f))) + "%";
+
+    return juce::String(v, 2);
+}
+
 std::vector<FxRackPanel::ModuleLayout> FxRackPanel::computeLayouts() const
 {
     std::vector<ModuleLayout> layouts;
@@ -201,7 +289,7 @@ std::vector<FxRackPanel::ModuleLayout> FxRackPanel::computeLayouts() const
 
         if (numKnobs > 0)
         {
-            if (mod.isCore)
+            if (useTwoByTwoLayout(mod))
             {
                 const int cols = 2;
                 const int rows = 2;
@@ -258,12 +346,13 @@ std::vector<FxRackPanel::ModuleLayout> FxRackPanel::computeLayouts() const
     return layouts;
 }
 
-void FxRackPanel::drawKnob(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& label,
-                           float normValue, juce::Colour accent, bool isSelected) const
+void FxRackPanel::drawKnob(juce::Graphics& g, juce::Rectangle<int> area, const KnobView& knob,
+                           juce::Colour accent, bool isSelected) const
 {
-    const float labelH = 12.0f;
+    const float labelH = 11.0f;
+    const float valueH = 10.0f;
     const float centreX = static_cast<float>(area.getCentreX());
-    const float knobBlockH = static_cast<float>(area.getHeight()) - labelH;
+    const float knobBlockH = static_cast<float>(area.getHeight()) - labelH - valueH;
     const float diameter = juce::jmin(static_cast<float>(knobDiameter),
                                       juce::jmin(static_cast<float>(area.getWidth()) - 6.0f, knobBlockH - 4.0f));
     const float radius = diameter * 0.5f;
@@ -293,7 +382,7 @@ void FxRackPanel::drawKnob(juce::Graphics& g, juce::Rectangle<int> area, const j
     g.drawEllipse(knobRect, isSelected ? 1.6f : 1.0f);
 
     // Center-detent mapping: 0 -> -135deg, 0.5 -> 0deg (straight up), 1 -> +135deg.
-    const float clamped = juce::jlimit(0.0f, 1.0f, normValue);
+    const float clamped = juce::jlimit(0.0f, 1.0f, knob.value);
     const float angle = (clamped - 0.5f) * (juce::MathConstants<float>::pi * 1.5f);
     const float innerR = radius - 3.0f - radius * 0.5f;
     const float outerR = radius - 3.0f;
@@ -307,9 +396,16 @@ void FxRackPanel::drawKnob(juce::Graphics& g, juce::Rectangle<int> area, const j
 
     g.setColour(isSelected ? accent : juce::Colour(0xFFA1A1AA));
     g.setFont(juce::Font(8.5f, isSelected ? juce::Font::bold : juce::Font::plain));
-    g.drawText(label, juce::Rectangle<float>(static_cast<float>(area.getX()),
-                                             static_cast<float>(area.getBottom()) - labelH,
+    g.drawText(knob.label, juce::Rectangle<float>(static_cast<float>(area.getX()),
+                                             static_cast<float>(area.getBottom()) - labelH - valueH,
                                              static_cast<float>(area.getWidth()), labelH),
+               juce::Justification::centredTop, false);
+
+    g.setColour(juce::Colour(0xFF71717A));
+    g.setFont(juce::Font(7.8f, juce::Font::plain));
+    g.drawText(formatKnobValue(knob), juce::Rectangle<float>(static_cast<float>(area.getX()),
+                                                             static_cast<float>(area.getBottom()) - valueH,
+                                                             static_cast<float>(area.getWidth()), valueH),
                juce::Justification::centredTop, false);
 }
 
@@ -344,7 +440,7 @@ void FxRackPanel::drawModuleCard(juce::Graphics& g, const ModuleLayout& layout, 
 
     g.setColour(mod.isCore ? juce::Colour(0xFFE4E4E7) : mod.accentColour);
     g.setFont(juce::Font(10.0f, juce::Font::bold));
-    g.drawText(mod.name.toUpperCase(), headerArea.withTrimmedLeft(18).withTrimmedRight(20),
+    g.drawText(getModuleDisplayName(mod).toUpperCase(), headerArea.withTrimmedLeft(18).withTrimmedRight(20),
                juce::Justification::centredLeft, true);
 
     if (mod.isCore)
@@ -363,7 +459,7 @@ void FxRackPanel::drawModuleCard(juce::Graphics& g, const ModuleLayout& layout, 
     for (const auto& hit : layout.knobs)
     {
         const auto& knob = mod.knobs[static_cast<size_t>(hit.knobIndex)];
-        drawKnob(g, hit.bounds, knob.label, knob.value, mod.accentColour, isKnobSelected(knob));
+        drawKnob(g, hit.bounds, knob, mod.accentColour, isKnobSelected(knob));
     }
 }
 
@@ -505,7 +601,7 @@ void FxRackPanel::mouseDrag(const juce::MouseEvent& event)
     if (objId <= 0)
         return;
 
-    const bool followTimeline = processor.getFxParameterFollowTimeline(objId, knob.fxName, knob.paramName, true);
+    const bool followTimeline = processor.getFxParameterFollowTimeline(objId, knob.fxName, knob.paramName, false);
     if (followTimeline)
     {
         processor.addFxAutomationKeyframe(objId, knob.fxName, knob.paramName, processor.getTransportSeconds(), norm);

@@ -27,7 +27,7 @@ public:
     {
         std::string name;
         std::vector<AutomationKeyframe> keyframes;
-        bool followTimeline = true;
+        bool followTimeline = false;
         float staticValue = 0.5f;
     };
 
@@ -165,7 +165,7 @@ public:
     bool getFxParameterFollowTimeline(int objectId,
                                       const std::string& effectName,
                                       const std::string& parameterName,
-                                      bool fallback = true) const;
+                                      bool fallback = false) const;
     void setFxStaticParameterValue(int objectId,
                                    const std::string& effectName,
                                    const std::string& parameterName,

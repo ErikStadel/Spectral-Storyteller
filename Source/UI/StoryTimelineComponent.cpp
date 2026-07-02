@@ -1,6 +1,7 @@
 #include "StoryTimelineComponent.h"
 #include "../PluginProcessor.h"
 #include "ModulationPanel.h"
+#include <array>
 
 namespace
 {
@@ -182,22 +183,48 @@ juce::Rectangle<int> StoryTimelineComponent::getLaneParameterTabArea(int rowTop,
     return juce::Rectangle<int>(8, rowTop + 26, nameColumnWidth - 16, juce::jmax(20, laneHeight - 30));
 }
 
-juce::String StoryTimelineComponent::formatLaneValue(const juce::String& effectName, float normalizedValue) const
+juce::String StoryTimelineComponent::formatLaneValue(const juce::String& effectName,
+                                                    const juce::String& parameterName,
+                                                    float normalizedValue) const
 {
+    const float v = juce::jlimit(0.0f, 1.0f, normalizedValue);
+
+    if (effectName.equalsIgnoreCase("Delay") && parameterName.equalsIgnoreCase("Time"))
+    {
+        static const std::array<juce::String, 5> straight = { "1/1", "1/2", "1/4", "1/8", "1/16" };
+        static const std::array<juce::String, 5> dotted = { "1/1.", "1/2.", "1/4.", "1/8.", "1/16." };
+
+        if (v >= 0.5f)
+        {
+            const float t = juce::jlimit(0.0f, 1.0f, (v - 0.5f) / 0.5f);
+            const int idx = juce::jlimit(0, static_cast<int>(straight.size()) - 1,
+                                         static_cast<int>(std::round(t * static_cast<float>(straight.size() - 1))));
+            return straight[static_cast<size_t>(idx)];
+        }
+
+        const float t = juce::jlimit(0.0f, 1.0f, (0.5f - v) / 0.5f);
+        const int idx = juce::jlimit(0, static_cast<int>(dotted.size()) - 1,
+                                     static_cast<int>(std::round(t * static_cast<float>(dotted.size() - 1))));
+        return dotted[static_cast<size_t>(idx)];
+    }
+
+    if (effectName.equalsIgnoreCase("Compressor") && parameterName.equalsIgnoreCase("Threshold"))
+        return juce::String(juce::jmap(v, -48.0f, -6.0f), 1) + " dB";
+
     if (effectName.equalsIgnoreCase("Pitch"))
     {
-        const float semitones = (normalizedValue - 0.5f) * 4.0f;
+        const float semitones = (v - 0.5f) * 4.0f;
         const float rounded = std::round(semitones * 10.0f) / 10.0f;
         return juce::String(rounded, 1) + " st";
     }
 
     if (effectName.equalsIgnoreCase("Volume"))
     {
-        const float gainPercent = juce::jlimit(0.0f, 1.5f, normalizedValue) * 200.0f;
+        const float gainPercent = v * 200.0f;
         return juce::String(static_cast<int>(std::round(gainPercent))) + "%";
     }
 
-    return juce::String(normalizedValue, 2);
+    return juce::String(v, 2);
 }
 
 float StoryTimelineComponent::applyCurvatureToT(float t, float curvature) const
@@ -419,7 +446,11 @@ void StoryTimelineComponent::beginKeyframeValueEdit(int laneIndex,
     keyframeValueEditor->setColour(juce::CaretComponent::caretColourId, juce::Colour(0xFFE0A96D));
 
     const auto& lane = lanes[static_cast<size_t>(laneIndex)];
-    keyframeValueEditor->setText(formatLaneValue(lane.effectName, currentValue), juce::dontSendNotification);
+    const int parameterIndex = juce::jlimit(0,
+                                            static_cast<int>(lane.parameterNames.size()) - 1,
+                                            lane.selectedParameter);
+    const auto parameterName = lane.parameterNames[static_cast<size_t>(parameterIndex)];
+    keyframeValueEditor->setText(formatLaneValue(lane.effectName, parameterName, currentValue), juce::dontSendNotification);
 
     editLaneIndex = laneIndex;
     editKeyTimeSec = keyTimeSec;
@@ -942,7 +973,12 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
             g.setColour(isHovered ? juce::Colour(0xFFE0A96D) : accent.withAlpha(0.6f));
             g.drawEllipse(p.x - keyRadiusPx, p.y - keyRadiusPx, keyRadiusPx * 2.0f, keyRadiusPx * 2.0f, isHovered ? 2.0f : 1.0f);
 
-            const auto label = formatLaneValue(lane.effectName, k.value);
+            const int selectedParamIndex = juce::jlimit(0,
+                                                        static_cast<int>(lane.parameterNames.size()) - 1,
+                                                        lane.selectedParameter);
+            const auto label = formatLaneValue(lane.effectName,
+                                               lane.parameterNames[static_cast<size_t>(selectedParamIndex)],
+                                               k.value);
             juce::Rectangle<int> labelBounds(static_cast<int>(p.x) + 8, static_cast<int>(p.y) - 8, 54, 16);
             g.setColour(juce::Colour(0xAA0C0A09));
             g.fillRoundedRectangle(labelBounds.toFloat(), 3.0f);

@@ -51,15 +51,40 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
     {
         fx.parameters.push_back({ "Time", {} });
         fx.parameters.push_back({ "Feedback", {} });
+        fx.parameters.push_back({ "Bleed", {} });
+        fx.parameters.push_back({ "Mix", {} });
+        fx.parameters[0].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        fx.parameters[1].keyframes.push_back({ 0.0, 0.35f, 0.0f });
+        fx.parameters[2].keyframes.push_back({ 0.0, 0.30f, 0.0f });
+        fx.parameters[3].keyframes.push_back({ 0.0, 0.30f, 0.0f });
         fx.parameters[0].staticValue = 0.5f;
-        fx.parameters[1].staticValue = 0.5f;
+        fx.parameters[1].staticValue = 0.35f;
+        fx.parameters[2].staticValue = 0.30f;
+        fx.parameters[3].staticValue = 0.30f;
     }
     else if (fx.name == "Filter")
     {
-        fx.parameters.push_back({ "Cutoff", {} });
-        fx.parameters.push_back({ "Resonance", {} });
-        fx.parameters[0].staticValue = 0.5f;
-        fx.parameters[1].staticValue = 0.5f;
+        fx.parameters.push_back({ "Low Cut", {} });
+        fx.parameters.push_back({ "High Cut", {} });
+        fx.parameters[0].keyframes.push_back({ 0.0, 0.0f, 0.0f });
+        fx.parameters[1].keyframes.push_back({ 0.0, 1.0f, 0.0f });
+        fx.parameters[0].staticValue = 0.0f;
+        fx.parameters[1].staticValue = 1.0f;
+    }
+    else if (fx.name == "Compressor")
+    {
+        fx.parameters.push_back({ "Threshold", {} });
+        fx.parameters.push_back({ "Forge", {} });
+        fx.parameters.push_back({ "Response", {} });
+        fx.parameters.push_back({ "Mix", {} });
+        fx.parameters[0].keyframes.push_back({ 0.0, 0.70f, 0.0f });
+        fx.parameters[1].keyframes.push_back({ 0.0, 0.25f, 0.0f });
+        fx.parameters[2].keyframes.push_back({ 0.0, 0.35f, 0.0f });
+        fx.parameters[3].keyframes.push_back({ 0.0, 0.75f, 0.0f });
+        fx.parameters[0].staticValue = 0.70f;
+        fx.parameters[1].staticValue = 0.25f;
+        fx.parameters[2].staticValue = 0.35f;
+        fx.parameters[3].staticValue = 0.75f;
     }
     else if (fx.name == "Transform")
     {
@@ -229,6 +254,8 @@ bool ObjectDatabase::addObject(const std::string& name)
     newObject.name = name.empty() ? ("Object_" + std::to_string(objects.size())) : name;
     newObject.mask.fill(false);
     ensureBaseFx(newObject);
+    for (auto& fx : newObject.fxChain)
+        fx.enabled = false;
 
     objects.push_back(newObject);
     if (selectedObjectId < 0)
@@ -581,10 +608,7 @@ bool ObjectDatabase::setObjectFxEnabled(int objectId, const std::string& effectN
             return false;
 
         auto& fx = object.fxChain[static_cast<size_t>(fxIndex)];
-        if (juce::String(fx.name).equalsIgnoreCase("Volume") || juce::String(fx.name).equalsIgnoreCase("Pitch"))
-            fx.enabled = true;
-        else
-            fx.enabled = enabled;
+        fx.enabled = enabled;
 
         ++revision;
         return true;
@@ -894,11 +918,28 @@ void ObjectDatabase::setFxStaticParameterValue(int objectId,
             return;
 
         auto& parameter = fx.parameters[static_cast<size_t>(paramIndex)];
-        if (std::abs(parameter.staticValue - value) < 1.0e-6f)
-            return;
+        bool changed = false;
 
-        parameter.staticValue = value;
-        ++revision;
+        if (std::abs(parameter.staticValue - value) >= 1.0e-6f)
+        {
+            parameter.staticValue = value;
+            changed = true;
+        }
+
+        if (parameter.keyframes.empty())
+        {
+            parameter.keyframes.push_back({ 0.0, value, 0.0f });
+            changed = true;
+        }
+        else if (std::abs(parameter.keyframes.front().value - value) >= 1.0e-6f)
+        {
+            // Keep the default/first keyframe aligned with static edits for clear timeline feedback.
+            parameter.keyframes.front().value = value;
+            changed = true;
+        }
+
+        if (changed)
+            ++revision;
         return;
     }
 }
@@ -1113,12 +1154,77 @@ uint64_t ObjectDatabase::getRevision() const
 bool ObjectDatabase::isAnyMaskingActive() const
 {
     juce::ScopedLock lock_(lock);
+
+    const auto readParamValue = [](const FXParameter& parameter, float fallback)
+    {
+        if (!parameter.keyframes.empty())
+            return parameter.keyframes.front().value;
+        return parameter.staticValue;
+    };
+
+    const auto isBaseNeutral = [&](const FXModule& fx)
+    {
+        const juce::String fxName(fx.name);
+        if (fxName.equalsIgnoreCase("Density"))
+        {
+            const int p = findParameterIndexByName(fx, "Density");
+            if (p >= 0)
+                return std::abs(readParamValue(fx.parameters[static_cast<size_t>(p)], 1.0f) - 1.0f) < 1.0e-3f;
+            return true;
+        }
+
+        if (fxName.equalsIgnoreCase("Brightness"))
+        {
+            const int p = findParameterIndexByName(fx, "Brightness");
+            if (p >= 0)
+                return std::abs(readParamValue(fx.parameters[static_cast<size_t>(p)], 0.5f) - 0.5f) < 1.0e-3f;
+            return true;
+        }
+
+        if (fxName.equalsIgnoreCase("Volume"))
+        {
+            const int p = findParameterIndexByName(fx, "Gain");
+            if (p >= 0)
+                return std::abs(readParamValue(fx.parameters[static_cast<size_t>(p)], 0.5f) - 0.5f) < 1.0e-3f;
+            return true;
+        }
+
+        if (fxName.equalsIgnoreCase("Pitch"))
+        {
+            const int p = findParameterIndexByName(fx, "Semitones");
+            if (p >= 0)
+                return std::abs(readParamValue(fx.parameters[static_cast<size_t>(p)], 0.5f) - 0.5f) < 1.0e-3f;
+            return true;
+        }
+
+        return false;
+    };
+
     for (const auto& obj : objects)
     {
-        if (obj.engaged)
-            return true;
         if (obj.solo || obj.mute)
             return true;
+
+        if (!obj.engaged)
+            continue;
+
+        for (const auto& fx : obj.fxChain)
+        {
+            if (!fx.enabled)
+                continue;
+
+            // Base FX are always on, but in their neutral state they should not force STFT routing.
+            if (!isBaseNeutral(fx))
+                return true;
+
+            const juce::String fxName(fx.name);
+            const bool isBase = fxName.equalsIgnoreCase("Density")
+                             || fxName.equalsIgnoreCase("Brightness")
+                             || fxName.equalsIgnoreCase("Volume")
+                             || fxName.equalsIgnoreCase("Pitch");
+            if (!isBase)
+                return true;
+        }
     }
 
     return false;
@@ -1302,7 +1408,7 @@ void ObjectDatabase::fromValueTree(const juce::ValueTree& tree)
 
                     FXParameter parameter;
                     parameter.name = paramNode.getProperty("name", "Amount").toString().toStdString();
-                    parameter.followTimeline = static_cast<bool>(paramNode.getProperty("followTimeline", true));
+                    parameter.followTimeline = static_cast<bool>(paramNode.getProperty("followTimeline", false));
                     const bool hasStaticValue = paramNode.hasProperty("staticValue");
                     parameter.staticValue = static_cast<float>(paramNode.getProperty("staticValue", 0.5f));
 
