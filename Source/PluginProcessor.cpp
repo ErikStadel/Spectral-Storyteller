@@ -232,6 +232,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     compressorFxByObject.clear();
     compressorStateByObject.clear();
     compressorParamsByObject.clear();
+    heatGlowFxByObject.clear();
     delayFxByObject.clear();
     echoBleedStateByChannel[0].clear();
     echoBleedStateByChannel[1].clear();
@@ -292,6 +293,7 @@ void PluginProcessor::updateTargetBinGains()
     filterFxByObject.clear();
     compressorFxByObject.clear();
     compressorParamsByObject.clear();
+    heatGlowFxByObject.clear();
     delayFxByObject.clear();
     spaceBlurFxByObject.clear();
 
@@ -497,6 +499,21 @@ void PluginProcessor::updateTargetBinGains()
                                                                                     hopSize);
             }
 
+            if (isFxEnabled("Saturation"))
+            {
+                const float driveNorm = getModulatedNorm(item.id, "Saturation", "Drive", 0.0f);
+                const float glowNorm = getModulatedNorm(item.id, "Saturation", "Glow", 0.5f);
+                const float heatNorm = getModulatedNorm(item.id, "Saturation", "Heat", 0.0f);
+                const float mixNorm = getModulatedNorm(item.id, "Saturation", "Mix", 0.5f);
+
+                heat_glow::Settings heatSettings;
+                heatSettings.drive = juce::jlimit(0.0f, 1.0f, driveNorm);
+                heatSettings.glow = juce::jlimit(0.0f, 1.0f, glowNorm);
+                heatSettings.heat = juce::jlimit(0.0f, 1.0f, heatNorm);
+                heatSettings.mix = juce::jlimit(0.0f, 1.0f, mixNorm);
+                heatGlowFxByObject[item.id] = heatSettings;
+            }
+
             if (isFxEnabled("Delay"))
             {
                 const float delayTimeNorm = getModulatedNorm(item.id, "Delay", "Time", 0.5f);
@@ -584,6 +601,7 @@ void PluginProcessor::updateTargetBinGains()
         compressorFxByObject.clear();
         compressorStateByObject.clear();
         compressorParamsByObject.clear();
+        heatGlowFxByObject.clear();
         delayFxByObject.clear();
         spaceBlurFxByObject.clear();
         transientMuteCompressorGain = 1.0f;
@@ -997,6 +1015,21 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
             const float lowProtect = juce::jlimit(0.0f, 1.0f, (180.0f - freqHz) / 140.0f);
             outRe = juce::jmap(lowProtect, processedRe, preCompRe);
             outIm = juce::jmap(lowProtect, processedIm, preCompIm);
+        }
+
+        const auto heatIt = heatGlowFxByObject.find(objectId);
+        if (heatIt != heatGlowFxByObject.end())
+        {
+            float heatRe = 0.0f;
+            float heatIm = 0.0f;
+            heat_glow::processBin(bin,
+                                  heatIt->second,
+                                  outRe,
+                                  outIm,
+                                  heatRe,
+                                  heatIm);
+            outRe = heatRe;
+            outIm = heatIm;
         }
 
         fftData[reIdx] = outRe;

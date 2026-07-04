@@ -118,6 +118,8 @@ target_sources(SpectralStoryteller PRIVATE
     Source/DSP/EchoBleed.h
     Source/DSP/SpaceBlur.cpp
     Source/DSP/SpaceBlur.h
+    Source/DSP/HeatGlow.cpp
+    Source/DSP/HeatGlow.h
     Source/UI/SpectralView.cpp
     Source/UI/SpectralView.h
     Source/UI/SpectralSelector.cpp

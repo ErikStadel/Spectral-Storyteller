@@ -372,6 +372,8 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\EchoBleed.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\SpaceBlur.cpp" />
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\SpaceBlur.h" />
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\HeatGlow.cpp" />
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\HeatGlow.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.cpp" />
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralSelector.cpp" />

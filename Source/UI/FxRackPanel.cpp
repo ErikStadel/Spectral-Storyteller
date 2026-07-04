@@ -184,6 +184,7 @@ bool FxRackPanel::useTwoByTwoLayout(const ModuleView& mod) const
 
     return mod.name.equalsIgnoreCase("Compressor")
         || mod.name.equalsIgnoreCase("Delay")
+        || mod.name.equalsIgnoreCase("Saturation")
         || mod.name.equalsIgnoreCase("SpaceBlur")
         || mod.name.equalsIgnoreCase("Spaceblur");
 }
@@ -198,9 +199,86 @@ juce::String FxRackPanel::getModuleDisplayName(const ModuleView& mod) const
         return "Mass Forge";
     if (mod.name.equalsIgnoreCase("Delay"))
         return "Echo Bleed";
+    if (mod.name.equalsIgnoreCase("Saturation"))
+        return "Heat Glow";
     if (mod.name.equalsIgnoreCase("SpaceBlur") || mod.name.equalsIgnoreCase("Spaceblur"))
         return "Space Blur";
     return mod.name;
+}
+
+bool FxRackPanel::isToggleParameter(const KnobView& knob) const
+{
+    return knob.fxName.equalsIgnoreCase("Saturation") && knob.paramName.equalsIgnoreCase("Heat");
+}
+
+void FxRackPanel::drawToggleButton(juce::Graphics& g,
+                                   juce::Rectangle<int> area,
+                                   const KnobView& knob,
+                                   juce::Colour accent,
+                                   bool isSelected) const
+{
+    const float labelH = 11.0f;
+    const float valueH = 10.0f;
+    const float centreX = static_cast<float>(area.getCentreX());
+    const float contentH = static_cast<float>(area.getHeight()) - labelH - valueH;
+    const float side = juce::jmin(34.0f, juce::jmin(static_cast<float>(area.getWidth()) - 6.0f, contentH - 6.0f));
+    const float x = centreX - side * 0.5f;
+    const float y = static_cast<float>(area.getY()) + (contentH - side) * 0.5f;
+    const bool isOn = knob.value >= 0.5f;
+
+    const juce::Rectangle<float> shadowRect(x - 3.0f, y - 3.0f, side + 6.0f, side + 6.0f);
+    g.setColour(juce::Colour(0xFF09090B));
+    g.fillRoundedRectangle(shadowRect, 9.0f);
+
+    const juce::Rectangle<float> buttonRect(x, y, side, side);
+    const juce::Colour edge = isOn ? accent.withAlpha(0.85f) : juce::Colour(0xFF52525B);
+    const juce::Colour inner = isOn ? accent.withAlpha(0.26f) : juce::Colour(0xFF27272A);
+    const juce::Colour innerDark = isOn ? accent.darker(0.65f).withAlpha(0.92f) : juce::Colour(0xFF18181B);
+    juce::ColourGradient grad(inner.brighter(0.18f), buttonRect.getCentreX(), buttonRect.getCentreY(),
+                              innerDark, buttonRect.getRight(), buttonRect.getBottom(), true);
+    g.setGradientFill(grad);
+    g.fillRoundedRectangle(buttonRect, 8.0f);
+
+    if (isOn)
+    {
+        g.setColour(accent.withAlpha(0.18f));
+        g.fillEllipse(buttonRect.expanded(-4.0f));
+        g.setColour(accent.withAlpha(0.28f));
+        g.fillEllipse(buttonRect.expanded(-8.0f));
+    }
+
+    if (isSelected)
+    {
+        g.setColour(accent.withAlpha(0.35f));
+        g.drawRoundedRectangle(buttonRect.expanded(2.0f), 9.0f, 2.2f);
+        g.setColour(accent.withAlpha(0.80f));
+        g.drawRoundedRectangle(buttonRect.expanded(0.8f), 8.0f, 1.6f);
+    }
+    else
+    {
+        g.setColour(edge.withAlpha(0.90f));
+        g.drawRoundedRectangle(buttonRect, 8.0f, 1.2f);
+    }
+
+    g.setColour(isOn ? accent.brighter(0.30f) : juce::Colour(0xFFB4B4B8));
+    g.setFont(juce::Font(8.5f, isSelected ? juce::Font::bold : juce::Font::plain));
+    g.drawText(knob.label,
+               juce::Rectangle<float>(static_cast<float>(area.getX()),
+                                      static_cast<float>(area.getBottom()) - labelH - valueH,
+                                      static_cast<float>(area.getWidth()),
+                                      labelH),
+               juce::Justification::centredTop,
+               false);
+
+    g.setColour(isOn ? accent : juce::Colour(0xFF71717A));
+    g.setFont(juce::Font(7.8f, juce::Font::plain));
+    g.drawText(isOn ? "On" : "Off",
+               juce::Rectangle<float>(static_cast<float>(area.getX()),
+                                      static_cast<float>(area.getBottom()) - valueH,
+                                      static_cast<float>(area.getWidth()),
+                                      valueH),
+               juce::Justification::centredTop,
+               false);
 }
 
 juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
@@ -255,6 +333,15 @@ juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
     if (knob.fxName.equalsIgnoreCase("Delay") && (knob.paramName.equalsIgnoreCase("Feedback")
                                                  || knob.paramName.equalsIgnoreCase("Bleed")
                                                  || knob.paramName.equalsIgnoreCase("Mix")))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
+
+    if (knob.fxName.equalsIgnoreCase("Saturation") && knob.paramName.equalsIgnoreCase("Heat"))
+        return v >= 0.5f ? "On" : "Off";
+
+    if (knob.fxName.equalsIgnoreCase("Saturation")
+        && (knob.paramName.equalsIgnoreCase("Drive")
+         || knob.paramName.equalsIgnoreCase("Glow")
+         || knob.paramName.equalsIgnoreCase("Mix")))
         return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 
     if ((knob.fxName.equalsIgnoreCase("SpaceBlur") || knob.fxName.equalsIgnoreCase("Spaceblur"))
@@ -369,6 +456,12 @@ void FxRackPanel::drawKnob(juce::Graphics& g, juce::Rectangle<int> area, const K
                                       juce::jmin(static_cast<float>(area.getWidth()) - 6.0f, knobBlockH - 4.0f));
     const float radius = diameter * 0.5f;
     const float centreY = static_cast<float>(area.getY()) + knobBlockH * 0.5f;
+
+    if (isToggleParameter(knob))
+    {
+        drawToggleButton(g, area, knob, accent, isSelected);
+        return;
+    }
 
     const juce::Rectangle<float> slotRect(centreX - radius - 2.0f, centreY - radius - 2.0f,
                                           diameter + 4.0f, diameter + 4.0f);
@@ -568,6 +661,18 @@ void FxRackPanel::mouseDown(const juce::MouseEvent& event)
 
             processor.setActiveFxSelection(knob.fxName, knob.paramName);
             processor.setObjectFxSelectedParameter(objId, knob.fxName, knob.paramIndexInFx);
+
+            if (isToggleParameter(knob))
+            {
+                const float toggledValue = knob.value >= 0.5f ? 0.0f : 1.0f;
+                if (processor.getFxParameterFollowTimeline(objId, knob.fxName, knob.paramName, false))
+                    processor.addFxAutomationKeyframe(objId, knob.fxName, knob.paramName, processor.getTransportSeconds(), toggledValue);
+                else
+                    processor.setFxStaticParameterValue(objId, knob.fxName, knob.paramName, toggledValue);
+
+                rebuildModules();
+                return;
+            }
 
             activeModuleIndex = layout.moduleIndex;
             activeKnobIndex = hit.knobIndex;

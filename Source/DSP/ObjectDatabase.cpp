@@ -112,6 +112,21 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
         fx.parameters[2].staticValue = 0.50f;
         fx.parameters[3].staticValue = 0.30f;
     }
+    else if (fx.name == "Saturation")
+    {
+        fx.parameters.push_back({ "Drive", {} });
+        fx.parameters.push_back({ "Glow", {} });
+        fx.parameters.push_back({ "Heat", {} });
+        fx.parameters.push_back({ "Mix", {} });
+        fx.parameters[0].keyframes.push_back({ 0.0, 0.0f, 0.0f });
+        fx.parameters[1].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        fx.parameters[2].keyframes.push_back({ 0.0, 0.0f, 0.0f });
+        fx.parameters[3].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        fx.parameters[0].staticValue = 0.0f;
+        fx.parameters[1].staticValue = 0.5f;
+        fx.parameters[2].staticValue = 0.0f;
+        fx.parameters[3].staticValue = 0.5f;
+    }
     else if (fx.name == "Density")
     {
         fx.parameters.push_back({ "Density", {} });
@@ -221,6 +236,13 @@ std::string ObjectDatabase::normaliseEffectName(const std::string& effectName)
 {
     if (effectName.empty())
         return "Effect";
+
+    std::string lower = effectName;
+    for (char& ch : lower)
+        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+
+    if (lower == "heat glow" || lower == "heatglow" || lower == "heat_glow" || lower == "saturation")
+        return "Saturation";
 
     std::string name = effectName;
     name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));

@@ -31,6 +31,9 @@
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\SpaceBlur.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\HeatGlow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -124,6 +127,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\SpaceBlur.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\HeatGlow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.h">

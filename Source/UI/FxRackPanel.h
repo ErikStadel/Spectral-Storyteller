@@ -76,12 +76,15 @@ private:
 
     std::vector<ModuleLayout> computeLayouts() const;
     bool isKnobSelected(const KnobView& knob) const;
+    bool isToggleParameter(const KnobView& knob) const;
     bool useTwoByTwoLayout(const ModuleView& mod) const;
     juce::String getModuleDisplayName(const ModuleView& mod) const;
     juce::String formatKnobValue(const KnobView& knob) const;
 
     void drawKnob(juce::Graphics& g, juce::Rectangle<int> area, const KnobView& knob,
                   juce::Colour accent, bool isSelected) const;
+    void drawToggleButton(juce::Graphics& g, juce::Rectangle<int> area, const KnobView& knob,
+                          juce::Colour accent, bool isSelected) const;
     void drawModuleCard(juce::Graphics& g, const ModuleLayout& layout, const ModuleView& mod) const;
     void drawAddFxButton(juce::Graphics& g, juce::Rectangle<int> area) const;
     juce::Colour colourForFxName(const juce::String& fxName) const;

@@ -55,6 +55,18 @@ float parseManualKeyframeValue(const juce::String& effectName,
         return juce::jlimit(0.0f, 1.0f, percent / 200.0f);
     }
 
+    if (effectName.equalsIgnoreCase("Saturation") && text.equalsIgnoreCase("on"))
+        return 1.0f;
+
+    if (effectName.equalsIgnoreCase("Saturation") && text.equalsIgnoreCase("off"))
+        return 0.0f;
+
+    if (effectName.equalsIgnoreCase("Saturation") && text.equalsIgnoreCase("true"))
+        return 1.0f;
+
+    if (effectName.equalsIgnoreCase("Saturation") && text.equalsIgnoreCase("false"))
+        return 0.0f;
+
     const float raw = static_cast<float>(text.getDoubleValue());
     if (effectName.equalsIgnoreCase("Pitch") && std::abs(raw) > 1.0f)
         return juce::jlimit(0.0f, 1.0f, 0.5f + raw / 4.0f);
@@ -223,6 +235,15 @@ juce::String StoryTimelineComponent::formatLaneValue(const juce::String& effectN
         const float gainPercent = v * 200.0f;
         return juce::String(static_cast<int>(std::round(gainPercent))) + "%";
     }
+
+    if (effectName.equalsIgnoreCase("Saturation") && parameterName.equalsIgnoreCase("Heat"))
+        return v >= 0.5f ? "On" : "Off";
+
+    if (effectName.equalsIgnoreCase("Saturation")
+        && (parameterName.equalsIgnoreCase("Drive")
+         || parameterName.equalsIgnoreCase("Glow")
+         || parameterName.equalsIgnoreCase("Mix")))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 
     return juce::String(v, 2);
 }
