@@ -441,20 +441,16 @@ void PluginProcessor::updateTargetBinGains()
                                                     (lowBin >= 0 && highBin >= lowBin)
                                                         ? 0.5f * static_cast<float>(lowBin + highBin)
                                                         : 1.0f);
-            spectralSettings.tiltExp = brightness * 2.0f;
+            // Gentle tilt: 0.5× strength keeps the effect musical (≈ ±3 dB/octave at max)
+            // without creating extreme spectral distortion that feeds into the reverb.
+            // tiltExp = 0 at brightness=0.5 (neutral), ±0.5 at the knob extremes.
+            spectralSettings.tiltExp = brightness * 0.5f;
 
-            float maxTiltBoost = 1.0f;
-            if (lowBin >= 0 && highBin >= lowBin && std::abs(spectralSettings.brightness) > 1.0e-6f)
-            {
-                const float lowRatio = juce::jmax(1.0e-3f, static_cast<float>(lowBin) / spectralSettings.centerBin);
-                const float highRatio = juce::jmax(1.0e-3f, static_cast<float>(highBin) / spectralSettings.centerBin);
-                const float lowTilt = std::pow(lowRatio, spectralSettings.tiltExp);
-                const float highTilt = std::pow(highRatio, spectralSettings.tiltExp);
-                maxTiltBoost = juce::jmax(1.0f, juce::jmax(lowTilt, highTilt));
-            }
-
-            // Keep brightness as a redistribution rather than broad gain boost.
-            spectralSettings.brightnessCompensation = 0.92f / maxTiltBoost;
+            // Fixed compensation anchors the centre bin at ≈ 0.9 (−0.9 dB) so that
+            // everything around the centre of the object stays at a natural level.
+            // This prevents the old over-normalisation that drove the centre bin to
+            // −18 dB and starved the reverb of mid-frequency energy.
+            spectralSettings.brightnessCompensation = 0.90f;
             spectralFxByObject[item.id] = spectralSettings;
 
             if (isFxEnabled("Filter"))
