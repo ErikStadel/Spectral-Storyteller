@@ -75,6 +75,21 @@ inline float readSpectralFrac(const std::vector<float>& buffer,
 
     return sum / weightSum;
 }
+
+inline float hashToUnit(int a, int b, int c, int d)
+{
+    uint32_t x = 0x9E3779B9u;
+    x ^= static_cast<uint32_t>(a) + 0x85EBCA6Bu + (x << 6) + (x >> 2);
+    x ^= static_cast<uint32_t>(b) + 0xC2B2AE35u + (x << 6) + (x >> 2);
+    x ^= static_cast<uint32_t>(c) + 0x27D4EB2Fu + (x << 6) + (x >> 2);
+    x ^= static_cast<uint32_t>(d) + 0x165667B1u + (x << 6) + (x >> 2);
+    x ^= x >> 15;
+    x *= 0x85EBCA6Bu;
+    x ^= x >> 13;
+    x *= 0xC2B2AE35u;
+    x ^= x >> 16;
+    return static_cast<float>(x & 0x00FFFFFFu) / static_cast<float>(0x01000000u);
+}
 }
 
 void ensureState(State& state)
@@ -152,10 +167,10 @@ void processBin(State& state,
                                 ? static_cast<float>(bin) / static_cast<float>(ObjectDatabase::NUM_BINS - 1)
                                 : 0.0f;
     const float highDamping = juce::jlimit(0.42f, 1.0f, 1.0f - blur * 0.42f * std::sqrt(binPosition));
-    const int spectralRadius = blur < 0.04f ? 0 : juce::jlimit(1, 12, 1 + static_cast<int>(std::round(blur * blur * 11.0f)));
+    const int spectralRadius = blur < 0.04f ? 0 : juce::jlimit(1, 16, 1 + static_cast<int>(std::round(blur * blur * 15.0f)));
     const float earlyComb = (1.0f - size) * (1.0f - 0.80f * blur);
     const float tankInputGain = 0.70f + 0.55f * blur + 0.25f * size;
-    const float diffusionLowpass = juce::jlimit(0.04f, 0.75f, 0.45f - 0.31f * blur + 0.10f * (1.0f - size));
+    const float diffusionLowpass = juce::jlimit(0.04f, 0.78f, 0.45f - 0.28f * blur + 0.10f * (1.0f - size));
 
     auto processCoeff = [&](float x, int coeff)
     {
@@ -206,6 +221,23 @@ void processBin(State& state,
 
     outRe = processCoeff(inRe, 2 * bin);
     outIm = processCoeff(inIm, 2 * bin + 1);
+
+    if (blur > 0.001f)
+    {
+        const float jitterSeed = hashToUnit(channel,
+                                            bin,
+                                            state.tankWritePosL,
+                                            state.tankWritePosR);
+        const float signedJitter = (jitterSeed * 2.0f - 1.0f)
+                                 * blur * blur
+                                 * juce::jlimit(0.06f, 1.20f, 0.12f + 0.88f * std::sqrt(juce::jlimit(0.0f, 1.0f, binPosition)));
+        const float c = std::cos(signedJitter);
+        const float s = std::sin(signedJitter);
+        const float rotatedRe = outRe * c - outIm * s;
+        const float rotatedIm = outRe * s + outIm * c;
+        outRe = rotatedRe;
+        outIm = rotatedIm;
+    }
 }
 
 void endFrame(State& state)
