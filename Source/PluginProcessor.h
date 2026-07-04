@@ -7,6 +7,10 @@
 #include "DSP/ObjectDatabase.h"
 #include "DSP/TimelineData.h"
 #include "DSP/ModulationMatrix.h"
+#include "DSP/ShadeContour.h"
+#include "DSP/MassForge.h"
+#include "DSP/EchoBleed.h"
+#include "DSP/SpaceBlur.h"
 #include <memory>
 #include <deque>
 #include <unordered_map>
@@ -14,7 +18,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 8;
-constexpr int VERSION_BUILD = 6;
+constexpr int VERSION_BUILD = 13;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -285,47 +289,18 @@ private:
         float brightnessCompensation = 1.0f;
     };
 
-    struct FilterSettings
-    {
-        float lowCutHz = 20.0f;
-        float highCutHz = 20000.0f;
-    };
-
-    struct AdaptiveCompressorSettings
-    {
-        float thresholdDb = -18.0f;
-        float forge = 0.0f;
-        float response = 0.5f;
-        float mix = 0.0f;
-    };
-
-    struct AdaptiveCompressorState
-    {
-        float smoothedGain = 1.0f;
-    };
-
-    struct EchoBleedSettings
-    {
-        float timeSeconds = 0.18f;
-        float feedback = 0.30f;
-        float bleed = 0.30f;
-        float mix = 0.30f;
-    };
-
-    struct EchoBleedState
-    {
-        std::vector<std::array<float, ObjectDatabase::NUM_BINS * 2>> historyFrames;
-        int writeIndex = 0;
-    };
-
     std::unordered_map<int, TransformSettings> transformSettingsByObject;
     std::unordered_map<int, SpectralFxSettings> spectralFxByObject;
-    std::unordered_map<int, FilterSettings> filterFxByObject;
-    std::unordered_map<int, AdaptiveCompressorSettings> compressorFxByObject;
-    std::unordered_map<int, AdaptiveCompressorState> compressorStateByObject;
-    std::unordered_map<int, float> compressorGainByObject;
-    std::unordered_map<int, EchoBleedSettings> delayFxByObject;
-    std::array<std::unordered_map<int, EchoBleedState>, 2> echoBleedStateByChannel;
+    std::unordered_map<int, shade_contour::Settings> filterFxByObject;
+    std::unordered_map<int, mass_forge::Settings> compressorFxByObject;
+    std::unordered_map<int, mass_forge::State> compressorStateByObject;
+    std::unordered_map<int, mass_forge::FrameParams> compressorParamsByObject;
+    std::unordered_map<int, echo_bleed::Settings> delayFxByObject;
+    std::array<std::unordered_map<int, echo_bleed::State>, 2> echoBleedStateByChannel;
+    std::array<std::array<int, ObjectDatabase::NUM_BINS>, 2> delayTailOwnerByChannel{};
+    std::unordered_map<int, space_blur::Settings> spaceBlurFxByObject;
+    std::array<std::unordered_map<int, space_blur::State>, 2> spaceBlurStateByChannel;
+    std::array<std::array<int, ObjectDatabase::NUM_BINS>, 2> spaceBlurTailOwnerByChannel{};
     std::array<std::unordered_map<int, TransformSmoothState>, 2> transformSmoothStates;
     mutable juce::CriticalSection transformFileLock;
     std::unordered_map<int, TransformFileData> transformFileBuffer;
@@ -337,6 +312,7 @@ private:
     void applyPhaseVocoderPitchShift(int channel);
     void applyTransformCrossSynthesis(int channel);
     void applyEchoBleedDelay(int channel);
+    void applySpaceBlur(int channel);
     void updateTargetBinGains();
     void analyseSegmentationFrame(const float* fftInterleaved, int64_t currentSampleIndex);
     void applyCosineMaskSmoothing(const std::array<float, SpectralFrameBuffer::NUM_BINS>& input,

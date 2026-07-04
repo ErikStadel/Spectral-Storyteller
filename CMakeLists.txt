@@ -110,6 +110,14 @@ target_sources(SpectralStoryteller PRIVATE
     Source/DSP/ModulationMatrix.h
     Source/DSP/TimelineData.cpp
     Source/DSP/TimelineData.h
+    Source/DSP/ShadeContour.cpp
+    Source/DSP/ShadeContour.h
+    Source/DSP/MassForge.cpp
+    Source/DSP/MassForge.h
+    Source/DSP/EchoBleed.cpp
+    Source/DSP/EchoBleed.h
+    Source/DSP/SpaceBlur.cpp
+    Source/DSP/SpaceBlur.h
     Source/UI/SpectralView.cpp
     Source/UI/SpectralView.h
     Source/UI/SpectralSelector.cpp

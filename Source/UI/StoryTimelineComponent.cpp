@@ -209,7 +209,7 @@ juce::String StoryTimelineComponent::formatLaneValue(const juce::String& effectN
     }
 
     if (effectName.equalsIgnoreCase("Compressor") && parameterName.equalsIgnoreCase("Threshold"))
-        return juce::String(juce::jmap(v, -48.0f, -6.0f), 1) + " dB";
+        return juce::String(juce::jmap(v, -48.0f, 0.0f), 1) + " dB";
 
     if (effectName.equalsIgnoreCase("Pitch"))
     {

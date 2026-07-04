@@ -77,11 +77,11 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
         fx.parameters.push_back({ "Forge", {} });
         fx.parameters.push_back({ "Response", {} });
         fx.parameters.push_back({ "Mix", {} });
-        fx.parameters[0].keyframes.push_back({ 0.0, 0.70f, 0.0f });
+        fx.parameters[0].keyframes.push_back({ 0.0, 0.875f, 0.0f });
         fx.parameters[1].keyframes.push_back({ 0.0, 0.25f, 0.0f });
         fx.parameters[2].keyframes.push_back({ 0.0, 0.35f, 0.0f });
         fx.parameters[3].keyframes.push_back({ 0.0, 0.75f, 0.0f });
-        fx.parameters[0].staticValue = 0.70f;
+        fx.parameters[0].staticValue = 0.875f;
         fx.parameters[1].staticValue = 0.25f;
         fx.parameters[2].staticValue = 0.35f;
         fx.parameters[3].staticValue = 0.75f;
@@ -96,6 +96,21 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
         fx.parameters[0].staticValue = 1.0f;
         fx.parameters[1].staticValue = 0.0f;
         fx.sourceObjectId = -1;
+    }
+    else if (fx.name == "Spaceblur")
+    {
+        fx.parameters.push_back({ "Size", {} });
+        fx.parameters.push_back({ "Decay", {} });
+        fx.parameters.push_back({ "Blur", {} });
+        fx.parameters.push_back({ "Mix", {} });
+        fx.parameters[0].keyframes.push_back({ 0.0, 0.50f, 0.0f });
+        fx.parameters[1].keyframes.push_back({ 0.0, 0.55f, 0.0f });
+        fx.parameters[2].keyframes.push_back({ 0.0, 0.50f, 0.0f });
+        fx.parameters[3].keyframes.push_back({ 0.0, 0.30f, 0.0f });
+        fx.parameters[0].staticValue = 0.50f;
+        fx.parameters[1].staticValue = 0.55f;
+        fx.parameters[2].staticValue = 0.50f;
+        fx.parameters[3].staticValue = 0.30f;
     }
     else if (fx.name == "Density")
     {

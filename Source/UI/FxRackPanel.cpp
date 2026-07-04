@@ -182,7 +182,10 @@ bool FxRackPanel::useTwoByTwoLayout(const ModuleView& mod) const
     if (mod.knobs.size() != 4)
         return false;
 
-    return mod.name.equalsIgnoreCase("Compressor") || mod.name.equalsIgnoreCase("Delay");
+    return mod.name.equalsIgnoreCase("Compressor")
+        || mod.name.equalsIgnoreCase("Delay")
+        || mod.name.equalsIgnoreCase("SpaceBlur")
+        || mod.name.equalsIgnoreCase("Spaceblur");
 }
 
 juce::String FxRackPanel::getModuleDisplayName(const ModuleView& mod) const
@@ -195,6 +198,8 @@ juce::String FxRackPanel::getModuleDisplayName(const ModuleView& mod) const
         return "Mass Forge";
     if (mod.name.equalsIgnoreCase("Delay"))
         return "Echo Bleed";
+    if (mod.name.equalsIgnoreCase("SpaceBlur") || mod.name.equalsIgnoreCase("Spaceblur"))
+        return "Space Blur";
     return mod.name;
 }
 
@@ -209,10 +214,10 @@ juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
         return juce::String(static_cast<int>(std::round(v * 200.0f))) + "%";
 
     if (knob.fxName.equalsIgnoreCase("Compressor") && knob.paramName.equalsIgnoreCase("Threshold"))
-        return juce::String(juce::jmap(v, -48.0f, -6.0f), 1) + " dB";
+        return juce::String(juce::jmap(v, -48.0f, 0.0f), 1) + " dB";
 
     if (knob.fxName.equalsIgnoreCase("Compressor") && knob.paramName.equalsIgnoreCase("Forge"))
-        return juce::String(juce::jmap(v, 1.0f, 12.0f), 1) + ":1";
+        return juce::String(1.0f + 49.0f * v * v, 1) + ":1";
 
     if (knob.fxName.equalsIgnoreCase("Compressor") && knob.paramName.equalsIgnoreCase("Mix"))
         return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
@@ -250,6 +255,13 @@ juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
     if (knob.fxName.equalsIgnoreCase("Delay") && (knob.paramName.equalsIgnoreCase("Feedback")
                                                  || knob.paramName.equalsIgnoreCase("Bleed")
                                                  || knob.paramName.equalsIgnoreCase("Mix")))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
+
+    if ((knob.fxName.equalsIgnoreCase("SpaceBlur") || knob.fxName.equalsIgnoreCase("Spaceblur"))
+        && (knob.paramName.equalsIgnoreCase("Size")
+         || knob.paramName.equalsIgnoreCase("Decay")
+         || knob.paramName.equalsIgnoreCase("Blur")
+         || knob.paramName.equalsIgnoreCase("Mix")))
         return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 
     if (knob.fxName.equalsIgnoreCase("Density"))
