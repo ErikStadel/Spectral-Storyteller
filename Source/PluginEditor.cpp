@@ -10,6 +10,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     spectralView->setShowGrid(true);
     spectralView->setGateDb(-96.0f);
     spectralView->setFrequencyCurve(2.0f);
+    spectralView->setTimeWindowSeconds(12.5f);
     spectralView->setSegmentationOverlayProvider([this](std::array<float, SpectralFrameBuffer::NUM_BINS>& transient,
                                                         std::array<float, SpectralFrameBuffer::NUM_BINS>& tonal,
                                                         std::array<float, SpectralFrameBuffer::NUM_BINS>& noise)
@@ -371,12 +372,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     dryWetLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF71717A));
     addAndMakeVisible(dryWetLabel);
 
-    // Gate slider (compact rotary in header area)
-    gateSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    // View gain slider (vertical, bottom-right in spectral view)
+    gateSlider.setSliderStyle(juce::Slider::LinearVertical);
     gateSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     gateSlider.setRange(-180.0, 6.0, 1.0);
     gateSlider.setValue(-96.0);
-    gateSlider.setTooltip("Gate (dB)");
+    gateSlider.setTooltip("View Gain (dB)");
     gateSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xFFE0A96D));
     gateSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xFFE0A96D));
     gateSlider.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF27272A));
@@ -392,6 +393,31 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     gateLabel.setFont(juce::Font(9.0f, juce::Font::bold));
     gateLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFA1A1AA));
     addAndMakeVisible(gateLabel);
+
+    // Time-axis slider (horizontal, bottom of spectral view)
+    timeAxisSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    timeAxisSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    timeAxisSlider.setRange(0.0, 1.0, 0.001);
+    timeAxisSlider.setValue(0.5);
+    timeAxisSlider.setTooltip("Time Axis (5s .. 20s)");
+    timeAxisSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xFFE0A96D));
+    timeAxisSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xFFE0A96D));
+    timeAxisSlider.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF27272A));
+    timeAxisSlider.onValueChange = [this]
+    {
+        if (spectralView)
+        {
+            const float seconds = 5.0f + static_cast<float>(timeAxisSlider.getValue()) * 15.0f;
+            spectralView->setTimeWindowSeconds(seconds);
+        }
+    };
+    addAndMakeVisible(timeAxisSlider);
+
+    timeAxisLabel.setText("Time", juce::dontSendNotification);
+    timeAxisLabel.setJustificationType(juce::Justification::centredLeft);
+    timeAxisLabel.setFont(juce::Font(9.0f, juce::Font::bold));
+    timeAxisLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFA1A1AA));
+    addAndMakeVisible(timeAxisLabel);
 
     // Attachments for parameter binding
     dryWetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -516,10 +542,27 @@ void PluginEditor::resized()
     toolArea.removeFromLeft(6);
     lassoSelectButton.setBounds(toolArea.removeFromLeft(56));
 
-    // View gain control in spectral view bottom-right
-    juce::Rectangle<int> viewGainArea(spectralBounds.getRight() - 140, spectralBounds.getBottom() - 30, 132, 20);
-    gateLabel.setBounds(viewGainArea.removeFromLeft(44));
-    gateSlider.setBounds(viewGainArea.reduced(3, 5));
+    // Time-axis control along the bottom of the spectral view.
+    juce::Rectangle<int> timeAxisArea(spectralBounds.getX() + 8,
+                                      spectralBounds.getBottom() - 34,
+                                      juce::jmax(48, spectralBounds.getWidth() - 56),
+                                      20);
+    auto timeLabelArea = timeAxisArea.removeFromLeft(40);
+    timeAxisLabel.setBounds(timeLabelArea);
+    timeAxisSlider.setBounds(timeAxisArea.reduced(3, 5));
+
+    // View gain control as a vertical slider at the lower-right corner.
+    juce::Rectangle<int> viewGainLabelArea(spectralBounds.getRight() - 36,
+                                           spectralBounds.getBottom() - 34,
+                                           28,
+                                           12);
+    gateLabel.setBounds(viewGainLabelArea);
+
+    juce::Rectangle<int> viewGainSliderArea(spectralBounds.getRight() - 30,
+                                            spectralBounds.getBottom() - 132,
+                                            20,
+                                            92);
+    gateSlider.setBounds(viewGainSliderArea);
 
     // Dry/Wet remains attached but hidden from the mockup-centric surface
     dryWetLabel.setBounds(0, 0, 0, 0);

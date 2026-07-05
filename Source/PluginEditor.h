@@ -104,11 +104,13 @@ private:
     juce::Slider outputGainSlider;
     juce::Slider dryWetSlider;
     juce::Slider gateSlider;
+    juce::Slider timeAxisSlider;
 
     juce::Label inputLabel;
     juce::Label outputLabel;
     juce::Label dryWetLabel;
     juce::Label gateLabel;
+    juce::Label timeAxisLabel;
 
     LevelMeter inputMeter;
     LevelMeter outputMeter;
