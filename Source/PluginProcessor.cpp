@@ -281,6 +281,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     compressorStateByObject.clear();
     compressorParamsByObject.clear();
     heatGlowFxByObject.clear();
+    gritEdgeFxByObject.clear();
     delayFxByObject.clear();
     echoBleedStateByChannel[0].clear();
     echoBleedStateByChannel[1].clear();
@@ -342,6 +343,7 @@ void PluginProcessor::updateTargetBinGains()
     compressorFxByObject.clear();
     compressorParamsByObject.clear();
     heatGlowFxByObject.clear();
+    gritEdgeFxByObject.clear();
     delayFxByObject.clear();
     spaceBlurFxByObject.clear();
 
@@ -558,6 +560,21 @@ void PluginProcessor::updateTargetBinGains()
                 heatGlowFxByObject[item.id] = heatSettings;
             }
 
+            if (isFxEnabled("Distortion"))
+            {
+                const float gritNorm = getModulatedNorm(item.id, "Distortion", "Grit", 0.0f);
+                const float edgeNorm = getModulatedNorm(item.id, "Distortion", "Edge", 0.5f);
+                const float asymNorm = getModulatedNorm(item.id, "Distortion", "Asymmetry", 0.0f);
+                const float mixNorm = getModulatedNorm(item.id, "Distortion", "Mix", 1.0f);
+
+                grit_edge::Settings gritSettings;
+                gritSettings.grit = juce::jlimit(0.0f, 1.0f, gritNorm);
+                gritSettings.edge = juce::jlimit(0.0f, 1.0f, edgeNorm);
+                gritSettings.asymmetry = juce::jlimit(0.0f, 1.0f, asymNorm);
+                gritSettings.mix = juce::jlimit(0.0f, 1.0f, mixNorm);
+                gritEdgeFxByObject[item.id] = gritSettings;
+            }
+
             if (isFxEnabled("Delay"))
             {
                 const float delayTimeNorm = getModulatedNorm(item.id, "Delay", "Time", 0.5f);
@@ -646,6 +663,7 @@ void PluginProcessor::updateTargetBinGains()
         compressorStateByObject.clear();
         compressorParamsByObject.clear();
         heatGlowFxByObject.clear();
+        gritEdgeFxByObject.clear();
         delayFxByObject.clear();
         spaceBlurFxByObject.clear();
         transientMuteCompressorGain = 1.0f;
@@ -1074,6 +1092,23 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
                                   heatIm);
             outRe = heatRe;
             outIm = heatIm;
+        }
+
+        const auto gritIt = gritEdgeFxByObject.find(objectId);
+        if (gritIt != gritEdgeFxByObject.end())
+        {
+            float gritRe = 0.0f;
+            float gritIm = 0.0f;
+            grit_edge::processBin(bin,
+                                  currentSampleRate,
+                                  fftSize,
+                                  gritIt->second,
+                                  outRe,
+                                  outIm,
+                                  gritRe,
+                                  gritIm);
+            outRe = gritRe;
+            outIm = gritIm;
         }
 
         fftData[reIdx] = outRe;

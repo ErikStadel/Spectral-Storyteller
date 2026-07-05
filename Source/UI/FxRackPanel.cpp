@@ -185,6 +185,7 @@ bool FxRackPanel::useTwoByTwoLayout(const ModuleView& mod) const
     return mod.name.equalsIgnoreCase("Compressor")
         || mod.name.equalsIgnoreCase("Delay")
         || mod.name.equalsIgnoreCase("Saturation")
+        || mod.name.equalsIgnoreCase("Distortion")
         || mod.name.equalsIgnoreCase("SpaceBlur")
         || mod.name.equalsIgnoreCase("Spaceblur");
 }
@@ -201,6 +202,8 @@ juce::String FxRackPanel::getModuleDisplayName(const ModuleView& mod) const
         return "Echo Bleed";
     if (mod.name.equalsIgnoreCase("Saturation"))
         return "Heat Glow";
+    if (mod.name.equalsIgnoreCase("Distortion"))
+        return "Grit Edge";
     if (mod.name.equalsIgnoreCase("SpaceBlur") || mod.name.equalsIgnoreCase("Spaceblur"))
         return "Space Blur";
     return mod.name;
@@ -341,6 +344,18 @@ juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
     if (knob.fxName.equalsIgnoreCase("Saturation")
         && (knob.paramName.equalsIgnoreCase("Drive")
          || knob.paramName.equalsIgnoreCase("Glow")
+         || knob.paramName.equalsIgnoreCase("Mix")))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
+
+    if (knob.fxName.equalsIgnoreCase("Distortion") && knob.paramName.equalsIgnoreCase("Edge"))
+    {
+        const float edgeDb = (v - 0.5f) * 24.0f;
+        return juce::String(edgeDb, 1) + " dB";
+    }
+
+    if (knob.fxName.equalsIgnoreCase("Distortion")
+        && (knob.paramName.equalsIgnoreCase("Grit")
+         || knob.paramName.equalsIgnoreCase("Asymmetry")
          || knob.paramName.equalsIgnoreCase("Mix")))
         return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 

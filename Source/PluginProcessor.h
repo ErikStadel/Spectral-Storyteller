@@ -12,6 +12,7 @@
 #include "DSP/EchoBleed.h"
 #include "DSP/SpaceBlur.h"
 #include "DSP/HeatGlow.h"
+#include "DSP/GritEdge.h"
 #include <memory>
 #include <deque>
 #include <unordered_map>
@@ -19,7 +20,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 8;
-constexpr int VERSION_BUILD = 21;
+constexpr int VERSION_BUILD = 25;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -326,6 +327,7 @@ private:
     std::unordered_map<int, mass_forge::State> compressorStateByObject;
     std::unordered_map<int, mass_forge::FrameParams> compressorParamsByObject;
     std::unordered_map<int, heat_glow::Settings> heatGlowFxByObject;
+    std::unordered_map<int, grit_edge::Settings> gritEdgeFxByObject;
     std::unordered_map<int, echo_bleed::Settings> delayFxByObject;
     std::array<std::unordered_map<int, echo_bleed::State>, 2> echoBleedStateByChannel;
     std::array<std::array<int, ObjectDatabase::NUM_BINS>, 2> delayTailOwnerByChannel{};

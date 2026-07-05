@@ -245,6 +245,18 @@ juce::String StoryTimelineComponent::formatLaneValue(const juce::String& effectN
          || parameterName.equalsIgnoreCase("Mix")))
         return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 
+    if (effectName.equalsIgnoreCase("Distortion") && parameterName.equalsIgnoreCase("Edge"))
+    {
+        const float edgeDb = (v - 0.5f) * 24.0f;
+        return juce::String(edgeDb, 1) + " dB";
+    }
+
+    if (effectName.equalsIgnoreCase("Distortion")
+        && (parameterName.equalsIgnoreCase("Grit")
+         || parameterName.equalsIgnoreCase("Asymmetry")
+         || parameterName.equalsIgnoreCase("Mix")))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
+
     return juce::String(v, 2);
 }
 

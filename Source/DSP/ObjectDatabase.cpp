@@ -127,6 +127,21 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
         fx.parameters[2].staticValue = 0.0f;
         fx.parameters[3].staticValue = 0.5f;
     }
+    else if (fx.name == "Distortion")
+    {
+        fx.parameters.push_back({ "Grit", {} });
+        fx.parameters.push_back({ "Edge", {} });
+        fx.parameters.push_back({ "Asymmetry", {} });
+        fx.parameters.push_back({ "Mix", {} });
+        fx.parameters[0].keyframes.push_back({ 0.0, 0.0f, 0.0f });
+        fx.parameters[1].keyframes.push_back({ 0.0, 0.5f, 0.0f });
+        fx.parameters[2].keyframes.push_back({ 0.0, 0.0f, 0.0f });
+        fx.parameters[3].keyframes.push_back({ 0.0, 1.0f, 0.0f });
+        fx.parameters[0].staticValue = 0.0f;
+        fx.parameters[1].staticValue = 0.5f;
+        fx.parameters[2].staticValue = 0.0f;
+        fx.parameters[3].staticValue = 1.0f;
+    }
     else if (fx.name == "Density")
     {
         fx.parameters.push_back({ "Density", {} });
@@ -243,6 +258,9 @@ std::string ObjectDatabase::normaliseEffectName(const std::string& effectName)
 
     if (lower == "heat glow" || lower == "heatglow" || lower == "heat_glow" || lower == "saturation")
         return "Saturation";
+
+    if (lower == "grit edge" || lower == "gritedge" || lower == "grit_edge" || lower == "distortion")
+        return "Distortion";
 
     std::string name = effectName;
     name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
