@@ -122,6 +122,8 @@ target_sources(SpectralStoryteller PRIVATE
     Source/DSP/HeatGlow.h
     Source/UI/SpectralView.cpp
     Source/UI/SpectralView.h
+    Source/UI/SourceView.cpp
+    Source/UI/SourceView.h
     Source/UI/SpectralSelector.cpp
     Source/UI/SpectralSelector.h
     Source/UI/ObjectSidebar.cpp

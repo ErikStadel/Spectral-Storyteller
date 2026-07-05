@@ -104,6 +104,54 @@ namespace
 
         return mags;
     }
+
+    std::vector<PluginProcessor::TransformSourceViewData::WaveformSlice> buildWaveformSlices(const juce::AudioBuffer<float>& audio,
+                                                                                           int sliceCount)
+    {
+        std::vector<PluginProcessor::TransformSourceViewData::WaveformSlice> slices;
+        sliceCount = juce::jmax(1, sliceCount);
+        slices.reserve(static_cast<size_t>(sliceCount));
+
+        const int numSamples = audio.getNumSamples();
+        const int numChannels = audio.getNumChannels();
+
+        if (numSamples <= 0 || numChannels <= 0)
+        {
+            for (int i = 0; i < sliceCount; ++i)
+                slices.push_back({ 0.0f, 0.0f });
+            return slices;
+        }
+
+        for (int sliceIndex = 0; sliceIndex < sliceCount; ++sliceIndex)
+        {
+            const int start = static_cast<int>((static_cast<int64_t>(sliceIndex) * numSamples) / sliceCount);
+            const int end = juce::jmax(start + 1, static_cast<int>((static_cast<int64_t>(sliceIndex + 1) * numSamples) / sliceCount));
+
+            float minSample = 1.0f;
+            float maxSample = -1.0f;
+
+            for (int ch = 0; ch < numChannels; ++ch)
+            {
+                const float* readPointer = audio.getReadPointer(ch);
+                for (int sample = start; sample < end && sample < numSamples; ++sample)
+                {
+                    const float value = readPointer[sample];
+                    minSample = juce::jmin(minSample, value);
+                    maxSample = juce::jmax(maxSample, value);
+                }
+            }
+
+            if (minSample > maxSample)
+            {
+                minSample = 0.0f;
+                maxSample = 0.0f;
+            }
+
+            slices.push_back({ minSample, maxSample });
+        }
+
+        return slices;
+    }
 }
 
 PluginProcessor::PluginProcessor()
@@ -1063,8 +1111,8 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
     constexpr int nyquistBin = fftSize / 2;
     auto &smoothStates = transformSmoothStates[channel];
     std::vector<int> firstFrameObjects;
-    const bool transportIsPlaying = transportPlaying.load();
-    const double transportSec = transportSeconds.load();
+    const bool sourceIsPlaying = sourceTransportPlaying.load();
+    const double sourceSec = sourceTransportSeconds.load();
 
     std::array<float, ObjectDatabase::NUM_BINS> binMagnitudes{};
     for (int bin = 0; bin <= nyquistBin; ++bin)
@@ -1120,10 +1168,10 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
         }
         else if (settings.sourceObjectId == ObjectDatabase::FILE_SOURCE_ID || settings.sourceObjectId == -3)
         {
-            // Externer Sound: nur abspielen, wenn DAW-Transport läuft.
+            // Externer Sound: nur abspielen, wenn der Source-Transport läuft.
             // -3 = interne Preset-Quelle (statisches Spektrum) → immer aktiv.
             const bool isExternalFile = (settings.sourceObjectId == ObjectDatabase::FILE_SOURCE_ID);
-            if (isExternalFile && !transportIsPlaying)
+            if (isExternalFile && !sourceIsPlaying)
             {
                 modMag = 0.0f;
             }
@@ -1140,9 +1188,17 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
 
                     if (isExternalFile && sourceData.durationSeconds > 1.0e-6)
                     {
-                        // fmod → Loop über die tatsächlich geladene Dauer
-                        const double phase = std::fmod(juce::jmax(0.0, transportSec), sourceData.durationSeconds);
-                        const double normalized = phase / sourceData.durationSeconds;
+                        const double durationSec = sourceData.durationSeconds;
+                        const double loopStart = juce::jlimit(0.0, durationSec, sourceData.loopStartSeconds);
+                        const double loopEnd = juce::jlimit(loopStart, durationSec, sourceData.loopEndSeconds);
+                        const double loopLen = juce::jmax(1.0e-6, loopEnd - loopStart);
+
+                        double loopPos = std::fmod(juce::jmax(0.0, sourceSec), loopLen);
+                        if (loopPos < 0.0)
+                            loopPos += loopLen;
+
+                        const double playbackSec = juce::jlimit(0.0, durationSec, loopStart + loopPos);
+                        const double normalized = juce::jlimit(0.0, 1.0, playbackSec / durationSec);
                         frameIndex = juce::jlimit(0, frameCount - 1,
                                                   static_cast<int>(std::floor(normalized * frameCount)));
                     }
@@ -1498,6 +1554,26 @@ inputPeakDb.store(
         transportSeconds.store(static_cast<double>(totalSamplesProcessed) / currentSampleRate);
         transportPlaying.store(false);
     }
+
+    {
+        const bool dawPlaying = transportPlaying.load();
+        if (dawPlaying)
+        {
+            if (!lastDawWasPlaying)
+                sourceLoopPhaseAccSec = 0.0;
+            sourceLoopPhaseAccSec += static_cast<double>(numSamples) / juce::jmax(1.0, currentSampleRate);
+            sourceTransportPlaying.store(true);
+        }
+        else
+        {
+            if (lastDawWasPlaying)
+                sourceLoopPhaseAccSec = 0.0;
+            sourceTransportPlaying.store(false);
+        }
+        lastDawWasPlaying = dawPlaying;
+        sourceTransportSeconds.store(sourceLoopPhaseAccSec);
+    }
+
     const bool maskingActive = (objectDatabase != nullptr && objectDatabase->isAnyMaskingActive());
 
     // Manual transient gate: block RMS trigger + fixed 40 ms hold.
@@ -1923,7 +1999,8 @@ void PluginProcessor::loadTransformFileAsync(int objectId, const juce::File &fil
         if (numSamples <= 0)
             return;
 
-        juce::AudioBuffer<float> fileAudio(static_cast<int>(reader->numChannels), static_cast<int>(numSamples));
+        const int fileChannels = juce::jmax(1, static_cast<int>(reader->numChannels));
+        juce::AudioBuffer<float> fileAudio(fileChannels, static_cast<int>(numSamples));
         if (!reader->read(&fileAudio, 0, static_cast<int>(numSamples), 0, true, true))
             return;
 
@@ -1937,7 +2014,7 @@ for (int ch = 0; ch < numChannels; ++ch) {
     for (int i = 0; i < numSamps; ++i) sumSq += (double)d[i]*d[i];
 }
 double rms  = std::sqrt(sumSq / juce::jmax(1, numChannels*numSamps));
-float  peak = fileAudio.getMagnitude(0, numSamps);
+float  peak = (numChannels > 0) ? fileAudio.getMagnitude(0, numSamps) : 0.0f;
 
 // Ziel-RMS = -20 dBFS  (≈ 0.1) statt 1.0
 const double targetRms = 0.1;
@@ -1950,6 +2027,8 @@ if (peak * scale > 0.95f)
 for (int ch = 0; ch < numChannels; ++ch)
     fileAudio.applyGain(ch, 0, numSamps, scale);
 
+        const int waveformSliceCount = juce::jlimit(256, 4096, static_cast<int>(numSamples / 256));
+        auto waveform = buildWaveformSlices(fileAudio, waveformSliceCount);
 
         juce::dsp::FFT localFft(fftOrder);
         std::vector<std::array<float, ObjectDatabase::NUM_BINS>> frames;
@@ -1965,9 +2044,79 @@ for (int ch = 0; ch < numChannels; ++ch)
         juce::ScopedLock sl(transformFileLock);
         TransformFileData data;
         data.frames = std::move(frames);
-        data.durationSeconds = juce::jmax(0.0, static_cast<double>(numSamples) / reader->sampleRate);
+        data.waveform = std::move(waveform);
+        const double fileSampleRate = (reader->sampleRate > 1.0) ? reader->sampleRate : 48000.0;
+        data.durationSeconds = juce::jmax(0.0, static_cast<double>(numSamples) / juce::jmax(1.0, fileSampleRate));
+        data.loopStartSeconds = 0.0;
+        data.loopEndSeconds = data.durationSeconds;
+        data.displayName = file.getFileNameWithoutExtension();
         transformFileBuffer[objectId] = std::move(data); })
         .detach();
+}
+
+bool PluginProcessor::getTransformSourceViewData(int objectId, TransformSourceViewData& outData) const
+{
+    if (objectId < 0)
+        return false;
+
+    juce::ScopedLock sl(transformFileLock);
+    const auto it = transformFileBuffer.find(objectId);
+    if (it == transformFileBuffer.end())
+        return false;
+
+    const auto& sourceData = it->second;
+    outData.displayName = sourceData.displayName;
+    outData.durationSeconds = sourceData.durationSeconds;
+    outData.loopStartSeconds = sourceData.loopStartSeconds;
+    outData.loopEndSeconds = sourceData.loopEndSeconds;
+    outData.waveform = sourceData.waveform;
+    outData.hasData = !sourceData.waveform.empty() && sourceData.durationSeconds > 0.0;
+    return outData.hasData;
+}
+
+bool PluginProcessor::setTransformLoopRange(int objectId, double loopStartSeconds, double loopEndSeconds)
+{
+    if (objectId < 0)
+        return false;
+
+    juce::ScopedLock sl(transformFileLock);
+    auto it = transformFileBuffer.find(objectId);
+    if (it == transformFileBuffer.end())
+        return false;
+
+    auto& sourceData = it->second;
+    if (sourceData.durationSeconds <= 0.0)
+        return false;
+
+    loopStartSeconds = juce::jlimit(0.0, sourceData.durationSeconds, loopStartSeconds);
+    loopEndSeconds = juce::jlimit(0.0, sourceData.durationSeconds, loopEndSeconds);
+    if (loopEndSeconds < loopStartSeconds)
+        std::swap(loopStartSeconds, loopEndSeconds);
+
+    if (std::abs(sourceData.loopStartSeconds - loopStartSeconds) < 1.0e-6
+        && std::abs(sourceData.loopEndSeconds - loopEndSeconds) < 1.0e-6)
+    {
+        return true;
+    }
+
+    sourceData.loopStartSeconds = loopStartSeconds;
+    sourceData.loopEndSeconds = loopEndSeconds;
+    return true;
+}
+
+bool PluginProcessor::getTransformLoopRange(int objectId, double& outLoopStart, double& outLoopEnd) const
+{
+    if (objectId < 0)
+        return false;
+
+    juce::ScopedLock sl(transformFileLock);
+    const auto it = transformFileBuffer.find(objectId);
+    if (it == transformFileBuffer.end())
+        return false;
+
+    outLoopStart = it->second.loopStartSeconds;
+    outLoopEnd   = it->second.loopEndSeconds;
+    return true;
 }
 
 int PluginProcessor::createTransformObjectFromPreset(const juce::String &presetName)

@@ -4,6 +4,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/SpectralView.h"
 #include "UI/SpectralSelector.h"
+#include "UI/SourceView.h"
 #include "UI/ObjectSidebar.h"
 #include "UI/StoryTimelineComponent.h"
 #include "UI/ModulationPanel.h"
@@ -91,9 +92,11 @@ private:
     PluginProcessor& processor;
 
     std::unique_ptr<SpectralView> spectralView;
+    std::unique_ptr<SourceView> sourceView;
     std::unique_ptr<SpectralSelector> spectralSelector;
     juce::TextButton rectSelectButton { "Rect" };
     juce::TextButton lassoSelectButton { "Brush" };
+    juce::TextButton viewModeButton { "Source" };
     std::unique_ptr<ObjectSidebar> objectSidebar;
     std::unique_ptr<StoryTimelineComponent> storyTimeline;
     std::unique_ptr<ModulationPanel> modulationPanel;
@@ -104,13 +107,11 @@ private:
     juce::Slider outputGainSlider;
     juce::Slider dryWetSlider;
     juce::Slider gateSlider;
-    juce::Slider timeAxisSlider;
 
     juce::Label inputLabel;
     juce::Label outputLabel;
     juce::Label dryWetLabel;
     juce::Label gateLabel;
-    juce::Label timeAxisLabel;
 
     LevelMeter inputMeter;
     LevelMeter outputMeter;
@@ -125,6 +126,7 @@ private:
 
     void paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area);
     void paintMeterStrip(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& label);
+    void updateViewMode();
 
     static constexpr int headerHeight = 48;
     static constexpr int sidebarWidth = 320;

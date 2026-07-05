@@ -19,7 +19,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 8;
-constexpr int VERSION_BUILD = 19;
+constexpr int VERSION_BUILD = 21;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -121,6 +121,27 @@ public:
     void setTransformSourceObjectId(int objectId, int sourceObjectId);
     int getTransformSourceObjectId(int objectId) const;
     void loadTransformFileAsync(int objectId, const juce::File& file);
+    struct TransformSourceViewData
+    {
+        struct WaveformSlice
+        {
+            float minSample = 0.0f;
+            float maxSample = 0.0f;
+        };
+
+        juce::String displayName;
+        std::vector<WaveformSlice> waveform;
+        double durationSeconds = 0.0;
+        double loopStartSeconds = 0.0;
+        double loopEndSeconds = 0.0;
+        bool hasData = false;
+    };
+
+    bool getTransformSourceViewData(int objectId, TransformSourceViewData& outData) const;
+    bool setTransformLoopRange(int objectId, double loopStartSeconds, double loopEndSeconds);
+    bool getTransformLoopRange(int objectId, double& outLoopStart, double& outLoopEnd) const;
+    double getSourceTransportSeconds() const noexcept { return sourceTransportSeconds.load(); }
+    bool isSourceTransportPlaying() const noexcept { return sourceTransportPlaying.load(); }
     int createTransformObjectFromPreset(const juce::String& presetName);
     int createTransformObjectFromFile(const juce::File& file);
     int createTransientObject();
@@ -182,6 +203,10 @@ private:
 
     std::atomic<double> transportSeconds{ 0.0 };
     std::atomic<bool> transportPlaying{ false };
+    std::atomic<double> sourceTransportSeconds{ 0.0 };
+    std::atomic<bool> sourceTransportPlaying{ false };
+    double sourceLoopPhaseAccSec = 0.0;
+    bool lastDawWasPlaying = false;
     double currentAnalysisFrameTimeSec = 0.0;
 
     int64_t totalSamplesProcessed = 0;
@@ -275,7 +300,11 @@ private:
     struct TransformFileData
     {
         std::vector<std::array<float, ObjectDatabase::NUM_BINS>> frames;
+        std::vector<TransformSourceViewData::WaveformSlice> waveform;
         double durationSeconds = 0.0;
+        double loopStartSeconds = 0.0;
+        double loopEndSeconds = 0.0;
+        juce::String displayName;
     };
 
     struct SpectralFxSettings

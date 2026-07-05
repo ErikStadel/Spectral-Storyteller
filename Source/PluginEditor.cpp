@@ -10,7 +10,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     spectralView->setShowGrid(true);
     spectralView->setGateDb(-96.0f);
     spectralView->setFrequencyCurve(2.0f);
-    spectralView->setTimeWindowSeconds(12.5f);
     spectralView->setSegmentationOverlayProvider([this](std::array<float, SpectralFrameBuffer::NUM_BINS>& transient,
                                                         std::array<float, SpectralFrameBuffer::NUM_BINS>& tonal,
                                                         std::array<float, SpectralFrameBuffer::NUM_BINS>& noise)
@@ -18,6 +17,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         return processor.getSegmentationOverlay(transient, tonal, noise);
     });
     addAndMakeVisible(*spectralView);
+
+    sourceView = std::make_unique<SourceView>(processor);
+    addAndMakeVisible(*sourceView);
 
     // Create spectrogram selector (lasso/rectangle overlay)
     spectralSelector = std::make_unique<SpectralSelector>();
@@ -202,6 +204,20 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (spectralSelector)
             spectralSelector->setToolMode(SpectralSelector::ToolMode::Brush);
     };
+
+    viewModeButton.setClickingTogglesState(true);
+    viewModeButton.setToggleState(false, juce::dontSendNotification);
+    viewModeButton.setButtonText("Source");
+    viewModeButton.setTooltip("Umschalten zwischen Spectral View und Source View");
+    viewModeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF27272A));
+    viewModeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF3F3F46));
+    viewModeButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
+    viewModeButton.setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
+    viewModeButton.onClick = [this]()
+    {
+        updateViewMode();
+    };
+    addAndMakeVisible(viewModeButton);
 
     // Create object sidebar
     objectSidebar = std::make_unique<ObjectSidebar>(
@@ -394,31 +410,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     gateLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFA1A1AA));
     addAndMakeVisible(gateLabel);
 
-    // Time-axis slider (horizontal, bottom of spectral view)
-    timeAxisSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    timeAxisSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    timeAxisSlider.setRange(0.0, 1.0, 0.001);
-    timeAxisSlider.setValue(0.5);
-    timeAxisSlider.setTooltip("Time Axis (5s .. 20s)");
-    timeAxisSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xFFE0A96D));
-    timeAxisSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xFFE0A96D));
-    timeAxisSlider.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF27272A));
-    timeAxisSlider.onValueChange = [this]
-    {
-        if (spectralView)
-        {
-            const float seconds = 5.0f + static_cast<float>(timeAxisSlider.getValue()) * 15.0f;
-            spectralView->setTimeWindowSeconds(seconds);
-        }
-    };
-    addAndMakeVisible(timeAxisSlider);
-
-    timeAxisLabel.setText("Time", juce::dontSendNotification);
-    timeAxisLabel.setJustificationType(juce::Justification::centredLeft);
-    timeAxisLabel.setFont(juce::Font(9.0f, juce::Font::bold));
-    timeAxisLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFA1A1AA));
-    addAndMakeVisible(timeAxisLabel);
-
     // Attachments for parameter binding
     dryWetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.getValueTreeState(), "dryWet", dryWetSlider);
@@ -436,6 +427,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setResizable(true, true);
     setResizeLimits(960, 540, 1920, 1080);
     setSize(1600, 900);
+
+    updateViewMode();
 }
 
 PluginEditor::~PluginEditor()
@@ -504,6 +497,26 @@ void PluginEditor::paint(juce::Graphics& g)
     g.drawVerticalLine(sidebarWidth, static_cast<float>(headerHeight), static_cast<float>(getHeight()));
 }
 
+void PluginEditor::updateViewMode()
+{
+    const bool showSourceView = viewModeButton.getToggleState();
+    viewModeButton.setButtonText(showSourceView ? "Spectral" : "Source");
+
+    if (spectralView)
+        spectralView->setVisible(!showSourceView);
+    if (spectralSelector)
+        spectralSelector->setVisible(!showSourceView);
+    if (sourceView)
+        sourceView->setVisible(showSourceView);
+
+    rectSelectButton.setVisible(!showSourceView);
+    lassoSelectButton.setVisible(!showSourceView);
+    gateSlider.setVisible(!showSourceView);
+    gateLabel.setVisible(!showSourceView);
+
+    repaint();
+}
+
 void PluginEditor::resized()
 {
     auto area = getLocalBounds();
@@ -531,25 +544,20 @@ void PluginEditor::resized()
     const auto spectralBounds = spectralArea;
     if (spectralView)
         spectralView->setBounds(spectralBounds);
+    if (sourceView)
+        sourceView->setBounds(spectralBounds);
     if (spectralSelector)
         spectralSelector->setBounds(spectralBounds);
     if (storyTimeline)
         storyTimeline->setBounds(timelineArea);
 
-    // Rect/Brush tools in spectral view top-left
+    // Spectral view controls in the corners of the main view
     juce::Rectangle<int> toolArea(spectralBounds.getX() + 8, spectralBounds.getY() + 8, 116, 20);
     rectSelectButton.setBounds(toolArea.removeFromLeft(54));
     toolArea.removeFromLeft(6);
     lassoSelectButton.setBounds(toolArea.removeFromLeft(56));
 
-    // Time-axis control along the bottom of the spectral view.
-    juce::Rectangle<int> timeAxisArea(spectralBounds.getX() + 8,
-                                      spectralBounds.getBottom() - 34,
-                                      juce::jmax(48, spectralBounds.getWidth() - 56),
-                                      20);
-    auto timeLabelArea = timeAxisArea.removeFromLeft(40);
-    timeAxisLabel.setBounds(timeLabelArea);
-    timeAxisSlider.setBounds(timeAxisArea.reduced(3, 5));
+    viewModeButton.setBounds(spectralBounds.getRight() - 94, spectralBounds.getY() + 8, 86, 20);
 
     // View gain control as a vertical slider at the lower-right corner.
     juce::Rectangle<int> viewGainLabelArea(spectralBounds.getRight() - 36,
