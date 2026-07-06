@@ -375,10 +375,10 @@ juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
         return v >= 0.5f ? "On" : "Off";
 
     if (knob.fxName.equalsIgnoreCase("Freeze") && knob.paramName.equalsIgnoreCase("Size"))
-        return sizeLabel();
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 
     if (knob.fxName.equalsIgnoreCase("Freeze")
-        && (knob.paramName.equalsIgnoreCase("Blur")
+        && (knob.paramName.equalsIgnoreCase("Cloud")
          || knob.paramName.equalsIgnoreCase("Mix")))
         return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 

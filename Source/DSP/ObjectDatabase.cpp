@@ -146,7 +146,7 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
     {
         fx.parameters.push_back({ "Freeze", {} });
         fx.parameters.push_back({ "Size", {} });
-        fx.parameters.push_back({ "Blur", {} });
+        fx.parameters.push_back({ "Cloud", {} });  // was "Blur"
         fx.parameters.push_back({ "Mix", {} });
         fx.parameters[0].keyframes.push_back({ 0.0, 0.0f, 0.0f });
         fx.parameters[1].keyframes.push_back({ 0.0, 0.5f, 0.0f });
