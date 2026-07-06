@@ -21,7 +21,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 8;
-constexpr int VERSION_BUILD = 30;
+constexpr int VERSION_BUILD = 31;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -194,6 +194,13 @@ private:
     std::array<float, ObjectDatabase::NUM_BINS> targetBinPitchSemitones{};
     std::array<std::array<float, ObjectDatabase::NUM_BINS>, 2> currentBinGains{};
     std::array<int, ObjectDatabase::NUM_BINS> targetBinDominantObjectIds{};
+    // Bug A fix: temporal hysteresis on the bin -> object assignment. The raw
+    // per-frame dominant object can flicker when detection is uncertain; these
+    // hold the debounced/committed owner and the pending-switch counter so a bin
+    // only changes object after a candidate has persisted for a few frames.
+    std::array<int, ObjectDatabase::NUM_BINS> committedDominantObjectIds{};
+    std::array<int, ObjectDatabase::NUM_BINS> pendingDominantObjectIds{};
+    std::array<int, ObjectDatabase::NUM_BINS> pendingDominantFrameCount{};
     float transientMuteCompressorGain = 1.0f;
 
     static constexpr float maskSmoothAlpha = 0.30f;  // one-pole per STFT frame ≈ 30ms @ 48kHz/512hop

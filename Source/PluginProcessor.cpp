@@ -195,6 +195,9 @@ PluginProcessor::PluginProcessor()
     targetBinGains.fill(1.0f);
     targetBinPitchSemitones.fill(0.0f);
     targetBinDominantObjectIds.fill(-1);
+    committedDominantObjectIds.fill(-1);
+    pendingDominantObjectIds.fill(-1);
+    pendingDominantFrameCount.fill(0);
     timelineObjectGains.fill(1.0f);
     currentTimelineObjectGains.fill(1.0f);
     previousMagnitudes.fill(0.0f);
@@ -277,6 +280,9 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     targetBinGains.fill(1.0f);
     targetBinPitchSemitones.fill(0.0f);
     targetBinDominantObjectIds.fill(-1);
+    committedDominantObjectIds.fill(-1);
+    pendingDominantObjectIds.fill(-1);
+    pendingDominantFrameCount.fill(0);
     transformSettingsByObject.clear();
     spectralFxByObject.clear();
     filterFxByObject.clear();
@@ -687,6 +693,10 @@ void PluginProcessor::updateTargetBinGains()
         delayFxByObject.clear();
         spaceBlurFxByObject.clear();
         transientMuteCompressorGain = 1.0f;
+        targetBinDominantObjectIds.fill(-1);
+        committedDominantObjectIds.fill(-1);
+        pendingDominantObjectIds.fill(-1);
+        pendingDominantFrameCount.fill(0);
         return;
     }
 
@@ -836,6 +846,55 @@ void PluginProcessor::updateTargetBinGains()
                     }
                 }
             }
+        }
+    }
+
+    // --- Bug A fix: temporal hysteresis on the bin -> object assignment ---
+    // The raw per-frame dominant object above can flicker whenever detection is
+    // uncertain (a bin's mask membership or relative strength wobbles for a single
+    // frame). Feeding that flicker straight into the FX layer makes each bin jump
+    // between unrelated per-object states (freeze, delay tail, spectral FX) and is
+    // a root cause of the choppy/metallic artefacts. Here a bin only commits to a
+    // new owner after the candidate has persisted for a few consecutive frames; a
+    // brand-new owner (previously none) is adopted immediately so nothing is
+    // delayed on first appearance.
+    {
+        static constexpr int dominanceSwitchFrames = 4;
+        for (int bin = 0; bin < ObjectDatabase::NUM_BINS; ++bin)
+        {
+            const int raw = targetBinDominantObjectIds[static_cast<size_t>(bin)];
+            int committed = committedDominantObjectIds[static_cast<size_t>(bin)];
+
+            if (raw == committed)
+            {
+                pendingDominantObjectIds[static_cast<size_t>(bin)] = committed;
+                pendingDominantFrameCount[static_cast<size_t>(bin)] = 0;
+            }
+            else if (committed < 0)
+            {
+                committed = raw;
+                pendingDominantObjectIds[static_cast<size_t>(bin)] = raw;
+                pendingDominantFrameCount[static_cast<size_t>(bin)] = 0;
+            }
+            else
+            {
+                if (raw == pendingDominantObjectIds[static_cast<size_t>(bin)])
+                    ++pendingDominantFrameCount[static_cast<size_t>(bin)];
+                else
+                {
+                    pendingDominantObjectIds[static_cast<size_t>(bin)] = raw;
+                    pendingDominantFrameCount[static_cast<size_t>(bin)] = 1;
+                }
+
+                if (pendingDominantFrameCount[static_cast<size_t>(bin)] >= dominanceSwitchFrames)
+                {
+                    committed = raw;
+                    pendingDominantFrameCount[static_cast<size_t>(bin)] = 0;
+                }
+            }
+
+            committedDominantObjectIds[static_cast<size_t>(bin)] = committed;
+            targetBinDominantObjectIds[static_cast<size_t>(bin)] = committed;
         }
     }
 
