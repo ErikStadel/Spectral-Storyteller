@@ -259,6 +259,8 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     currentSampleRate = juce::jmax(1.0, sampleRate);
     const double tauSeconds = 0.03;
     stftBlendCoeff = static_cast<float>(1.0 - std::exp(-1.0 / (tauSeconds * currentSampleRate)));
+    const double releaseTauSeconds = 3.5;
+    stftBlendReleaseCoeff = static_cast<float>(1.0 - std::exp(-1.0 / (releaseTauSeconds * currentSampleRate)));
     stftBlend = 0.0f;
 
     createHannWindow();
@@ -1344,6 +1346,16 @@ void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* time
                                  currentSampleRate, hopSeconds,
                                  timeFrame, numSamples);
     }
+
+    // SpaceBlur (Reverb) — time-domain reverb, last in the post chain.
+    const auto reverbIt = spaceBlurFxByObject.find(objectId);
+    if (reverbIt != spaceBlurFxByObject.end())
+    {
+        auto& state = spaceBlurStateByChannel[channel][objectId];
+        space_blur::processBlock(reverbIt->second, state,
+                                 currentSampleRate, channel,
+                                 timeFrame, numSamples);
+    }
 }
 
 void PluginProcessor::applyTransformCrossSynthesis(int channel)
@@ -1665,88 +1677,9 @@ void PluginProcessor::applyEchoBleedDelay(int channel)
 
 void PluginProcessor::applySpaceBlur(int channel)
 {
-    constexpr int nyquistBin = fftSize / 2;
-
-    auto& channelStates = spaceBlurStateByChannel[channel];
-    std::vector<int> touchedObjects;
-    touchedObjects.reserve(8);
-
-    for (int bin = 0; bin <= nyquistBin; ++bin)
-    {
-        int objectId = targetBinDominantObjectIds[static_cast<size_t>(bin)];
-        bool tailOnly = false;
-
-        if (objectId >= 0)
-        {
-            if (spaceBlurFxByObject.find(objectId) != spaceBlurFxByObject.end())
-                spaceBlurTailOwnerByChannel[channel][static_cast<size_t>(bin)] = objectId;
-        }
-        else
-        {
-            const int stickyObject = spaceBlurTailOwnerByChannel[channel][static_cast<size_t>(bin)];
-            if (stickyObject >= 0 && spaceBlurFxByObject.find(stickyObject) != spaceBlurFxByObject.end())
-            {
-                objectId = stickyObject;
-                tailOnly = true;
-            }
-            else
-            {
-                continue;
-            }
-        }
-
-        const auto settingsIt = spaceBlurFxByObject.find(objectId);
-        if (settingsIt == spaceBlurFxByObject.end())
-            continue;
-
-        const auto& settings = settingsIt->second;
-        if (settings.mix <= 1.0e-4f)
-            continue;
-
-        auto& state = channelStates[objectId];
-        space_blur::ensureState(state);
-
-        if (std::find(touchedObjects.begin(), touchedObjects.end(), objectId) == touchedObjects.end())
-        {
-            space_blur::beginFrame(state);
-            touchedObjects.push_back(objectId);
-        }
-
-        const int reIdx = 2 * bin;
-        const int imIdx = reIdx + 1;
-        const float inRe = tailOnly ? 0.0f : fftData[reIdx];
-        const float inIm = tailOnly ? 0.0f : fftData[imIdx];
-
-        float outRe = inRe;
-        float outIm = inIm;
-        space_blur::processBin(state,
-                               channel,
-                               bin,
-                               hopSize,
-                               currentSampleRate,
-                               settings,
-                               inRe,
-                               inIm,
-                               outRe,
-                               outIm);
-
-        if (tailOnly)
-        {
-            fftData[reIdx] += outRe;
-            fftData[imIdx] += outIm;
-        }
-        else
-        {
-            fftData[reIdx] = outRe;
-            fftData[imIdx] = outIm;
-        }
-    }
-
-    for (const int objectId : touchedObjects)
-    {
-        auto& state = channelStates[objectId];
-        space_blur::endFrame(state);
-    }
+    // SpaceBlur has been ported to the time-domain post-ISTFT chain.
+    // Processing now happens in applyPostIstftChain → space_blur::processBlock.
+    juce::ignoreUnused(channel);
 }
 
 void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
@@ -1892,9 +1825,13 @@ inputPeakDb.store(
                                          ? (outputBuffers[ch][bufferPos] / norm)
                                          : inputSample;
 
-            // Smoothly crossfade STFT path in/out to avoid hard route switches.
+            // Smoothly crossfade STFT path in/out.
+            // Fast attack (~30ms) when going wet; slow release (~3.5s) when going dry.
+            // The slow release lets reverb and delay tails ring out naturally after
+            // transport stop or when no object is masking-active.
             const float targetBlend = maskingActive ? 1.0f : 0.0f;
-            stftBlend += (targetBlend - stftBlend) * stftBlendCoeff;
+            const float blendCoeff  = (targetBlend > stftBlend) ? stftBlendCoeff : stftBlendReleaseCoeff;
+            stftBlend += (targetBlend - stftBlend) * blendCoeff;
             stftBlend = juce::jlimit(0.0f, 1.0f, stftBlend);
 
             const float processedSample = stftBlend * stftSample + (1.0f - stftBlend) * inputSample;

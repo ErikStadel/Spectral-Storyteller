@@ -21,7 +21,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 9;
-constexpr int VERSION_BUILD = 3;
+constexpr int VERSION_BUILD = 6;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -209,7 +209,8 @@ private:
 
     static constexpr float maskSmoothAlpha = 0.30f;  // one-pole per STFT frame ≈ 30ms @ 48kHz/512hop
     float stftBlend = 0.0f;
-    float stftBlendCoeff = 0.0f;
+    float stftBlendCoeff = 0.0f;         // fast attack (~30ms) going wet
+    float stftBlendReleaseCoeff = 0.0f;  // slow release (~3.5s) going dry → allows reverb/delay tails to ring out
     double currentSampleRate = 48000.0;
     std::array<float, ObjectDatabase::MAX_OBJECTS> timelineObjectGains{};
     std::array<float, ObjectDatabase::MAX_OBJECTS> currentTimelineObjectGains{};
