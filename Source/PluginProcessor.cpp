@@ -238,6 +238,8 @@ PluginProcessor::PluginProcessor()
         currentBinGains[ch].fill(1.0f);
         delayTailOwnerByChannel[ch].fill(-1);
         spaceBlurTailOwnerByChannel[ch].fill(-1);
+        stasisFreezeOwnerByChannel[ch].fill(-1);
+        stasisCloudStateByChannel[ch].clear();
         phaseVocoderStates[ch].clear();
         transformSmoothStates[ch].clear();
     }
@@ -267,6 +269,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         currentBinGains[ch].fill(1.0f);
         delayTailOwnerByChannel[ch].fill(-1);
         spaceBlurTailOwnerByChannel[ch].fill(-1);
+        stasisFreezeOwnerByChannel[ch].fill(-1);
         phaseVocoderStates[ch].clear();
         transformSmoothStates[ch].clear();
     }
@@ -282,6 +285,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     compressorParamsByObject.clear();
     heatGlowFxByObject.clear();
     gritEdgeFxByObject.clear();
+    stasisCloudFxByObject.clear();
     delayFxByObject.clear();
     echoBleedStateByChannel[0].clear();
     echoBleedStateByChannel[1].clear();
@@ -575,6 +579,21 @@ void PluginProcessor::updateTargetBinGains()
                 gritEdgeFxByObject[item.id] = gritSettings;
             }
 
+            if (isFxEnabled("Freeze"))
+            {
+                const float freezeNorm = getModulatedNorm(item.id, "Freeze", "Freeze", 0.0f);
+                const float sizeNorm = getModulatedNorm(item.id, "Freeze", "Size", 0.5f);
+                const float blurNorm = getModulatedNorm(item.id, "Freeze", "Blur", 0.5f);
+                const float mixNorm = getModulatedNorm(item.id, "Freeze", "Mix", 0.5f);
+
+                stasis_cloud::Settings freezeSettings;
+                freezeSettings.freeze = juce::jlimit(0.0f, 1.0f, freezeNorm);
+                freezeSettings.size = juce::jlimit(0.0f, 1.0f, sizeNorm);
+                freezeSettings.blur = juce::jlimit(0.0f, 1.0f, blurNorm);
+                freezeSettings.mix = juce::jlimit(0.0f, 1.0f, mixNorm);
+                stasisCloudFxByObject[item.id] = freezeSettings;
+            }
+
             if (isFxEnabled("Delay"))
             {
                 const float delayTimeNorm = getModulatedNorm(item.id, "Delay", "Time", 0.5f);
@@ -664,6 +683,7 @@ void PluginProcessor::updateTargetBinGains()
         compressorParamsByObject.clear();
         heatGlowFxByObject.clear();
         gritEdgeFxByObject.clear();
+        stasisCloudFxByObject.clear();
         delayFxByObject.clear();
         spaceBlurFxByObject.clear();
         transientMuteCompressorGain = 1.0f;
@@ -1122,6 +1142,7 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
 
     applyTransformCrossSynthesis(channel);
     applyPhaseVocoderPitchShift(channel);
+    applyStasisCloud(channel);
     applyEchoBleedDelay(channel);
     applySpaceBlur(channel);
 
@@ -1352,6 +1373,103 @@ void PluginProcessor::applyPhaseVocoderPitchShift(int channel)
 
     for (int i = 0; i < 2 * fftSize; ++i)
         fftData[static_cast<size_t>(i)] = shifted[static_cast<size_t>(i)];
+}
+
+void PluginProcessor::applyStasisCloud(int channel)
+{
+    constexpr int nyquistBin = fftSize / 2;
+    auto& channelStates = stasisCloudStateByChannel[channel];
+    auto& freezeOwner = stasisFreezeOwnerByChannel[channel];
+    std::vector<int> touchedObjects;
+    touchedObjects.reserve(8);
+
+    const auto hasActiveFreeze = [this](int id) -> bool
+    {
+        if (id < 0)
+            return false;
+        const auto it = stasisCloudFxByObject.find(id);
+        return it != stasisCloudFxByObject.end() && it->second.freeze > 0.5f;
+    };
+
+    // Release freeze state for any object whose freeze is no longer active, so a
+    // later re-freeze captures a fresh snapshot instead of reusing a stale one.
+    for (auto& entry : channelStates)
+    {
+        if (!hasActiveFreeze(entry.first))
+        {
+            entry.second.freezeWasActive = false;
+            entry.second.captureBlend = 0.0f;
+        }
+    }
+
+    for (int bin = 0; bin <= nyquistBin; ++bin)
+    {
+        const int dominantId = targetBinDominantObjectIds[static_cast<size_t>(bin)];
+        int objectId = -1;
+
+        // Bin-lock during freeze (Bug B fix): a frozen object keeps ownership of
+        // its bins even when the per-frame dominant-object assignment flickers to
+        // a different object. Without this a bin would jump between unrelated
+        // StasisCloud states every frame - a hard, discontinuous magnitude/phase
+        // step - which reads as the choppy/machine-gun artefact regardless of
+        // Blur/Size (those only smooth WITHIN one state, never between two).
+        if (hasActiveFreeze(dominantId))
+        {
+            objectId = dominantId;
+            freezeOwner[static_cast<size_t>(bin)] = dominantId;
+        }
+        else if (hasActiveFreeze(freezeOwner[static_cast<size_t>(bin)]))
+        {
+            objectId = freezeOwner[static_cast<size_t>(bin)];
+        }
+        else
+        {
+            freezeOwner[static_cast<size_t>(bin)] = -1;
+            continue;
+        }
+
+        const auto settingsIt = stasisCloudFxByObject.find(objectId);
+        if (settingsIt == stasisCloudFxByObject.end())
+        {
+            freezeOwner[static_cast<size_t>(bin)] = -1;
+            continue;
+        }
+
+        const auto& settings = settingsIt->second;
+        auto& state = channelStates[objectId];
+        const bool firstBinForObject = std::find(touchedObjects.begin(), touchedObjects.end(), objectId) == touchedObjects.end();
+        if (firstBinForObject)
+        {
+            if (!state.initialized || !state.freezeWasActive)
+            {
+                stasis_cloud::captureSnapshot(state, currentAnalysisMagnitudes, fftData.data(), fftSize, hopSize, settings.size);
+            }
+
+            const float frameDt = static_cast<float>((fftSize * 0.25) / juce::jmax(1.0, currentSampleRate));
+            const float captureRate = juce::jlimit(0.05f, 0.45f, 0.20f + 0.18f * juce::jlimit(0.0f, 1.0f, settings.size));
+            state.captureBlend = juce::jlimit(0.0f, 1.0f, state.captureBlend + captureRate * frameDt * 24.0f);
+            state.freezeWasActive = true;
+            touchedObjects.push_back(objectId);
+        }
+
+        const int reIdx = 2 * bin;
+        const int imIdx = reIdx + 1;
+        float outRe = fftData[reIdx];
+        float outIm = fftData[imIdx];
+        stasis_cloud::processBin(bin,
+                                 fftSize,
+                                 hopSize,
+                                 currentSampleRate,
+                                 settings,
+                                 currentAnalysisMagnitudes,
+                                 fftData[reIdx],
+                                 fftData[imIdx],
+                                 state,
+                                 outRe,
+                                 outIm);
+        fftData[reIdx] = outRe;
+        fftData[imIdx] = outIm;
+    }
 }
 
 void PluginProcessor::applyEchoBleedDelay(int channel)

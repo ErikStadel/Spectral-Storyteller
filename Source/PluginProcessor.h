@@ -13,6 +13,7 @@
 #include "DSP/SpaceBlur.h"
 #include "DSP/HeatGlow.h"
 #include "DSP/GritEdge.h"
+#include "DSP/StasisCloud.h"
 #include <memory>
 #include <deque>
 #include <unordered_map>
@@ -20,7 +21,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 8;
-constexpr int VERSION_BUILD = 25;
+constexpr int VERSION_BUILD = 30;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -328,10 +329,17 @@ private:
     std::unordered_map<int, mass_forge::FrameParams> compressorParamsByObject;
     std::unordered_map<int, heat_glow::Settings> heatGlowFxByObject;
     std::unordered_map<int, grit_edge::Settings> gritEdgeFxByObject;
+    std::unordered_map<int, stasis_cloud::Settings> stasisCloudFxByObject;
     std::unordered_map<int, echo_bleed::Settings> delayFxByObject;
     std::array<std::unordered_map<int, echo_bleed::State>, 2> echoBleedStateByChannel;
     std::array<std::array<int, ObjectDatabase::NUM_BINS>, 2> delayTailOwnerByChannel{};
     std::unordered_map<int, space_blur::Settings> spaceBlurFxByObject;
+    std::array<std::unordered_map<int, stasis_cloud::State>, 2> stasisCloudStateByChannel;
+    // Bin-lock during freeze: once a bin is captured by a frozen object it keeps
+    // ownership of that bin (per channel) until the object's freeze is released,
+    // even if the per-frame dominant-object assignment flickers. Prevents the
+    // frozen spectrum from jumping between unrelated states every frame.
+    std::array<std::array<int, ObjectDatabase::NUM_BINS>, 2> stasisFreezeOwnerByChannel{};
     std::array<std::unordered_map<int, space_blur::State>, 2> spaceBlurStateByChannel;
     std::array<std::array<int, ObjectDatabase::NUM_BINS>, 2> spaceBlurTailOwnerByChannel{};
     std::array<std::unordered_map<int, TransformSmoothState>, 2> transformSmoothStates;
@@ -345,6 +353,7 @@ private:
     void applyPhaseVocoderPitchShift(int channel);
     void applyTransformCrossSynthesis(int channel);
     void applyEchoBleedDelay(int channel);
+    void applyStasisCloud(int channel);
     void applySpaceBlur(int channel);
     void updateTargetBinGains();
     void analyseSegmentationFrame(const float* fftInterleaved, int64_t currentSampleIndex);

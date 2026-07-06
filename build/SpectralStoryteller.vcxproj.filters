@@ -37,6 +37,9 @@
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\GritEdge.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\StasisCloud.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -139,6 +142,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\GritEdge.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\StasisCloud.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.h">

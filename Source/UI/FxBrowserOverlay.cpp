@@ -12,6 +12,7 @@ FxBrowserOverlay::FxBrowserOverlay()
         { "Mass Forge",   "Compressor", "Dynamics",          "Adaptiver Dynamik-Compander mit physischem Gewicht.",      juce::Colour(0xFF3B82F6) },
         { "Heat Glow",    "Saturation", "Harmonics",         "Sattigungs-Schmiede fur Rohrenwarme und Oberton-Glow.",    juce::Colour(0xFFF97316) },
         { "Grit Edge",    "Distortion", "Destruction",       "Aggressives Hard-Clipping und Wavefolding-Zerstorung.",    juce::Colour(0xFFF43F5E) },
+        { "Stasis Cloud", "Freeze",     "Spectral Freeze",   "Friert das Spektrum ein und formt eine stehende Klangwolke.", juce::Colour(0xFF06B6D4) },
         { "Prism Focus",  "Contrast",   "Spectral Dynamics", "Regelt den spektralen Kontrast uber die Frequenzbins.",    juce::Colour(0xFFD946EF) },
         { "Stasis Cloud", "Freeze",     "Spectral Freeze",   "Friert das Spektrum ein. Erzeugt unendliche Flachen.",     juce::Colour(0xFF06B6D4) },
         { "Fluid Grain",  "Perlin",     "Noise Gen",         "Mathematisch fliessendes Perlin-Rauschen.",                juce::Colour(0xFF84CC16) },

@@ -67,6 +67,36 @@ float parseManualKeyframeValue(const juce::String& effectName,
     if (effectName.equalsIgnoreCase("Saturation") && text.equalsIgnoreCase("false"))
         return 0.0f;
 
+    if (effectName.equalsIgnoreCase("Freeze") && text.equalsIgnoreCase("on"))
+        return 1.0f;
+
+    if (effectName.equalsIgnoreCase("Freeze") && text.equalsIgnoreCase("off"))
+        return 0.0f;
+
+    if (effectName.equalsIgnoreCase("Freeze") && text.equalsIgnoreCase("true"))
+        return 1.0f;
+
+    if (effectName.equalsIgnoreCase("Freeze") && text.equalsIgnoreCase("false"))
+        return 0.0f;
+
+    if (effectName.equalsIgnoreCase("Freeze") && text.containsOnly("0123456789"))
+    {
+        const int sizeValue = juce::jlimit(512, 4096, text.getIntValue());
+        static const std::array<int, 4> sizes = { 512, 1024, 2048, 4096 };
+        int closestIndex = 0;
+        int smallestDistance = std::numeric_limits<int>::max();
+        for (int i = 0; i < static_cast<int>(sizes.size()); ++i)
+        {
+            const int distance = std::abs(sizes[static_cast<size_t>(i)] - sizeValue);
+            if (distance < smallestDistance)
+            {
+                smallestDistance = distance;
+                closestIndex = i;
+            }
+        }
+        return static_cast<float>(closestIndex) / static_cast<float>(sizes.size() - 1);
+    }
+
     const float raw = static_cast<float>(text.getDoubleValue());
     if (effectName.equalsIgnoreCase("Pitch") && std::abs(raw) > 1.0f)
         return juce::jlimit(0.0f, 1.0f, 0.5f + raw / 4.0f);
@@ -242,6 +272,24 @@ juce::String StoryTimelineComponent::formatLaneValue(const juce::String& effectN
     if (effectName.equalsIgnoreCase("Saturation")
         && (parameterName.equalsIgnoreCase("Drive")
          || parameterName.equalsIgnoreCase("Glow")
+         || parameterName.equalsIgnoreCase("Mix")))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
+
+    if (effectName.equalsIgnoreCase("Freeze") && parameterName.equalsIgnoreCase("Freeze"))
+        return v >= 0.5f ? "On" : "Off";
+
+    if (effectName.equalsIgnoreCase("Freeze")
+        && parameterName.equalsIgnoreCase("Size"))
+    {
+        static const std::array<int, 4> sizes = { 512, 1024, 2048, 4096 };
+        const int idx = juce::jlimit(0,
+                                     static_cast<int>(sizes.size()) - 1,
+                                     juce::roundToInt(v * static_cast<float>(sizes.size() - 1)));
+        return juce::String(sizes[static_cast<size_t>(idx)]);
+    }
+
+    if (effectName.equalsIgnoreCase("Freeze")
+        && (parameterName.equalsIgnoreCase("Blur")
          || parameterName.equalsIgnoreCase("Mix")))
         return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 

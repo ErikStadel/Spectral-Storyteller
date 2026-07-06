@@ -186,6 +186,7 @@ bool FxRackPanel::useTwoByTwoLayout(const ModuleView& mod) const
         || mod.name.equalsIgnoreCase("Delay")
         || mod.name.equalsIgnoreCase("Saturation")
         || mod.name.equalsIgnoreCase("Distortion")
+        || mod.name.equalsIgnoreCase("Freeze")
         || mod.name.equalsIgnoreCase("SpaceBlur")
         || mod.name.equalsIgnoreCase("Spaceblur");
 }
@@ -204,6 +205,8 @@ juce::String FxRackPanel::getModuleDisplayName(const ModuleView& mod) const
         return "Heat Glow";
     if (mod.name.equalsIgnoreCase("Distortion"))
         return "Grit Edge";
+    if (mod.name.equalsIgnoreCase("Freeze"))
+        return "Stasis Cloud";
     if (mod.name.equalsIgnoreCase("SpaceBlur") || mod.name.equalsIgnoreCase("Spaceblur"))
         return "Space Blur";
     return mod.name;
@@ -211,7 +214,8 @@ juce::String FxRackPanel::getModuleDisplayName(const ModuleView& mod) const
 
 bool FxRackPanel::isToggleParameter(const KnobView& knob) const
 {
-    return knob.fxName.equalsIgnoreCase("Saturation") && knob.paramName.equalsIgnoreCase("Heat");
+    return (knob.fxName.equalsIgnoreCase("Saturation") && knob.paramName.equalsIgnoreCase("Heat"))
+        || (knob.fxName.equalsIgnoreCase("Freeze") && knob.paramName.equalsIgnoreCase("Freeze"));
 }
 
 void FxRackPanel::drawToggleButton(juce::Graphics& g,
@@ -287,6 +291,14 @@ void FxRackPanel::drawToggleButton(juce::Graphics& g,
 juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
 {
     const float v = juce::jlimit(0.0f, 1.0f, knob.value);
+    const auto sizeLabel = [v]()
+    {
+        static const std::array<int, 4> sizes = { 512, 1024, 2048, 4096 };
+        const int idx = juce::jlimit(0,
+                                     static_cast<int>(sizes.size()) - 1,
+                                     juce::roundToInt(v * static_cast<float>(sizes.size() - 1)));
+        return juce::String(sizes[static_cast<size_t>(idx)]);
+    };
 
     if (knob.fxName.equalsIgnoreCase("Pitch") || knob.paramName.equalsIgnoreCase("Semitones"))
         return juce::String((v - 0.5f) * 4.0f, 1) + " st";
@@ -356,6 +368,17 @@ juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
     if (knob.fxName.equalsIgnoreCase("Distortion")
         && (knob.paramName.equalsIgnoreCase("Grit")
          || knob.paramName.equalsIgnoreCase("Asymmetry")
+         || knob.paramName.equalsIgnoreCase("Mix")))
+        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
+
+    if (knob.fxName.equalsIgnoreCase("Freeze") && knob.paramName.equalsIgnoreCase("Freeze"))
+        return v >= 0.5f ? "On" : "Off";
+
+    if (knob.fxName.equalsIgnoreCase("Freeze") && knob.paramName.equalsIgnoreCase("Size"))
+        return sizeLabel();
+
+    if (knob.fxName.equalsIgnoreCase("Freeze")
+        && (knob.paramName.equalsIgnoreCase("Blur")
          || knob.paramName.equalsIgnoreCase("Mix")))
         return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 

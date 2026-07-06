@@ -122,6 +122,8 @@ target_sources(SpectralStoryteller PRIVATE
     Source/DSP/HeatGlow.h
     Source/DSP/GritEdge.cpp
     Source/DSP/GritEdge.h
+    Source/DSP/StasisCloud.cpp
+    Source/DSP/StasisCloud.h
     Source/UI/SpectralView.cpp
     Source/UI/SpectralView.h
     Source/UI/SourceView.cpp
