@@ -244,6 +244,7 @@ PluginProcessor::PluginProcessor()
         spaceBlurTailOwnerByChannel[ch].fill(-1);
         stasisFreezeOwnerByChannel[ch].fill(-1);
         stasisCloudStateByChannel[ch].clear();
+        heatGlowStateByChannel[ch].clear();
         phaseVocoderStates[ch].clear();
         transformSmoothStates[ch].clear();
     }
@@ -276,6 +277,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         stasisFreezeOwnerByChannel[ch].fill(-1);
         phaseVocoderStates[ch].clear();
         transformSmoothStates[ch].clear();
+        heatGlowStateByChannel[ch].clear();
     }
 
     objectSpectrumScratch.assign(static_cast<size_t>(2 * fftSize), 0.0f);
@@ -1162,19 +1164,8 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
         }
 
         const auto heatIt = heatGlowFxByObject.find(objectId);
-        if (heatIt != heatGlowFxByObject.end())
-        {
-            float heatRe = 0.0f;
-            float heatIm = 0.0f;
-            heat_glow::processBin(bin,
-                                  heatIt->second,
-                                  outRe,
-                                  outIm,
-                                  heatRe,
-                                  heatIm);
-            outRe = heatRe;
-            outIm = heatIm;
-        }
+        // HeatGlow is now handled post-ISTFT in applyPostIstftChain (time domain).
+        juce::ignoreUnused(heatIt);
 
         const auto gritIt = gritEdgeFxByObject.find(objectId);
         if (gritIt != gritEdgeFxByObject.end())
@@ -1333,15 +1324,26 @@ void PluginProcessor::reconstructAndOverlapAdd(int channel, int64_t currentSampl
 
 void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* timeFrame, int numSamples)
 {
-    // Post-ISTFT (time-domain / waveshaping) FX chain for a single object's
-    // isolated audio. Modules that belong AFTER the per-object ISTFT
-    // (Saturation, Distortion, Compressor, Delay, Reverb, Freeze) will be
-    // migrated here one at a time, each carrying its own per-object time-domain
-    // state. The order of modules WITHIN this chain may vary, but the pre/post
-    // boundary is fixed by the pipeline. Currently a pass-through placeholder so
-    // this new reconstruction path stays bit-identical to the previous single
-    // ISTFT until each module is ported.
-    juce::ignoreUnused(channel, objectId, timeFrame, numSamples);
+    const float hopSeconds = static_cast<float>(hopSize)
+                           / static_cast<float>(juce::jmax(1.0, currentSampleRate));
+
+    // HeatGlow (Saturation) — time-domain waveshaper.
+    const auto heatIt = heatGlowFxByObject.find(objectId);
+    if (heatIt != heatGlowFxByObject.end())
+    {
+        auto& state = heatGlowStateByChannel[channel][objectId];
+        heat_glow::processBlock(heatIt->second, state, timeFrame, numSamples);
+    }
+
+    // EchoBleed (Delay) — frame-domain delay line with tape/digital character.
+    const auto delayIt = delayFxByObject.find(objectId);
+    if (delayIt != delayFxByObject.end())
+    {
+        auto& state = echoBleedStateByChannel[channel][objectId];
+        echo_bleed::processBlock(delayIt->second, state,
+                                 currentSampleRate, hopSeconds,
+                                 timeFrame, numSamples);
+    }
 }
 
 void PluginProcessor::applyTransformCrossSynthesis(int channel)
@@ -1656,91 +1658,9 @@ void PluginProcessor::applyStasisCloud(int channel)
 
 void PluginProcessor::applyEchoBleedDelay(int channel)
 {
-    constexpr int nyquistBin = fftSize / 2;
-    const float hopSeconds = static_cast<float>(hopSize / juce::jmax(1.0, currentSampleRate));
-
-    auto& channelStates = echoBleedStateByChannel[channel];
-    std::vector<int> touchedObjects;
-    touchedObjects.reserve(8);
-
-    for (int bin = 0; bin <= nyquistBin; ++bin)
-    {
-        int objectId = targetBinDominantObjectIds[static_cast<size_t>(bin)];
-        bool tailOnly = false;
-
-        if (objectId >= 0)
-        {
-            if (delayFxByObject.find(objectId) != delayFxByObject.end())
-                delayTailOwnerByChannel[channel][static_cast<size_t>(bin)] = objectId;
-            else
-                delayTailOwnerByChannel[channel][static_cast<size_t>(bin)] = -1;
-        }
-        else
-        {
-            const int stickyObject = delayTailOwnerByChannel[channel][static_cast<size_t>(bin)];
-            if (stickyObject >= 0 && delayFxByObject.find(stickyObject) != delayFxByObject.end())
-            {
-                objectId = stickyObject;
-                tailOnly = true;
-            }
-            else
-            {
-                delayTailOwnerByChannel[channel][static_cast<size_t>(bin)] = -1;
-                continue;
-            }
-        }
-
-        const auto settingsIt = delayFxByObject.find(objectId);
-        if (settingsIt == delayFxByObject.end())
-            continue;
-
-        const auto& settings = settingsIt->second;
-        if (settings.mix <= 1.0e-4f)
-            continue;
-
-        auto& state = channelStates[objectId];
-        echo_bleed::ensureState(state);
-
-        if (std::find(touchedObjects.begin(), touchedObjects.end(), objectId) == touchedObjects.end())
-        {
-            echo_bleed::beginFrame(state);
-            touchedObjects.push_back(objectId);
-        }
-
-        const int reIdx = 2 * bin;
-        const int imIdx = reIdx + 1;
-        const float inRe = tailOnly ? 0.0f : fftData[reIdx];
-        const float inIm = tailOnly ? 0.0f : fftData[imIdx];
-
-        float outRe = inRe;
-        float outIm = inIm;
-        echo_bleed::processBin(state,
-                               bin,
-                               nyquistBin,
-                               hopSeconds,
-                               settings,
-                               inRe,
-                               inIm,
-                               outRe,
-                               outIm);
-
-        if (tailOnly)
-        {
-            fftData[reIdx] += outRe;
-            fftData[imIdx] += outIm;
-        }
-        else
-        {
-            fftData[reIdx] = outRe;
-            fftData[imIdx] = outIm;
-        }
-    }
-
-    for (const int objectId : touchedObjects)
-    {
-        auto& state = channelStates[objectId];
-        echo_bleed::endFrame(state);
-    }
+    // EchoBleed has been ported to the time-domain post-ISTFT chain.
+    // Processing now happens in applyPostIstftChain → echo_bleed::processBlock.
+    juce::ignoreUnused(channel);
 }
 
 void PluginProcessor::applySpaceBlur(int channel)

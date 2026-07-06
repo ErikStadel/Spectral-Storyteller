@@ -21,7 +21,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 9;
-constexpr int VERSION_BUILD = 1;
+constexpr int VERSION_BUILD = 3;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -339,6 +339,7 @@ private:
     std::unordered_map<int, mass_forge::State> compressorStateByObject;
     std::unordered_map<int, mass_forge::FrameParams> compressorParamsByObject;
     std::unordered_map<int, heat_glow::Settings> heatGlowFxByObject;
+    std::array<std::unordered_map<int, heat_glow::State>, 2> heatGlowStateByChannel;
     std::unordered_map<int, grit_edge::Settings> gritEdgeFxByObject;
     std::unordered_map<int, stasis_cloud::Settings> stasisCloudFxByObject;
     std::unordered_map<int, echo_bleed::Settings> delayFxByObject;
