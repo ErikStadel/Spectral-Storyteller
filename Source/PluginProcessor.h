@@ -20,8 +20,8 @@
 
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
-constexpr int VERSION_MINOR = 8;
-constexpr int VERSION_BUILD = 31;
+constexpr int VERSION_MINOR = 9;
+constexpr int VERSION_BUILD = 1;
 
 class PluginProcessor : public juce::AudioProcessor
 {
@@ -190,6 +190,10 @@ private:
     std::array<int, 2> samplesInBuffer{ 0, 0 };
     std::array<int, 2> samplesSinceLastFrame{ 0, 0 };
     std::vector<float> fftData;
+    // Scratch spectrum (2*fftSize) used to build one object's soft-masked slice
+    // before its per-object ISTFT in reconstructAndOverlapAdd. Not per channel;
+    // reconstruction runs one channel/one object at a time.
+    std::vector<float> objectSpectrumScratch;
     std::array<float, ObjectDatabase::NUM_BINS> targetBinGains{};
     std::array<float, ObjectDatabase::NUM_BINS> targetBinPitchSemitones{};
     std::array<std::array<float, ObjectDatabase::NUM_BINS>, 2> currentBinGains{};
@@ -357,6 +361,15 @@ private:
 
     void createHannWindow();
     void processStftFrame(int channel, int64_t currentSampleIndex);
+    // Pipeline pre/post-ISTFT split. When this runs, the spectral (pre-ISTFT)
+    // chain has already produced the processed spectrum in fftData. It splits
+    // that spectrum into per-object slices using soft partition-of-unity masks,
+    // runs a per-object ISTFT, applies the time-domain post-ISTFT chain to each
+    // object's isolated audio, and overlap-adds every object plus the unowned
+    // "rest" spectrum into the shared output ring (latency-aligned: all slices
+    // share the same window and write position, so the summation cannot comb).
+    void reconstructAndOverlapAdd(int channel, int64_t currentSampleIndex);
+    void applyPostIstftChain(int channel, int objectId, float* timeFrame, int numSamples);
     void applyPhaseVocoderPitchShift(int channel);
     void applyTransformCrossSynthesis(int channel);
     void applyEchoBleedDelay(int channel);

@@ -186,6 +186,7 @@ PluginProcessor::PluginProcessor()
       fft(fftOrder),
       window(fftSize),
       fftData(2 * fftSize),
+      objectSpectrumScratch(2 * fftSize),
       spectralFrameBuffer(std::make_unique<SpectralFrameBuffer>()),
       objectDatabase(std::make_unique<ObjectDatabase>())
 {
@@ -276,6 +277,8 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         phaseVocoderStates[ch].clear();
         transformSmoothStates[ch].clear();
     }
+
+    objectSpectrumScratch.assign(static_cast<size_t>(2 * fftSize), 0.0f);
 
     targetBinGains.fill(1.0f);
     targetBinPitchSemitones.fill(0.0f);
@@ -1205,20 +1208,140 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
     applyEchoBleedDelay(channel);
     applySpaceBlur(channel);
 
-    fft.performRealOnlyInverseTransform(fftData.data());
+    // Pre-ISTFT chain is complete: fftData now holds the processed spectrum.
+    // Split it per object, run per-object ISTFT + time-domain post chain, and
+    // overlap-add every object plus the unowned rest spectrum.
+    reconstructAndOverlapAdd(channel, currentSampleIndex);
+}
+
+void PluginProcessor::reconstructAndOverlapAdd(int channel, int64_t currentSampleIndex)
+{
+    constexpr int nyquistBin = fftSize / 2;
+    static constexpr int maskRadius = 6;
+
+    if (static_cast<int>(objectSpectrumScratch.size()) < 2 * fftSize)
+        objectSpectrumScratch.assign(static_cast<size_t>(2 * fftSize), 0.0f);
+
+    // Cosine smoothing kernel for soft object-edge masks. Smoothing the hard
+    // per-bin ownership with a normalised kernel yields per-object membership
+    // weights that sum to exactly 1 across all owners at every bin (partition of
+    // unity). Because the ISTFT is linear, the summed per-object time frames then
+    // reconstruct the full frame with no level change or comb-filter artefact.
+    // Soft edges also avoid the "musical noise" that hard bin cuts create once
+    // objects are processed independently in the time-domain post chain.
+    std::array<float, 2 * maskRadius + 1> kernel{};
+    float kernelSum = 0.0f;
+    for (int k = -maskRadius; k <= maskRadius; ++k)
+    {
+        const float w = 0.5f * (1.0f + std::cos(juce::MathConstants<float>::pi
+                                                * static_cast<float>(k)
+                                                / static_cast<float>(maskRadius + 1)));
+        kernel[static_cast<size_t>(k + maskRadius)] = w;
+        kernelSum += w;
+    }
+    const float invKernelSum = (kernelSum > 0.0f) ? (1.0f / kernelSum) : 1.0f;
+
+    // Collect the distinct object owners present this frame. -1 (rest / unowned
+    // bins) is always reconstructed as well so no spectral energy is dropped.
+    std::vector<int> owners;
+    owners.reserve(16);
+    bool hasRest = false;
+    for (int bin = 0; bin <= nyquistBin; ++bin)
+    {
+        const int id = targetBinDominantObjectIds[static_cast<size_t>(bin)];
+        if (id < 0)
+        {
+            hasRest = true;
+            continue;
+        }
+        if (std::find(owners.begin(), owners.end(), id) == owners.end())
+            owners.push_back(id);
+    }
 
     // Causal OLA write position: never write into the past.
     const int64_t writeBase64 = currentSampleIndex;
     const int writeBase = static_cast<int>(((writeBase64 % outputBufferSize) + outputBufferSize) % outputBufferSize);
 
+    // Synthesis-window normalisation is accumulated exactly once per hop (not per
+    // object): the per-object time frames already sum to the single full-frame
+    // synthesis, so adding w*w once keeps OLA reconstruction correct.
     for (int i = 0; i < fftSize; ++i)
     {
-        const float w = window[i];
-        const float sample = fftData[i] * w;
+        const float w = window[static_cast<size_t>(i)];
         const int writePos = (writeBase + i) % outputBufferSize;
-        outputBuffers[channel][writePos] += sample;
-        outputNormBuffers[channel][writePos] += (w * w);
+        outputNormBuffers[channel][static_cast<size_t>(writePos)] += (w * w);
     }
+
+    const auto softMembership = [this, &kernel, invKernelSum, nyquistBin](int bin, int ownerId) -> float
+    {
+        float num = 0.0f;
+        for (int k = -maskRadius; k <= maskRadius; ++k)
+        {
+            int b = bin + k;
+            if (b < 0)
+                b = 0;
+            if (b > nyquistBin)
+                b = nyquistBin;
+            if (targetBinDominantObjectIds[static_cast<size_t>(b)] == ownerId)
+                num += kernel[static_cast<size_t>(k + maskRadius)];
+        }
+        return num * invKernelSum;
+    };
+
+    const auto reconstructSlice = [&](int ownerId)
+    {
+        float* scratch = objectSpectrumScratch.data();
+
+        // Build the soft-masked, Hermitian-consistent spectrum for this owner. The
+        // mirror bin (fftSize - k) is scaled by the same real factor as bin k so
+        // each slice stays a valid real spectrum for the inverse transform.
+        for (int bin = 0; bin <= nyquistBin; ++bin)
+        {
+            const float m = softMembership(bin, ownerId);
+            scratch[2 * bin] = fftData[static_cast<size_t>(2 * bin)] * m;
+            scratch[2 * bin + 1] = fftData[static_cast<size_t>(2 * bin + 1)] * m;
+
+            if (bin > 0 && bin < nyquistBin)
+            {
+                const int mb = fftSize - bin;
+                scratch[2 * mb] = fftData[static_cast<size_t>(2 * mb)] * m;
+                scratch[2 * mb + 1] = fftData[static_cast<size_t>(2 * mb + 1)] * m;
+            }
+        }
+
+        fft.performRealOnlyInverseTransform(scratch);
+
+        // Post-ISTFT time-domain FX operate on this object's isolated audio only.
+        // The rest spectrum (ownerId < 0) is dry by definition.
+        if (ownerId >= 0)
+            applyPostIstftChain(channel, ownerId, scratch, fftSize);
+
+        for (int i = 0; i < fftSize; ++i)
+        {
+            const float sample = scratch[static_cast<size_t>(i)] * window[static_cast<size_t>(i)];
+            const int writePos = (writeBase + i) % outputBufferSize;
+            outputBuffers[channel][static_cast<size_t>(writePos)] += sample;
+        }
+    };
+
+    for (const int ownerId : owners)
+        reconstructSlice(ownerId);
+
+    if (hasRest)
+        reconstructSlice(-1);
+}
+
+void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* timeFrame, int numSamples)
+{
+    // Post-ISTFT (time-domain / waveshaping) FX chain for a single object's
+    // isolated audio. Modules that belong AFTER the per-object ISTFT
+    // (Saturation, Distortion, Compressor, Delay, Reverb, Freeze) will be
+    // migrated here one at a time, each carrying its own per-object time-domain
+    // state. The order of modules WITHIN this chain may vary, but the pre/post
+    // boundary is fixed by the pipeline. Currently a pass-through placeholder so
+    // this new reconstruction path stays bit-identical to the previous single
+    // ISTFT until each module is ported.
+    juce::ignoreUnused(channel, objectId, timeFrame, numSamples);
 }
 
 void PluginProcessor::applyTransformCrossSynthesis(int channel)
