@@ -150,4 +150,97 @@ void processBin(int bin,
     outRe = inRe * dryWeight + (inRe * wetScale) * mix;
     outIm = inIm * dryWeight + (inIm * wetScale) * mix;
 }
+
+void processBlock(const Settings& settings,
+                  State&          state,
+                  double          sampleRate,
+                  float*          buffer,
+                  int             numSamples)
+{
+    const float grit      = clamp01(settings.grit);
+    const float edge      = clamp01(settings.edge);
+    const float asymmetry = clamp01(settings.asymmetry);
+    const float mix       = clamp01(settings.mix);
+
+    if (grit < 1.0e-5f || mix < 1.0e-5f)
+        return;
+
+    const float sr = static_cast<float>(juce::jmax(1.0, sampleRate));
+
+    // Pre-gain (same drive-curve as spectral version)
+    const float gritDb  = gritDbFromControl(grit);
+    const float preGain = dbToGain(gritDb);
+
+    // Waveshaper character weights (tube / digital / fuzz blend via Asymmetry)
+    const float tubeWeight    = smoothstep(juce::jlimit(0.0f, 1.0f, 1.0f - asymmetry * 2.0f));
+    const float fuzzWeight    = smoothstep(juce::jlimit(0.0f, 1.0f, (asymmetry - 0.5f) * 2.0f));
+    const float digitalWeight = juce::jmax(0.0f, 1.0f - tubeWeight - fuzzWeight);
+
+    // Output trim (same formula as spectral version)
+    const float edgeBoostDb = juce::jmax(0.0f, (edge - 0.5f) * 24.0f);
+    const float trimGain    = dbToGain(-juce::jmin(2.0f, gritDb * 0.018f + edgeBoostDb * 0.04f));
+
+    constexpr float kneeRef = 7.5f;
+
+    // ── Edge EQ: biquad peaking filter at 4 kHz ───────────────────────────
+    // Replaces the per-bin spectral gain of the old implementation with a
+    // proper time-domain resonance. Bell width Q=2 (≈ 1 octave). Gain: ±12 dB.
+    const float edgeGainDb = (edge - 0.5f) * 24.0f;  // -12..+12 dB
+    float bq_b0 = 1.0f, bq_b1 = 0.0f, bq_b2 = 0.0f;
+    float bq_a1 = 0.0f, bq_a2 = 0.0f;
+    const bool applyEdge = std::abs(edgeGainDb) > 0.5f;
+    if (applyEdge)
+    {
+        const float A     = std::pow(10.0f, edgeGainDb / 40.0f);  // sqrt(linear gain)
+        const float w0    = juce::MathConstants<float>::twoPi * 4000.0f / sr;
+        const float cosW0 = std::cos(w0);
+        const float sinW0 = std::sin(w0);
+        const float alpha = sinW0 / (2.0f * 2.0f);               // Q = 2.0
+        const float a0inv = 1.0f / (1.0f + alpha / A);
+        bq_b0 = (1.0f + alpha * A)  * a0inv;
+        bq_b1 = (-2.0f * cosW0)     * a0inv;
+        bq_b2 = (1.0f - alpha * A)  * a0inv;
+        bq_a1 = (-2.0f * cosW0)     * a0inv;
+        bq_a2 = (1.0f  - alpha / A) * a0inv;
+    }
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float dry  = buffer[i];
+        const float sign = (dry >= 0.0f) ? 1.0f : -1.0f;
+        const float absX = std::abs(dry);
+
+        // Normalize → waveshaper → restore scale + sign
+        const float xNorm = absX * preGain / kneeRef;
+
+        const float tubeN    = std::tanh(xNorm * 1.35f)
+                             * (1.0f + 0.18f * (1.0f - std::exp(-xNorm * 1.1f)));
+        const float digitalN = juce::jmin(1.0f, xNorm);
+        const float fuzzBase = std::pow(juce::jmin(1.0f, xNorm), 0.45f);
+        const float sputter  = 0.86f + 0.14f * std::sin(juce::jlimit(0.0f, 24.0f, xNorm) * 2.6f);
+        const float fuzzN    = juce::jlimit(0.0f, 1.22f, fuzzBase * sputter);
+
+        float wet = sign * (tubeN * tubeWeight + digitalN * digitalWeight + fuzzN * fuzzWeight) * kneeRef;
+
+        // Output trim
+        wet *= trimGain;
+
+        // Dynamic ceiling: prevents spectral energy build-up
+        const float ceiling = juce::jmax(1.0e-6f, absX * (3.2f + 7.0f * grit));
+        if (std::abs(wet) > ceiling)
+            wet = sign * ceiling * std::tanh(std::abs(wet) / juce::jmax(1.0e-6f, ceiling));
+
+        // Edge EQ (biquad peaking)
+        if (applyEdge)
+        {
+            const float yin = bq_b0 * wet + bq_b1 * state.x1 + bq_b2 * state.x2
+                                          - bq_a1 * state.y1 - bq_a2 * state.y2;
+            state.x2 = state.x1;  state.x1 = wet;
+            state.y2 = state.y1;  state.y1 = yin;
+            wet = yin;
+        }
+
+        buffer[i] = (1.0f - mix) * dry + mix * wet;
+    }
+}
 }

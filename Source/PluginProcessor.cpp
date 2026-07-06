@@ -245,6 +245,7 @@ PluginProcessor::PluginProcessor()
         stasisFreezeOwnerByChannel[ch].fill(-1);
         stasisCloudStateByChannel[ch].clear();
         heatGlowStateByChannel[ch].clear();
+        gritEdgeStateByChannel[ch].clear();
         phaseVocoderStates[ch].clear();
         transformSmoothStates[ch].clear();
     }
@@ -280,6 +281,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         phaseVocoderStates[ch].clear();
         transformSmoothStates[ch].clear();
         heatGlowStateByChannel[ch].clear();
+        gritEdgeStateByChannel[ch].clear();
     }
 
     objectSpectrumScratch.assign(static_cast<size_t>(2 * fftSize), 0.0f);
@@ -1152,39 +1154,16 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
         float outIm = fftData[imIdx] * appliedGain;
 
         const auto compParamsIt = compressorParamsByObject.find(objectId);
-        if (compParamsIt != compressorParamsByObject.end())
-        {
-            const float preCompRe = outRe;
-            const float preCompIm = outIm;
-            const float processedRe = mass_forge::processSample(preCompRe, compParamsIt->second);
-            const float processedIm = mass_forge::processSample(preCompIm, compParamsIt->second);
-
-            const float freqHz = static_cast<float>(bin) * static_cast<float>(currentSampleRate) / static_cast<float>(fftSize);
-            const float lowProtect = juce::jlimit(0.0f, 1.0f, (180.0f - freqHz) / 140.0f);
-            outRe = juce::jmap(lowProtect, processedRe, preCompRe);
-            outIm = juce::jmap(lowProtect, processedIm, preCompIm);
-        }
+        // MassForge (Compressor) is now handled post-ISTFT in applyPostIstftChain.
+        juce::ignoreUnused(compParamsIt);
 
         const auto heatIt = heatGlowFxByObject.find(objectId);
         // HeatGlow is now handled post-ISTFT in applyPostIstftChain (time domain).
         juce::ignoreUnused(heatIt);
 
         const auto gritIt = gritEdgeFxByObject.find(objectId);
-        if (gritIt != gritEdgeFxByObject.end())
-        {
-            float gritRe = 0.0f;
-            float gritIm = 0.0f;
-            grit_edge::processBin(bin,
-                                  currentSampleRate,
-                                  fftSize,
-                                  gritIt->second,
-                                  outRe,
-                                  outIm,
-                                  gritRe,
-                                  gritIm);
-            outRe = gritRe;
-            outIm = gritIm;
-        }
+        // GritEdge is now handled post-ISTFT in applyPostIstftChain (time domain).
+        juce::ignoreUnused(gritIt);
 
         fftData[reIdx] = outRe;
         fftData[imIdx] = outIm;
@@ -1329,12 +1308,31 @@ void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* time
     const float hopSeconds = static_cast<float>(hopSize)
                            / static_cast<float>(juce::jmax(1.0, currentSampleRate));
 
-    // HeatGlow (Saturation) — time-domain waveshaper.
+    // HeatGlow (Saturation) — waveshaper, first in the post chain.
     const auto heatIt = heatGlowFxByObject.find(objectId);
     if (heatIt != heatGlowFxByObject.end())
     {
         auto& state = heatGlowStateByChannel[channel][objectId];
         heat_glow::processBlock(heatIt->second, state, timeFrame, numSamples);
+    }
+
+    // MassForge (Compressor) — apply per-frame envelope params computed from
+    // spectral analysis in updateTargetBinGains. No new per-sample state needed:
+    // processSample is stateless given the pre-computed FrameParams.
+    const auto compParamsIt = compressorParamsByObject.find(objectId);
+    if (compParamsIt != compressorParamsByObject.end())
+    {
+        const auto& params = compParamsIt->second;
+        for (int i = 0; i < numSamples; ++i)
+            timeFrame[i] = mass_forge::processSample(timeFrame[i], params);
+    }
+
+    // GritEdge (Distortion) — time-domain waveshaper + biquad 4kHz Edge EQ.
+    const auto gritIt = gritEdgeFxByObject.find(objectId);
+    if (gritIt != gritEdgeFxByObject.end())
+    {
+        auto& state = gritEdgeStateByChannel[channel][objectId];
+        grit_edge::processBlock(gritIt->second, state, currentSampleRate, timeFrame, numSamples);
     }
 
     // EchoBleed (Delay) — frame-domain delay line with tape/digital character.
