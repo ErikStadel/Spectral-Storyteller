@@ -26,6 +26,8 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void timerCallback() override;
+    void setOverlayVisibility(bool shouldBeVisible);
+    bool hasActiveSpectralMasks() const;
 
     // -------------------------------------------------------------------------
     // Public API
@@ -58,6 +60,7 @@ private:
     float frequencyCurveAmount =    2.0f;
     bool  showGrid             = true;
     bool  isPaused             = false;
+    bool isOverlayVisible = false;
 
     juce::Image spectrogramImage;
 

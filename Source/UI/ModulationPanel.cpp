@@ -164,6 +164,17 @@ ModulationPanel::ModulationPanel(PluginProcessor& p) : processor(p)
 
     rewireForCurrentSlot();
     startTimerHz(30);
+    // 🔥 NEU: Auf Änderungen der FX-Selektion hören
+    processor.addChangeListener(this);
+}
+
+void ModulationPanel::changeListenerCallback(juce::ChangeBroadcaster* source)
+{
+    if (source == &processor)
+    {
+        // Wenn sich das aktive FX-Modul ändert, bauen wir die Dropdowns neu auf
+        refresh();
+    }
 }
 
 void ModulationPanel::showLfo(bool show)
@@ -278,16 +289,63 @@ void ModulationPanel::rebuildTargetMenu(juce::ComboBox& cb)
     while (id == noneItemId)
         ++id;
 
-    for (const auto& fx : processor.getFxChainForSelectedObject())
-    {
-        if (!fx.enabled)
-            continue;
+    // 🔥 NEU: Hole das aktuell "gehighlightete" FX-Modul
+    const juce::String activeFx = processor.getActiveFxEffectName();
+    const juce::String activeParam = processor.getActiveFxParameterName();
 
-        for (const auto& p : fx.parameters)
+    // Wenn ein FX-Parameter selektiert ist, zeigen wir NUR dieses Modul
+    if (activeFx.isNotEmpty())
+    {
+        for (const auto& fx : processor.getFxChainForSelectedObject())
         {
-            cb.addItem(juce::String(fx.name) + " · " + juce::String(p.name), id++);
-            if (id == noneItemId)
-                ++id;
+            if (!fx.enabled)
+                continue;
+
+            // Filter: Nur das aktive Modul durchlassen
+            if (fx.name == activeFx)
+            {
+                for (const auto& p : fx.parameters)
+                {
+                    cb.addItem(juce::String(fx.name) + " · " + juce::String(p.name), id++);
+                    if (id == noneItemId) ++id;
+                }
+                break; // Wir haben das Modul gefunden, Rest überspringen
+            }
+        }
+    }
+    else
+    {
+        // 🔥 FALLBACK: Wenn KEIN FX-Parameter selektiert ist, zeige die Basisparameter
+        // (Hier müsstest du deine Basisparameter-Namen eintragen, z.B. "Base", "Input Gain" etc.)
+        // Beispiel:
+        // cb.addItem("Base · Input Gain", id++);
+        // cb.addItem("Base · Output Gain", id++);
+        // cb.addItem("Base · Dry/Wet", id++);
+        
+        // Alternativ: Zeige einfach alle Module, aber gruppiert
+        for (const auto& fx : processor.getFxChainForSelectedObject())
+        {
+            if (!fx.enabled) continue;
+            cb.addSectionHeading(fx.name);
+            for (const auto& p : fx.parameters)
+            {
+                cb.addItem(juce::String(p.name), id++);
+                if (id == noneItemId) ++id;
+            }
+        }
+    }
+    
+    // Optional: Wenn wir ein aktives Modul haben, aber noch kein Target gesetzt ist,
+    // könnten wir automatisch den zuletzt angeklickten Parameter vorauswählen
+    if (activeFx.isNotEmpty() && activeParam.isNotEmpty())
+    {
+        for (int i = 0; i < cb.getNumItems(); ++i)
+        {
+            if (cb.getItemText(i).contains(activeParam))
+            {
+                cb.setSelectedId(cb.getItemId(i), juce::dontSendNotification);
+                break;
+            }
         }
     }
 }

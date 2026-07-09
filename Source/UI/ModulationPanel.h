@@ -6,7 +6,8 @@ class PluginProcessor;
 
 class ModulationPanel : public juce::Component,
                         public juce::DragAndDropTarget,
-                        private juce::Timer
+                        private juce::Timer,
+                        public juce::ChangeListener  // 🔥 NEU
 {
 public:
     explicit ModulationPanel(PluginProcessor& p);
@@ -27,6 +28,7 @@ private:
     void timerCallback() override { repaint(); }
     void rebuildTargetMenu(juce::ComboBox& cb);
     void applyTargetFromMenu(juce::ComboBox& cb, ModulationMatrix::Target& dst);
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
     PluginProcessor& processor;
 

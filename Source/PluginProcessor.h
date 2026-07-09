@@ -21,9 +21,10 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 9;
-constexpr int VERSION_BUILD = 10;
+constexpr int VERSION_BUILD = 11;
 
-class PluginProcessor : public juce::AudioProcessor
+class PluginProcessor : public juce::AudioProcessor,
+                        public juce::ChangeBroadcaster
 {
 public:
     PluginProcessor();
@@ -86,8 +87,18 @@ public:
 
     // UI-only shared selection of the currently active FX parameter (rack <-> timeline).
     void setActiveFxSelection(const juce::String& effectName, const juce::String& parameterName);
-    juce::String getActiveFxEffectName() const;
-    juce::String getActiveFxParameterName() const;
+    // ─── Getter für das ModulationPanel ───
+    juce::String getActiveFxEffectName() const 
+    { 
+        const juce::ScopedLock sl(activeFxLock); 
+        return activeFxEffectName; 
+    }
+    
+    juce::String getActiveFxParameterName() const 
+    { 
+        const juce::ScopedLock sl(activeFxLock); 
+        return activeFxParameterName; 
+    }
 
     std::vector<ObjectDatabase::FXModule> getFxChainForObject(int objectId) const;
     std::vector<ObjectDatabase::FXModule> getFxChainForSelectedObject() const;

@@ -49,6 +49,15 @@ void SpectralView::setGateDb(float gateDbValue)
     rebuildLookupTables();
 }
 
+void SpectralView::setOverlayVisibility(bool shouldBeVisible)
+{
+    if (isOverlayVisible != shouldBeVisible)
+    {
+        isOverlayVisible = shouldBeVisible;
+        repaint(); // Sorgt dafür, dass das Bild sofort aktualisiert wird
+    }
+}
+
 void SpectralView::setFrequencyCurve(float curveAmount)
 {
     frequencyCurveAmount = juce::jlimit(0.0f, 10.0f, curveAmount);
@@ -336,26 +345,33 @@ void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
             : juce::jlimit(magnitudeMin, magnitudeMax, smooth);
         auto pixel = magnitudeToColour(clippedDb);
 
-        if (hasOverlay)
+        // FIX 1 & 2: Overlay nur zeichnen, wenn Objekte existieren UND Signal laut genug ist
+        if (hasOverlay && isOverlayVisible)
         {
             const int binLo = juce::jlimit(0, SpectralFrameBuffer::NUM_BINS - 1, static_cast<int>(binF));
             const int binHi = juce::jmin(SpectralFrameBuffer::NUM_BINS - 1, binLo + 1);
             const float frac = binF - static_cast<float>(binLo);
 
             const float t = overlayTransient[static_cast<size_t>(binLo)]
-                          + frac * (overlayTransient[static_cast<size_t>(binHi)] - overlayTransient[static_cast<size_t>(binLo)]);
+                + frac * (overlayTransient[static_cast<size_t>(binHi)] - overlayTransient[static_cast<size_t>(binLo)]);
             const float tn = overlayTonal[static_cast<size_t>(binLo)]
-                           + frac * (overlayTonal[static_cast<size_t>(binHi)] - overlayTonal[static_cast<size_t>(binLo)]);
+                + frac * (overlayTonal[static_cast<size_t>(binHi)] - overlayTonal[static_cast<size_t>(binLo)]);
             const float n = overlayNoise[static_cast<size_t>(binLo)]
-                          + frac * (overlayNoise[static_cast<size_t>(binHi)] - overlayNoise[static_cast<size_t>(binLo)]);
+                + frac * (overlayNoise[static_cast<size_t>(binHi)] - overlayNoise[static_cast<size_t>(binLo)]);
 
-            const float alphaT = juce::jlimit(0.0f, 0.55f, t * 0.55f);
-            const float alphaTN = juce::jlimit(0.0f, 0.50f, tn * 0.50f);
-            const float alphaN = juce::jlimit(0.0f, 0.45f, n * 0.45f);
+            // ✨ DER "POLISH"-FIX FÜR DEN GRÜNEN HINTERGRUND ✨
+            // Wir berechnen einen Fader-Wert basierend auf dem Abstand zum Gate.
+            // Wenn das Signal unter dem Gate ist (Stille/Rauschen), wird gateFade zu 0.0.
+            // Die Overlays werden dann nicht mehr auf den schwarzen Hintergrund gemalt.
+            const float gateFade = juce::jlimit(0.0f, 1.0f, (smooth - gateDb) / 12.0f);
 
-            pixel = pixel.interpolatedWith(juce::Colour(0xFFFF5252), alphaT);
-            pixel = pixel.interpolatedWith(juce::Colour(0xFF4AA3FF), alphaTN);
-            pixel = pixel.interpolatedWith(juce::Colour(0xFF4FD16A), alphaN);
+            const float alphaT = juce::jlimit(0.0f, 0.55f, t * 0.55f * gateFade);
+            const float alphaTN = juce::jlimit(0.0f, 0.50f, tn * 0.50f * gateFade);
+            const float alphaN = juce::jlimit(0.0f, 0.45f, n * 0.45f * gateFade);
+
+            pixel = pixel.interpolatedWith(juce::Colour(0xFFFF5252), alphaT);   // Transient (Rot)
+            pixel = pixel.interpolatedWith(juce::Colour(0xFF4AA3FF), alphaTN);  // Tonal (Cyan)
+            pixel = pixel.interpolatedWith(juce::Colour(0xFF4FD16A), alphaN);   // Noise (Grün)
         }
 
         bmpData.setPixelColour(0, y, pixel);
