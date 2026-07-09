@@ -198,9 +198,7 @@ void processBlock(const Settings& settings,
 
         // FIX 5: Wow & Flutter. Transienten werden organisch verschmiert.
         const float speed = 1.0f + std::sin(voice.phaseAcc) * 0.035f * cloud;
-
-        // Advance read position: speed slightly modulated by shimmer (±0.8% at cloud=1)
-        const float speed = 1.0f + std::sin(voice.phaseAcc) * 0.008f * cloud;
+        
         voice.readPos += speed;
         if (voice.readPos >= fN) voice.readPos -= fN;
         if (voice.readPos <  0.0f) voice.readPos += fN;
