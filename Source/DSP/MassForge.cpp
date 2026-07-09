@@ -69,11 +69,19 @@ FrameParams computeFrameParams(const Settings& settings,
 
 float processSample(float inSample, const FrameParams& params)
 {
+    // 1. Kompression
     const float compressed = inSample * params.gainLinear;
-    const float driven = compressed * params.driveLinear;
+    
+    // 2. Makeup-Gain und Drive werden VOR der Sättigung angewendet!
+    const float driven = compressed * params.driveLinear * params.makeupLinear;
+    
+    // 3. Sättigung (Tanh fungiert nun als finaler Limiter)
     const float offset = 0.1f * params.forge;
     const float saturated = std::tanh(driven + offset) - std::tanh(offset);
-    const float wet = saturated * params.makeupLinear;
+    
+    // 'wet' ist jetzt direkt 'saturated', da das Makeup-Gain schon im Tanh gelandet ist.
+    const float wet = saturated; 
+
     return (1.0f - params.mix) * compressed + params.mix * wet;
 }
 }

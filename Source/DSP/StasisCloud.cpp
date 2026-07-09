@@ -75,10 +75,17 @@ void processBlock(const Settings& settings,
         state.freezeActive = true;
         state.blendRamp    = 0.0f;
 
-        // Map Size → frozen loop length (quadratic: small stays small)
+        // Map Size → frozen loop length
+        // FIX 2: Gängige Freeze-Effekte nutzen Loops im Bereich von ca. 100 - 500 ms.
+        // Das alte Maximum (128 Frames = ~1.5s) klang eher wie ein Looper.
+        // Wir begrenzen das Maximum auf 48 Frames (~500 ms), was perfekt für 
+        // rhythmische Stutters und dichte Ambient-Pads ist.
+        constexpr int MAX_FREEZE_FRAMES = 48;
         const int available = juce::jmin(state.capturedFrames, State::MAX_CAPTURE_FRAMES);
-        state.frozenFrameCount = juce::jlimit(1, available,
-            1 + static_cast<int>(size * size * static_cast<float>(available - 1)));
+        const int maxLoopFrames = juce::jmin(available, MAX_FREEZE_FRAMES);
+        
+        state.frozenFrameCount = juce::jlimit(1, maxLoopFrames,
+            1 + static_cast<int>(size * size * static_cast<float>(maxLoopFrames - 1)));
 
         // The frozen loop uses the most recently captured N frames.
         // captureWriteIdx is the NEXT write slot, so the last written frame
@@ -90,16 +97,14 @@ void processBlock(const Settings& settings,
         state.numActiveVoices = juce::jlimit(1, State::MAX_VOICES,
             1 + juce::roundToInt(cloud * static_cast<float>(State::MAX_VOICES - 1)));
 
-        for (int v = 0; v < State::MAX_VOICES; ++v)
+                for (int v = 0; v < State::MAX_VOICES; ++v)
         {
             state.voices[v].active = (v < state.numActiveVoices);
+            state.voices[v].lpz = 0.0f; // Filter-State für sauberen Start zurücksetzen
             if (v >= state.numActiveVoices) continue;
 
-            // Base position: spread voices evenly across the frozen loop
             const float basePos = (static_cast<float>(v) / static_cast<float>(state.numActiveVoices))
                                 * static_cast<float>(state.frozenFrameCount);
-
-            // Cloud>0: add random jitter to the start position
             const float jitterRange = cloud * static_cast<float>(state.frozenFrameCount) * 0.5f;
             const float jitter = (cloud > 0.01f)
                 ? (hashToUnit(channel, v, state.frozenStartIdx) - 0.5f) * jitterRange
@@ -108,17 +113,20 @@ void processBlock(const Settings& settings,
             state.voices[v].readPos = juce::jlimit(0.0f,
                 static_cast<float>(state.frozenFrameCount) - 0.001f,
                 basePos + jitter);
+
             state.voices[v].phaseAcc = 0.0f;
 
-            // Shimmer: slow organic phase drift per voice (only meaningful at Cloud>0)
             if (cloud > 0.01f)
             {
                 const float seed1 = hashToUnit(channel, v + 1, state.frozenStartIdx + 1);
                 const float seed2 = hashToUnit(channel, v + 2, state.frozenStartIdx + 2);
-                const float baseVel  = juce::jmap(size, 0.0f, 1.0f, 0.020f, 0.004f);
-                const float sign     = (seed1 < 0.5f) ? -1.0f : 1.0f;
+                const float baseVel = juce::jmap(size, 0.0f, 1.0f, 0.020f, 0.004f);
+                const float sign = (seed1 < 0.5f) ? -1.0f : 1.0f;
                 const float speedMul = juce::jmap(seed2, 0.0f, 1.0f, 0.60f, 1.40f);
-                state.voices[v].phaseVel = baseVel * speedMul * sign * cloud;
+                
+                // FIX 1: Shimmer Boost. Stimmen driften bei hohem Blur-Wert stark auseinander (Chorus-Effekt)
+                const float shimmerBoost = 1.0f + 24.0f * cloud; 
+                state.voices[v].phaseVel = baseVel * speedMul * sign * cloud * shimmerBoost;
             }
             else
             {
@@ -155,32 +163,41 @@ void processBlock(const Settings& settings,
         if (!voice.active) continue;
 
         // ── Grain amplitude envelope ──────────────────────────────────
-        // Cloud=0: rectangular (full amplitude, click at wrap point)
-        // Cloud=1: Hann shape  (smooth fade in/out, no click)
-        const float grainPhase = voice.readPos / fN;  // 0..1
-        const float hannAmp    = 0.5f * (1.0f - std::cos(
-                                    juce::MathConstants<float>::twoPi * grainPhase));
-        const float amplitude  = juce::jmap(cloud, 1.0f, hannAmp) * voiceGain;
+        // FIX 3: Sustain-Envelope. Das Pad darf an den Rändern nicht auf 0 abfallen.
+        const float grainPhase = voice.readPos / fN; // 0..1
+        const float hannAmp = 0.5f * (1.0f - std::cos(
+            juce::MathConstants<float>::twoPi * grainPhase));
+        const float envAmp = juce::jmap(cloud, 1.0f, 0.45f + 0.55f * hannAmp);
+        const float amplitude = envAmp * voiceGain;
 
-        // ── Linear interpolation between adjacent frozen frames ───────
-        const int   fi0      = static_cast<int>(std::floor(voice.readPos)) % state.frozenFrameCount;
-        const int   fi1      = (fi0 + 1) % state.frozenFrameCount;
-        const float frac     = voice.readPos - std::floor(voice.readPos);
-        const int   ringIdx0 = (state.frozenStartIdx + fi0) % State::MAX_CAPTURE_FRAMES;
-        const int   ringIdx1 = (state.frozenStartIdx + fi1) % State::MAX_CAPTURE_FRAMES;
+        // ── Linear interpolation & Lowpass ───────
+        const int fi0 = static_cast<int>(std::floor(voice.readPos)) % state.frozenFrameCount;
+        const int fi1 = (fi0 + 1) % state.frozenFrameCount;
+        const float frac = voice.readPos - std::floor(voice.readPos);
+
+        const int ringIdx0 = (state.frozenStartIdx + fi0) % State::MAX_CAPTURE_FRAMES;
+        const int ringIdx1 = (state.frozenStartIdx + fi1) % State::MAX_CAPTURE_FRAMES;
+
         const float* src0 = state.captureRing.data() + static_cast<size_t>(ringIdx0) * static_cast<size_t>(frameSize);
         const float* src1 = state.captureRing.data() + static_cast<size_t>(ringIdx1) * static_cast<size_t>(frameSize);
 
-        const float w0 = amplitude * (1.0f - frac);
-        const float w1 = amplitude * frac;
+        // FIX 4: 1-Pol Lowpass pro Stimme. Macht das Pad bei hohem Blur-Wert weich und dunkel.
+        const float lpCoeff = juce::jlimit(0.05f, 1.0f, 1.0f - 0.92f * cloud);
+
         for (int i = 0; i < frameSize; ++i)
-            state.scratchFrame[static_cast<size_t>(i)] += src0[i] * w0 + src1[i] * w1;
+        {
+            const float s = src0[i] * (1.0f - frac) + src1[i] * frac;
+            voice.lpz += (s - voice.lpz) * lpCoeff;
+            state.scratchFrame[static_cast<size_t>(i)] += voice.lpz * amplitude;
+        }
 
         // ── Advance read position with shimmer modulation ─────────────
-        // phaseVel: slow per-frame LFO that causes subtle organic pitch drift
         voice.phaseAcc += voice.phaseVel;
-        if (voice.phaseAcc >  juce::MathConstants<float>::pi) voice.phaseAcc -= juce::MathConstants<float>::twoPi;
+        if (voice.phaseAcc > juce::MathConstants<float>::pi) voice.phaseAcc -= juce::MathConstants<float>::twoPi;
         if (voice.phaseAcc < -juce::MathConstants<float>::pi) voice.phaseAcc += juce::MathConstants<float>::twoPi;
+
+        // FIX 5: Wow & Flutter. Transienten werden organisch verschmiert.
+        const float speed = 1.0f + std::sin(voice.phaseAcc) * 0.035f * cloud;
 
         // Advance read position: speed slightly modulated by shimmer (±0.8% at cloud=1)
         const float speed = 1.0f + std::sin(voice.phaseAcc) * 0.008f * cloud;

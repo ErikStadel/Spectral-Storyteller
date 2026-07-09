@@ -138,11 +138,11 @@ void processBin(int bin,
 
     // Gentle output trim + safety limiter (avoid severe level collapse).
     const float edgeBoostDb = juce::jmax(0.0f, (edge - 0.5f) * 24.0f);
-    const float trimDb = -juce::jmin(2.0f, gritDb * 0.018f + edgeBoostDb * 0.04f);
-    wetMag *= dbToGain(trimDb);
+    const float trimDb      = -(gritDb * 0.5f + edgeBoostDb * 0.6f);
+    wetMag *= dbToGain(juce::jlimit(-48.0f, 0.0f, trimDb));
 
-    const float ceiling = juce::jmax(1.0e-6f, inMag * (3.2f + 7.0f * grit));
-    wetMag = ceiling * std::tanh(wetMag / ceiling);
+    constexpr float safeCeiling = 0.95f; 
+    wetMag = safeCeiling * std::tanh(wetMag / safeCeiling);
 
     const float wetScale = wetMag / inMag;
     const float dryWeight = 1.0f - mix;
@@ -178,7 +178,8 @@ void processBlock(const Settings& settings,
 
     // Output trim (same formula as spectral version)
     const float edgeBoostDb = juce::jmax(0.0f, (edge - 0.5f) * 24.0f);
-    const float trimGain    = dbToGain(-juce::jmin(2.0f, gritDb * 0.018f + edgeBoostDb * 0.04f));
+    const float trimDb      = -(gritDb * 0.5f + edgeBoostDb * 0.6f);
+    const float trimGain    = dbToGain(juce::jlimit(-48.0f, 0.0f, trimDb));
 
     constexpr float kneeRef = 7.5f;
 
@@ -210,7 +211,6 @@ void processBlock(const Settings& settings,
         const float sign = (dry >= 0.0f) ? 1.0f : -1.0f;
         const float absX = std::abs(dry);
 
-        // Normalize → waveshaper → restore scale + sign
         const float xNorm = absX * preGain / kneeRef;
 
         const float tubeN    = std::tanh(xNorm * 1.35f)
@@ -222,13 +222,8 @@ void processBlock(const Settings& settings,
 
         float wet = sign * (tubeN * tubeWeight + digitalN * digitalWeight + fuzzN * fuzzWeight) * kneeRef;
 
-        // Output trim
+        // Output trim anwenden (Kompensiert den massiven Pre-Gain)
         wet *= trimGain;
-
-        // Dynamic ceiling: prevents spectral energy build-up
-        const float ceiling = juce::jmax(1.0e-6f, absX * (3.2f + 7.0f * grit));
-        if (std::abs(wet) > ceiling)
-            wet = sign * ceiling * std::tanh(std::abs(wet) / juce::jmax(1.0e-6f, ceiling));
 
         // Edge EQ (biquad peaking)
         if (applyEdge)
@@ -239,6 +234,13 @@ void processBlock(const Settings& settings,
             state.y2 = state.y1;  state.y1 = yin;
             wet = yin;
         }
+
+        // ─── FIX 2 & 3: Fester Safety-Limiter NACH dem EQ ───
+        // Verhindert, dass der +12 dB Boost des EQs die DAW clippen lässt.
+        // Ein fester Wert (~ -0.4 dBFS) ist sicherer als die alte Input-Skalierung.
+        constexpr float safeCeiling = 0.95f; 
+        if (std::abs(wet) > safeCeiling)
+            wet = (wet >= 0.0f ? 1.0f : -1.0f) * safeCeiling * std::tanh(std::abs(wet) / safeCeiling);
 
         buffer[i] = (1.0f - mix) * dry + mix * wet;
     }

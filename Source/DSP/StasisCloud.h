@@ -39,12 +39,13 @@ struct State
     float blendRamp        = 0.0f; // 0=live → 1=fully frozen (smooth engage ramp)
 
     // ── Grain voices ──────────────────────────────────────────────────────
-    struct Voice
+        struct Voice
     {
-        float readPos  = 0.0f;  // fractional frame position in frozen loop
-        float phaseAcc = 0.0f;  // shimmer LFO accumulator
-        float phaseVel = 0.0f;  // shimmer phase velocity (radians per frame)
-        bool  active   = false;
+        float readPos = 0.0f;      // fractional frame position in frozen loop
+        float phaseAcc = 0.0f;     // shimmer LFO accumulator
+        float phaseVel = 0.0f;     // shimmer phase velocity (radians per frame)
+        float lpz = 0.0f;          // NEU: 1-pole lowpass filter state for "Blur" diffusion
+        bool active = false;
     };
     std::array<Voice, MAX_VOICES> voices{};
     int numActiveVoices = 0;
