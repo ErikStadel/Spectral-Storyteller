@@ -136,13 +136,13 @@ void processBin(int bin,
 
     float wetMag = shapedN * kneeRef;
 
-    // Gentle output trim + safety limiter (avoid severe level collapse).
+    // ─── FIX: Aggressiverer Trim für Spektral-Magnituden ───
     const float edgeBoostDb = juce::jmax(0.0f, (edge - 0.5f) * 24.0f);
-    const float trimDb      = -(gritDb * 0.5f + edgeBoostDb * 0.6f);
-    wetMag *= dbToGain(juce::jlimit(-48.0f, 0.0f, trimDb));
+    const float trimDb      = -(gritDb * 0.75f + edgeBoostDb * 0.85f);
+    wetMag *= dbToGain(juce::jlimit(-60.0f, 0.0f, trimDb));
 
-    constexpr float safeCeiling = 0.95f; 
-    wetMag = safeCeiling * std::tanh(wetMag / safeCeiling);
+    // Fester Ceiling für Magnituden (immer positiv)
+    wetMag = 0.95f * std::tanh(wetMag / 0.95f);
 
     const float wetScale = wetMag / inMag;
     const float dryWeight = 1.0f - mix;
@@ -176,10 +176,14 @@ void processBlock(const Settings& settings,
     const float fuzzWeight    = smoothstep(juce::jlimit(0.0f, 1.0f, (asymmetry - 0.5f) * 2.0f));
     const float digitalWeight = juce::jmax(0.0f, 1.0f - tubeWeight - fuzzWeight);
 
-    // Output trim (same formula as spectral version)
+     // Output trim (same formula as spectral version)
     const float edgeBoostDb = juce::jmax(0.0f, (edge - 0.5f) * 24.0f);
-    const float trimDb      = -(gritDb * 0.5f + edgeBoostDb * 0.6f);
-    const float trimGain    = dbToGain(juce::jlimit(-48.0f, 0.0f, trimDb));
+    
+    // FIX: Aggressivere Dämpfung (0.75 / 0.85 statt 0.5 / 0.6)
+    // und tieferes Limit (-60 dB statt -48 dB), damit der Safety-Limiter 
+    // nicht mehr hart clippen muss.
+    const float trimDb      = -(gritDb * 0.75f + edgeBoostDb * 0.85f);
+    const float trimGain    = dbToGain(juce::jlimit(-60.0f, 0.0f, trimDb));
 
     constexpr float kneeRef = 7.5f;
 
