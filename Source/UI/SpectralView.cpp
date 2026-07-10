@@ -1,4 +1,5 @@
 #include "SpectralView.h"
+#include <algorithm>
 
 // =============================================================================
 // Konstruktor / Destruktor
@@ -74,6 +75,33 @@ void SpectralView::setSegmentationOverlayProvider(std::function<bool(std::array<
                                                                      std::array<float, SpectralFrameBuffer::NUM_BINS>&)> provider)
 {
     overlayProvider = std::move(provider);
+}
+
+void SpectralView::setSelectedObjectOverlayStateProvider(std::function<bool(int& selectedObjectId, uint64_t& revision)> provider)
+{
+    selectedObjectOverlayStateProvider = std::move(provider);
+    selectedObjectOverlayDirty = true;
+}
+
+void SpectralView::setSelectedObjectOverlayDataProvider(std::function<bool(int objectId, SelectedObjectOverlayData& outData)> provider)
+{
+    selectedObjectOverlayDataProvider = std::move(provider);
+    selectedObjectOverlayDirty = true;
+}
+
+void SpectralView::setAllObjectOverlayDataProvider(std::function<bool(std::vector<SelectedObjectOverlayData>& outData)> provider)
+{
+    allObjectOverlayDataProvider = std::move(provider);
+    selectedObjectOverlayDirty = true;
+}
+
+void SpectralView::setShowAllObjectOverlays(bool shouldShowAll)
+{
+    if (showAllObjectOverlays == shouldShowAll)
+        return;
+
+    showAllObjectOverlays = shouldShowAll;
+    selectedObjectOverlayDirty = true;
 }
 
 int SpectralView::getBinForY(int y) const
@@ -321,6 +349,9 @@ void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
 
     const int x = w - 1;
 
+    if (selectedObjectOverlayImage.isValid())
+        selectedObjectOverlayImage.moveImageSection(0, 0, 1, 0, w - 1, h);
+
     // BitmapData nach moveImageSection: readWrite nötig, da moveImageSection
     // intern in-place kopiert hat; writeOnly wäre unsicher auf manchen Backends.
     juce::Image::BitmapData bmpData(spectrogramImage,
@@ -375,6 +406,188 @@ void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
         }
 
         bmpData.setPixelColour(0, y, pixel);
+    }
+
+    writeSelectedObjectOverlayColumn(x, frame.transportTimeSec);
+}
+
+bool SpectralView::resolveFrameMaskForTime(const SelectedObjectOverlayData& data,
+                                           double timeSec,
+                                           std::array<bool, SpectralFrameBuffer::NUM_BINS>& outMask) const
+{
+    outMask.fill(false);
+
+    if (!data.hasTimeFrequencyMask)
+        return false;
+
+    const auto& times = data.frameTimesSec;
+    const auto& masks = data.frameMasks;
+    if (times.empty() || times.size() != masks.size())
+        return false;
+
+    auto lower = std::lower_bound(times.begin(), times.end(), timeSec);
+    size_t idx = 0;
+    if (lower == times.end())
+        idx = times.size() - 1;
+    else if (lower == times.begin())
+        idx = 0;
+    else
+    {
+        const size_t hi = static_cast<size_t>(std::distance(times.begin(), lower));
+        const size_t lo = hi - 1;
+        idx = (std::abs(times[hi] - timeSec) < std::abs(timeSec - times[lo])) ? hi : lo;
+    }
+
+    double maxDistance = 0.03;
+    if (times.size() > 1)
+    {
+        if (idx > 0)
+            maxDistance = juce::jmax(maxDistance, 0.5 * (times[idx] - times[idx - 1]));
+        if (idx + 1 < times.size())
+            maxDistance = juce::jmax(maxDistance, 0.5 * (times[idx + 1] - times[idx]));
+    }
+
+    if (std::abs(times[idx] - timeSec) > maxDistance)
+        return false;
+
+    outMask = masks[idx];
+    return true;
+}
+
+void SpectralView::writeSelectedObjectOverlayColumn(int x, double timeSec)
+{
+    if (!selectedObjectOverlayImage.isValid())
+        return;
+
+    const int h = getHeight();
+    if (x < 0 || x >= selectedObjectOverlayImage.getWidth() || h <= 0)
+        return;
+
+    juce::Image::BitmapData overlayData(selectedObjectOverlayImage,
+                                        x, 0, 1, h,
+                                        juce::Image::BitmapData::writeOnly);
+
+    if (visibleOverlayObjects.empty())
+    {
+        for (int y = 0; y < h; ++y)
+            overlayData.setPixelColour(0, y, juce::Colours::transparentBlack);
+        return;
+    }
+
+    std::vector<std::array<bool, SpectralFrameBuffer::NUM_BINS>> columnMasks;
+    std::vector<bool> columnMaskValid;
+    columnMasks.resize(visibleOverlayObjects.size());
+    columnMaskValid.resize(visibleOverlayObjects.size(), false);
+
+    for (size_t i = 0; i < visibleOverlayObjects.size(); ++i)
+    {
+        const auto& obj = visibleOverlayObjects[i];
+        if (!obj.hasObject)
+            continue;
+
+        if (obj.hasTimeFrequencyMask)
+            columnMaskValid[i] = resolveFrameMaskForTime(obj, timeSec, columnMasks[i]);
+        else
+        {
+            columnMasks[i] = obj.combinedMask;
+            columnMaskValid[i] = true;
+        }
+    }
+
+    for (int y = 0; y < h; ++y)
+    {
+        juce::Colour pixel = juce::Colours::transparentBlack;
+
+        const int bin = getBinForY(y);
+        for (size_t i = 0; i < visibleOverlayObjects.size(); ++i)
+        {
+            if (!columnMaskValid[i])
+                continue;
+
+            const auto& maskForColumn = columnMasks[i];
+            if (!maskForColumn[static_cast<size_t>(bin)])
+                continue;
+
+            bool edge = false;
+            if (y == 0 || y == h - 1)
+            {
+                edge = true;
+            }
+            else
+            {
+                const int prevBin = getBinForY(y - 1);
+                const int nextBin = getBinForY(y + 1);
+                edge = !maskForColumn[static_cast<size_t>(prevBin)] || !maskForColumn[static_cast<size_t>(nextBin)];
+            }
+
+            const auto& obj = visibleOverlayObjects[i];
+            const juce::Colour fillColour = obj.colour.withAlpha(0.18f);
+            const juce::Colour edgeColour = obj.colour.withAlpha(0.64f);
+            pixel = pixel.interpolatedWith(edge ? edgeColour : fillColour, 0.9f);
+        }
+
+        overlayData.setPixelColour(0, y, pixel);
+    }
+}
+
+void SpectralView::rebuildSelectedObjectOverlayFromVisibleColumns()
+{
+    const int w = juce::jmax(1, getWidth());
+    const int h = juce::jmax(1, getHeight());
+    selectedObjectOverlayImage = juce::Image(juce::Image::ARGB, w, h, true);
+
+    if (visibleOverlayObjects.empty())
+        return;
+
+    for (int x = 0; x < w; ++x)
+    {
+        if (x >= static_cast<int>(visibleColumnHasData.size()) || !visibleColumnHasData[static_cast<size_t>(x)])
+            continue;
+
+        writeSelectedObjectOverlayColumn(x, visibleColumnTimesSec[static_cast<size_t>(x)]);
+    }
+}
+
+void SpectralView::updateSelectedObjectOverlayState()
+{
+    if (!selectedObjectOverlayStateProvider)
+        return;
+
+    int selectedObjectId = -1;
+    uint64_t revision = 0;
+    if (!selectedObjectOverlayStateProvider(selectedObjectId, revision))
+        return;
+
+    if (showAllObjectOverlays != cachedShowAllObjectOverlays
+        || selectedObjectId != cachedSelectedObjectId
+        || revision != cachedSelectedObjectRevision)
+    {
+        cachedShowAllObjectOverlays = showAllObjectOverlays;
+        cachedSelectedObjectId = selectedObjectId;
+        cachedSelectedObjectRevision = revision;
+
+        visibleOverlayObjects.clear();
+        if (showAllObjectOverlays)
+        {
+            if (allObjectOverlayDataProvider)
+            {
+                std::vector<SelectedObjectOverlayData> allData;
+                if (allObjectOverlayDataProvider(allData))
+                    visibleOverlayObjects = std::move(allData);
+            }
+        }
+        else
+        {
+            SelectedObjectOverlayData newData;
+            bool ok = false;
+            if (selectedObjectId > 0 && selectedObjectOverlayDataProvider)
+                ok = selectedObjectOverlayDataProvider(selectedObjectId, newData);
+
+            if (ok)
+                visibleOverlayObjects.push_back(std::move(newData));
+        }
+
+        selectedObjectOverlayDirty = true;
     }
 }
 
@@ -450,6 +663,9 @@ void SpectralView::paint(juce::Graphics& g)
     if (spectrogramImage.isValid())
         g.drawImageAt(spectrogramImage, 0, 0);
 
+    if (selectedObjectOverlayImage.isValid())
+        g.drawImageAt(selectedObjectOverlayImage, 0, 0);
+
     if (showGrid)
         drawGrid(g);
 }
@@ -460,13 +676,24 @@ void SpectralView::resized()
     const int h = juce::jmax(1, getHeight());
 
     spectrogramImage = juce::Image(juce::Image::RGB, w, h, true);
+    selectedObjectOverlayImage = juce::Image(juce::Image::ARGB, w, h, true);
     visibleColumnTimesSec.assign(static_cast<size_t>(w), 0.0);
     visibleColumnHasData.assign(static_cast<size_t>(w), false);
+    selectedObjectOverlayDirty = true;
     rebuildLookupTables();
 }
 
 void SpectralView::timerCallback()
 {
+    updateSelectedObjectOverlayState();
+
+    if (selectedObjectOverlayDirty)
+    {
+        rebuildSelectedObjectOverlayFromVisibleColumns();
+        selectedObjectOverlayDirty = false;
+        repaint();
+    }
+
     if (isPaused)
         return;
 

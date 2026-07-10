@@ -16,6 +16,82 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         return processor.getSegmentationOverlay(transient, tonal, noise);
     });
+    spectralView->setSelectedObjectOverlayStateProvider([this](int& selectedObjectId, uint64_t& revision)
+    {
+        auto* db = processor.getObjectDatabase();
+        if (db == nullptr)
+            return false;
+
+        selectedObjectId = processor.getSelectedObjectId();
+        revision = db->getRevision();
+        return true;
+    });
+    spectralView->setSelectedObjectOverlayDataProvider([this](int objectId, SpectralView::SelectedObjectOverlayData& outData)
+    {
+        auto* db = processor.getObjectDatabase();
+        if (db == nullptr || objectId <= 0)
+            return false;
+
+        ObjectDatabase::ObjectMask obj;
+        if (!db->getObjectCopyById(objectId, obj))
+            return false;
+
+        outData = SpectralView::SelectedObjectOverlayData{};
+        outData.hasObject = true;
+        outData.objectId = obj.id;
+        outData.colour = juce::Colour(static_cast<juce::uint32>(obj.color));
+        outData.combinedMask = obj.mask;
+        outData.hasTimeFrequencyMask = obj.hasTimeFrequencyMask
+            && !obj.timeMaskFrameTimesSec.empty()
+            && obj.timeMaskFrameTimesSec.size() == obj.timeMaskFrameMasks.size();
+
+        if (outData.hasTimeFrequencyMask)
+        {
+            outData.frameTimesSec = obj.timeMaskFrameTimesSec;
+            outData.frameMasks = obj.timeMaskFrameMasks;
+        }
+
+        return true;
+    });
+    spectralView->setAllObjectOverlayDataProvider([this](std::vector<SpectralView::SelectedObjectOverlayData>& outData)
+    {
+        outData.clear();
+
+        auto* db = processor.getObjectDatabase();
+        if (db == nullptr)
+            return false;
+
+        const int numObjects = db->getNumObjects();
+        outData.reserve(static_cast<size_t>(numObjects));
+        for (int i = 0; i < numObjects; ++i)
+        {
+            ObjectDatabase::ObjectMask obj;
+            if (!db->getObjectCopy(i, obj))
+                continue;
+
+            if (!obj.engaged)
+                continue;
+
+            SpectralView::SelectedObjectOverlayData data;
+            data.hasObject = true;
+            data.objectId = obj.id;
+            data.colour = juce::Colour(static_cast<juce::uint32>(obj.color));
+            data.combinedMask = obj.mask;
+            data.hasTimeFrequencyMask = obj.hasTimeFrequencyMask
+                && !obj.timeMaskFrameTimesSec.empty()
+                && obj.timeMaskFrameTimesSec.size() == obj.timeMaskFrameMasks.size();
+
+            if (data.hasTimeFrequencyMask)
+            {
+                data.frameTimesSec = obj.timeMaskFrameTimesSec;
+                data.frameMasks = obj.timeMaskFrameMasks;
+            }
+
+            outData.push_back(std::move(data));
+        }
+
+        return true;
+    });
     addAndMakeVisible(*spectralView);
 
     sourceView = std::make_unique<SourceView>(processor);
@@ -192,6 +268,22 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     rectSelectButton.setToggleState(true, juce::dontSendNotification);
     rectSelectButton.setTooltip("Rechteck-Auswahl: erzeugt die bisherige 1D-Frequenzmaske");
     lassoSelectButton.setTooltip("Pinsel-Auswahl: erzeugt eine echte 2D-Zeit-Frequenz-Maske; Shift+Scroll aendert den Durchmesser");
+
+    maskScopeButton.setClickingTogglesState(true);
+    maskScopeButton.setToggleState(false, juce::dontSendNotification);
+    maskScopeButton.setButtonText("Masks: Sel");
+    maskScopeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF27272A));
+    maskScopeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF3F3F46));
+    maskScopeButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
+    maskScopeButton.setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
+    maskScopeButton.setTooltip("Masken-Anzeige im Spectral View: nur ausgewaehltes Objekt oder alle Objekte");
+    maskScopeButton.onClick = [this]()
+    {
+        const bool showAll = maskScopeButton.getToggleState();
+        maskScopeButton.setButtonText(showAll ? "Masks: All" : "Masks: Sel");
+        if (spectralView)
+            spectralView->setShowAllObjectOverlays(showAll);
+    };
 
     rectSelectButton.onClick = [this]()
     {
@@ -453,21 +545,10 @@ void PluginEditor::paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area)
     g.drawText("SPCTRL /\\ ARC", area.withTrimmedLeft(16).withTrimmedRight(area.getWidth() / 2),
                juce::Justification::centredLeft, false);
 
-    // Preset selector look
-    auto presetArea = juce::Rectangle<int>(area.getX() + 260, area.getY() + 10, 160, area.getHeight() - 20);
-    g.setColour(juce::Colour(0xFF18181B));
-    g.fillRoundedRectangle(presetArea.toFloat(), 3.0f);
-    g.setColour(juce::Colour(0xFF3F3F46));
-    g.drawRoundedRectangle(presetArea.toFloat(), 3.0f, 1.0f);
-    g.setColour(juce::Colour(0xFFE4E4E7));
-    g.setFont(juce::Font(10.0f));
-    g.drawText("Default Preset", presetArea.reduced(8, 0), juce::Justification::centredLeft, false);
-
     // Right side status
     g.setFont(juce::Font(10.0f));
     g.setColour(juce::Colour(0xFFA1A1AA));
     auto rightArea = area.withTrimmedLeft(area.getWidth() - 200).reduced(8, 0);
-    g.drawText("CPU: --", rightArea.removeFromLeft(70), juce::Justification::centredRight, false);
     g.drawText(processor.getBuildInfo(), rightArea, juce::Justification::centredRight, false);
 }
 
@@ -511,6 +592,7 @@ void PluginEditor::updateViewMode()
 
     rectSelectButton.setVisible(!showSourceView);
     lassoSelectButton.setVisible(!showSourceView);
+    maskScopeButton.setVisible(!showSourceView);
     gateSlider.setVisible(!showSourceView);
     gateLabel.setVisible(!showSourceView);
 
@@ -558,6 +640,7 @@ void PluginEditor::resized()
     lassoSelectButton.setBounds(toolArea.removeFromLeft(56));
 
     viewModeButton.setBounds(spectralBounds.getRight() - 94, spectralBounds.getY() + 8, 86, 20);
+    maskScopeButton.setBounds(spectralBounds.getRight() - 184, spectralBounds.getY() + 8, 84, 20);
 
     // View gain control as a vertical slider at the lower-right corner.
     juce::Rectangle<int> viewGainLabelArea(spectralBounds.getRight() - 36,

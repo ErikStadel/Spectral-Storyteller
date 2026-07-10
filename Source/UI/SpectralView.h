@@ -20,6 +20,17 @@
 class SpectralView : public juce::Component, public juce::Timer
 {
 public:
+    struct SelectedObjectOverlayData
+    {
+        bool hasObject = false;
+        int objectId = -1;
+        juce::Colour colour = juce::Colour(0xFF00CCFF);
+        bool hasTimeFrequencyMask = false;
+        std::array<bool, SpectralFrameBuffer::NUM_BINS> combinedMask{};
+        std::vector<double> frameTimesSec;
+        std::vector<std::array<bool, SpectralFrameBuffer::NUM_BINS>> frameMasks;
+    };
+
     explicit SpectralView(SpectralFrameBuffer* frameBuffer);
     ~SpectralView() override;
 
@@ -42,6 +53,10 @@ public:
     void setSegmentationOverlayProvider(std::function<bool(std::array<float, SpectralFrameBuffer::NUM_BINS>&,
                                                             std::array<float, SpectralFrameBuffer::NUM_BINS>&,
                                                             std::array<float, SpectralFrameBuffer::NUM_BINS>&)> provider);
+    void setSelectedObjectOverlayStateProvider(std::function<bool(int& selectedObjectId, uint64_t& revision)> provider);
+    void setSelectedObjectOverlayDataProvider(std::function<bool(int objectId, SelectedObjectOverlayData& outData)> provider);
+    void setAllObjectOverlayDataProvider(std::function<bool(std::vector<SelectedObjectOverlayData>& outData)> provider);
+    void setShowAllObjectOverlays(bool shouldShowAll);
     int getBinForY(int y) const;
     bool buildTimeFrequencyMaskFromBrushMask(const juce::Image& brushMask,
                                              std::vector<double>& frameTimesSec,
@@ -80,6 +95,18 @@ private:
     std::array<float, SpectralFrameBuffer::NUM_BINS> overlayNoise{};
     bool hasOverlay = false;
 
+    std::function<bool(int& selectedObjectId, uint64_t& revision)> selectedObjectOverlayStateProvider;
+    std::function<bool(int objectId, SelectedObjectOverlayData& outData)> selectedObjectOverlayDataProvider;
+    std::function<bool(std::vector<SelectedObjectOverlayData>& outData)> allObjectOverlayDataProvider;
+    SelectedObjectOverlayData selectedObjectOverlayData;
+    std::vector<SelectedObjectOverlayData> visibleOverlayObjects;
+    juce::Image selectedObjectOverlayImage;
+    int cachedSelectedObjectId = -1;
+    uint64_t cachedSelectedObjectRevision = 0;
+    bool cachedShowAllObjectOverlays = false;
+    bool showAllObjectOverlays = false;
+    bool selectedObjectOverlayDirty = true;
+
     // 512-Einträge Farb-LUT
     static constexpr int LUT_SIZE = 512;
     std::array<juce::Colour, LUT_SIZE> colourLut{};
@@ -110,6 +137,12 @@ private:
 
     /** Schreibt einen neuen Frame als rechte Spalte ins spectrogramImage. */
     void appendFrameColumn(const SpectralFrameBuffer::Frame& frame);
+    void updateSelectedObjectOverlayState();
+    void rebuildSelectedObjectOverlayFromVisibleColumns();
+    bool resolveFrameMaskForTime(const SelectedObjectOverlayData& data,
+                                 double timeSec,
+                                 std::array<bool, SpectralFrameBuffer::NUM_BINS>& outMask) const;
+    void writeSelectedObjectOverlayColumn(int x, double timeSec);
 
     /** Grid-Linien und Labels über das Spektrogramm zeichnen. */
     void drawGrid(juce::Graphics& g);
