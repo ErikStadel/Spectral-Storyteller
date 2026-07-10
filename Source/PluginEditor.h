@@ -96,7 +96,6 @@ private:
     std::unique_ptr<SpectralSelector> spectralSelector;
     juce::TextButton rectSelectButton { "Rect" };
     juce::TextButton lassoSelectButton { "Brush" };
-    juce::TextButton maskScopeButton { "Masks: Sel" };
     juce::TextButton viewModeButton { "Source" };
     std::unique_ptr<ObjectSidebar> objectSidebar;
     std::unique_ptr<StoryTimelineComponent> storyTimeline;

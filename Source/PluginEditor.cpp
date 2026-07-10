@@ -269,22 +269,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     rectSelectButton.setTooltip("Rechteck-Auswahl: erzeugt die bisherige 1D-Frequenzmaske");
     lassoSelectButton.setTooltip("Pinsel-Auswahl: erzeugt eine echte 2D-Zeit-Frequenz-Maske; Shift+Scroll aendert den Durchmesser");
 
-    maskScopeButton.setClickingTogglesState(true);
-    maskScopeButton.setToggleState(false, juce::dontSendNotification);
-    maskScopeButton.setButtonText("Masks: Sel");
-    maskScopeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF27272A));
-    maskScopeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF3F3F46));
-    maskScopeButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
-    maskScopeButton.setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
-    maskScopeButton.setTooltip("Masken-Anzeige im Spectral View: nur ausgewaehltes Objekt oder alle Objekte");
-    maskScopeButton.onClick = [this]()
-    {
-        const bool showAll = maskScopeButton.getToggleState();
-        maskScopeButton.setButtonText(showAll ? "Masks: All" : "Masks: Sel");
-        if (spectralView)
-            spectralView->setShowAllObjectOverlays(showAll);
-    };
-
     rectSelectButton.onClick = [this]()
     {
         if (spectralSelector)
@@ -592,7 +576,6 @@ void PluginEditor::updateViewMode()
 
     rectSelectButton.setVisible(!showSourceView);
     lassoSelectButton.setVisible(!showSourceView);
-    maskScopeButton.setVisible(!showSourceView);
     gateSlider.setVisible(!showSourceView);
     gateLabel.setVisible(!showSourceView);
 
@@ -640,7 +623,6 @@ void PluginEditor::resized()
     lassoSelectButton.setBounds(toolArea.removeFromLeft(56));
 
     viewModeButton.setBounds(spectralBounds.getRight() - 94, spectralBounds.getY() + 8, 86, 20);
-    maskScopeButton.setBounds(spectralBounds.getRight() - 184, spectralBounds.getY() + 8, 84, 20);
 
     // View gain control as a vertical slider at the lower-right corner.
     juce::Rectangle<int> viewGainLabelArea(spectralBounds.getRight() - 36,

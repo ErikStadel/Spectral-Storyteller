@@ -2,9 +2,105 @@
 #include "PluginEditor.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <thread>
+#include <vector>
 
 namespace
 {
+    struct HostFxParamBinding
+    {
+        const char* id;
+        const char* name;
+        const char* fxName;
+        const char* paramName;
+        float defaultValue;
+    };
+
+    static const std::array<HostFxParamBinding, 32> kHostFxParamBindings = {{
+        { "fx.density", "FX Density", "Density", "Density", 1.0f },
+        { "fx.brightness", "FX Brightness", "Brightness", "Brightness", 0.5f },
+        { "fx.volume", "FX Volume", "Volume", "Gain", 0.5f },
+        { "fx.pitch", "FX Pitch", "Pitch", "Semitones", 0.5f },
+
+        { "fx.filter.lowcut", "FX Filter Low Cut", "Filter", "Low Cut", 0.0f },
+        { "fx.filter.highcut", "FX Filter High Cut", "Filter", "High Cut", 1.0f },
+
+        { "fx.comp.threshold", "FX Compressor Threshold", "Compressor", "Threshold", 0.875f },
+        { "fx.comp.forge", "FX Compressor Forge", "Compressor", "Forge", 0.25f },
+        { "fx.comp.response", "FX Compressor Response", "Compressor", "Response", 0.35f },
+        { "fx.comp.mix", "FX Compressor Mix", "Compressor", "Mix", 0.75f },
+
+        { "fx.delay.time", "FX Delay Time", "Delay", "Time", 0.5f },
+        { "fx.delay.feedback", "FX Delay Feedback", "Delay", "Feedback", 0.35f },
+        { "fx.delay.bleed", "FX Delay Bleed", "Delay", "Bleed", 0.30f },
+        { "fx.delay.mix", "FX Delay Mix", "Delay", "Mix", 0.30f },
+
+        { "fx.sat.drive", "FX Saturation Drive", "Saturation", "Drive", 0.0f },
+        { "fx.sat.glow", "FX Saturation Glow", "Saturation", "Glow", 0.5f },
+        { "fx.sat.heat", "FX Saturation Heat", "Saturation", "Heat", 0.0f },
+        { "fx.sat.mix", "FX Saturation Mix", "Saturation", "Mix", 0.5f },
+
+        { "fx.dist.grit", "FX Distortion Grit", "Distortion", "Grit", 0.0f },
+        { "fx.dist.edge", "FX Distortion Edge", "Distortion", "Edge", 0.5f },
+        { "fx.dist.asym", "FX Distortion Asymmetry", "Distortion", "Asymmetry", 0.0f },
+        { "fx.dist.mix", "FX Distortion Mix", "Distortion", "Mix", 1.0f },
+
+        { "fx.freeze.freeze", "FX Freeze", "Freeze", "Freeze", 0.0f },
+        { "fx.freeze.size", "FX Freeze Size", "Freeze", "Size", 0.5f },
+        { "fx.freeze.cloud", "FX Freeze Cloud", "Freeze", "Cloud", 0.5f },
+        { "fx.freeze.mix", "FX Freeze Mix", "Freeze", "Mix", 0.5f },
+
+        { "fx.space.size", "FX SpaceBlur Size", "Spaceblur", "Size", 0.50f },
+        { "fx.space.decay", "FX SpaceBlur Decay", "Spaceblur", "Decay", 0.55f },
+        { "fx.space.blur", "FX SpaceBlur Blur", "Spaceblur", "Blur", 0.50f },
+        { "fx.space.mix", "FX SpaceBlur Mix", "Spaceblur", "Mix", 0.30f },
+
+        { "fx.transform.amount", "FX Transform Amount", "Transform", "Amount", 1.0f },
+        { "fx.transform.smooth", "FX Transform Smooth", "Transform", "Smooth", 0.0f }
+    }};
+
+    static const char* findHostFxParameterId(const juce::String& fxName, const juce::String& paramName)
+    {
+        for (const auto& b : kHostFxParamBindings)
+        {
+            if (fxName.equalsIgnoreCase(b.fxName) && paramName.equalsIgnoreCase(b.paramName))
+                return b.id;
+        }
+
+        return nullptr;
+    }
+
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
+    {
+        std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+        params.reserve(4 + kHostFxParamBindings.size() + 18);
+
+        params.push_back(std::make_unique<juce::AudioParameterFloat>("dryWet", "Dry/Wet", 0.0f, 1.0f, 1.0f));
+        params.push_back(std::make_unique<juce::AudioParameterFloat>("transientThreshold", "Transient Threshold", -60.0f, 0.0f, -24.0f));
+        params.push_back(std::make_unique<juce::AudioParameterFloat>("inputGain", "Input Gain", -24.0f, 24.0f, 0.0f));
+        params.push_back(std::make_unique<juce::AudioParameterFloat>("outputGain", "Output Gain", -24.0f, 24.0f, 0.0f));
+
+        for (const auto& b : kHostFxParamBindings)
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(b.id, b.name, 0.0f, 1.0f, b.defaultValue));
+
+        for (int i = 0; i < ModulationMatrix::NUM_LFOS; ++i)
+        {
+            const juce::String idx = juce::String(i + 1);
+            params.push_back(std::make_unique<juce::AudioParameterFloat>("mod.lfo" + idx + ".rate", "Mod LFO " + idx + " Rate", juce::NormalisableRange<float>(0.0f, 8.0f, 1.0f), 4.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>("mod.lfo" + idx + ".shape", "Mod LFO " + idx + " Shape", juce::NormalisableRange<float>(0.0f, 3.0f, 1.0f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>("mod.lfo" + idx + ".amount", "Mod LFO " + idx + " Amount", 0.0f, 1.0f, 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>("mod.lfo" + idx + ".phase", "Mod LFO " + idx + " Phase", 0.0f, 1.0f, 0.0f));
+        }
+
+        for (int i = 0; i < ModulationMatrix::NUM_XY; ++i)
+        {
+            const juce::String idx = juce::String(i + 1);
+            params.push_back(std::make_unique<juce::AudioParameterFloat>("mod.xy" + idx + ".x", "Mod XY " + idx + " X", 0.0f, 1.0f, 0.5f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>("mod.xy" + idx + ".y", "Mod XY " + idx + " Y", 0.0f, 1.0f, 0.5f));
+        }
+
+        return { params.begin(), params.end() };
+    }
+
     float wrapPhaseToPi(float phase)
     {
         while (phase > juce::MathConstants<float>::pi)
@@ -158,31 +254,7 @@ PluginProcessor::PluginProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters(*this, nullptr, juce::Identifier("Parameters"),
-{
-    std::make_unique<juce::AudioParameterFloat>("dryWet", "Dry/Wet", 0.0f, 1.0f, 1.0f),
-
-    std::make_unique<juce::AudioParameterFloat>(
-        "transientThreshold",
-        "Transient Threshold",
-        -60.0f,
-        0.0f,
-        -24.0f),
-
-    std::make_unique<juce::AudioParameterFloat>(
-        "inputGain",
-        "Input Gain",
-        -24.0f,
-        24.0f,
-        0.0f),
-
-    std::make_unique<juce::AudioParameterFloat>(
-        "outputGain",
-        "Output Gain",
-        -24.0f,
-        24.0f,
-        0.0f)
-}),
+      parameters(*this, nullptr, juce::Identifier("Parameters"), createParameterLayout()),
       fft(fftOrder),
       window(fftSize),
       fftData(2 * fftSize),
@@ -405,16 +477,28 @@ void PluginProcessor::updateTargetBinGains()
         return item.timeMaskFrameMasks[selectedIndex];
     };
 
-    const auto getModulatedNorm = [this, nowSec](int objectId,
-                                                 const juce::String& fxName,
-                                                 const juce::String& paramName,
-                                                 float fallback)
+    const int selectedIdSnapshot = selectedObjectId.load();
+
+    const auto getModulatedNorm = [this, nowSec, selectedIdSnapshot](int objectId,
+                                                                      const juce::String& fxName,
+                                                                      const juce::String& paramName,
+                                                                      float fallback)
     {
-        const float base = objectDatabase->getInterpolatedAutomationValue(objectId,
-                                                                          fxName.toStdString(),
-                                                                          paramName.toStdString(),
-                                                                          nowSec,
-                                                                          fallback);
+        float base = objectDatabase->getInterpolatedAutomationValue(objectId,
+                                                                    fxName.toStdString(),
+                                                                    paramName.toStdString(),
+                                                                    nowSec,
+                                                                    fallback);
+
+        if (objectId == selectedIdSnapshot)
+        {
+            if (const char* hostParamId = findHostFxParameterId(fxName, paramName))
+            {
+                if (auto* hostParam = parameters.getRawParameterValue(hostParamId))
+                    base = hostParam->load();
+            }
+        }
+
         const float mod = modMatrix.getModulation(objectId, fxName, paramName);
         return juce::jlimit(0.0f, 1.0f, base + mod);
     };
@@ -1647,6 +1731,32 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
     currentTempoBpm.store(static_cast<float>(bpm));
     modMatrix.setTransport(ppq, bpm, playing);
 
+    for (int i = 0; i < ModulationMatrix::NUM_LFOS; ++i)
+    {
+        const juce::String idx = juce::String(i + 1);
+        auto& l = modMatrix.lfo(i);
+
+        if (auto* p = parameters.getRawParameterValue("mod.lfo" + idx + ".rate"))
+            l.rateIndex.store(juce::jlimit(0, 8, static_cast<int>(std::round(p->load()))));
+        if (auto* p = parameters.getRawParameterValue("mod.lfo" + idx + ".shape"))
+            l.shape.store(juce::jlimit(0, 3, static_cast<int>(std::round(p->load()))));
+        if (auto* p = parameters.getRawParameterValue("mod.lfo" + idx + ".amount"))
+            l.amount.store(juce::jlimit(0.0f, 1.0f, p->load()));
+        if (auto* p = parameters.getRawParameterValue("mod.lfo" + idx + ".phase"))
+            l.phaseOffset.store(juce::jlimit(0.0f, 1.0f, p->load()));
+    }
+
+    for (int i = 0; i < ModulationMatrix::NUM_XY; ++i)
+    {
+        const juce::String idx = juce::String(i + 1);
+        auto& s = modMatrix.xy(i);
+
+        if (auto* p = parameters.getRawParameterValue("mod.xy" + idx + ".x"))
+            s.x.store(juce::jlimit(0.0f, 1.0f, p->load()));
+        if (auto* p = parameters.getRawParameterValue("mod.xy" + idx + ".y"))
+            s.y.store(juce::jlimit(0.0f, 1.0f, p->load()));
+    }
+
 
 
 // Eingangspegel messen
@@ -1950,6 +2060,22 @@ void PluginProcessor::setSelectedObjectId(int objectId)
     selectedObjectId.store(objectId);
     if (objectDatabase != nullptr)
         objectDatabase->setSelectedObjectId(objectId);
+
+    if (objectDatabase != nullptr && objectId > 0)
+    {
+        for (const auto& b : kHostFxParamBindings)
+        {
+            const float v = juce::jlimit(0.0f,
+                                         1.0f,
+                                         objectDatabase->getObjectFxParameterValue(objectId,
+                                                                                   b.fxName,
+                                                                                   b.paramName,
+                                                                                   b.defaultValue));
+
+            if (auto* p = parameters.getParameter(b.id))
+                p->setValueNotifyingHost(v);
+        }
+    }
 }
 
 void PluginProcessor::setActiveFxSelection(const juce::String& effectName, const juce::String& parameterName)
