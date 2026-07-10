@@ -378,8 +378,6 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\GritEdge.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\StasisCloud.cpp" />
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\StasisCloud.h" />
-    <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\DSP\FluidSpectra.cpp" />
-    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\DSP\FluidSpectra.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.cpp" />
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\SpectralView.h" />
     <ClCompile Include="C:\Users\helms\Spectral Storyteller\Source\UI\SourceView.cpp" />

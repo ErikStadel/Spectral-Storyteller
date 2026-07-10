@@ -124,8 +124,6 @@ target_sources(SpectralStoryteller PRIVATE
     Source/DSP/GritEdge.h
     Source/DSP/StasisCloud.cpp
     Source/DSP/StasisCloud.h
-    Source/DSP/FluidSpectra.cpp
-    Source/DSP/FluidSpectra.h
     Source/UI/SpectralView.cpp
     Source/UI/SpectralView.h
     Source/UI/SourceView.cpp

@@ -187,7 +187,6 @@ bool FxRackPanel::useTwoByTwoLayout(const ModuleView& mod) const
         || mod.name.equalsIgnoreCase("Saturation")
         || mod.name.equalsIgnoreCase("Distortion")
         || mod.name.equalsIgnoreCase("Freeze")
-        || mod.name.equalsIgnoreCase("FluidSpectra")
         || mod.name.equalsIgnoreCase("SpaceBlur")
         || mod.name.equalsIgnoreCase("Spaceblur");
 }
@@ -208,8 +207,6 @@ juce::String FxRackPanel::getModuleDisplayName(const ModuleView& mod) const
         return "Grit Edge";
     if (mod.name.equalsIgnoreCase("Freeze"))
         return "Stasis Cloud";
-    if (mod.name.equalsIgnoreCase("FluidSpectra"))
-        return "Fluid Spectra";
     if (mod.name.equalsIgnoreCase("SpaceBlur") || mod.name.equalsIgnoreCase("Spaceblur"))
         return "Space Blur";
     return mod.name;
@@ -382,13 +379,6 @@ juce::String FxRackPanel::formatKnobValue(const KnobView& knob) const
 
     if (knob.fxName.equalsIgnoreCase("Freeze")
         && (knob.paramName.equalsIgnoreCase("Cloud")
-         || knob.paramName.equalsIgnoreCase("Mix")))
-        return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
-
-    if (knob.fxName.equalsIgnoreCase("FluidSpectra")
-        && (knob.paramName.equalsIgnoreCase("Spectral Drift")
-         || knob.paramName.equalsIgnoreCase("Harmonic Bloom")
-         || knob.paramName.equalsIgnoreCase("Stereo Flow")
          || knob.paramName.equalsIgnoreCase("Mix")))
         return juce::String(static_cast<int>(std::round(v * 100.0f))) + "%";
 
