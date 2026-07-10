@@ -15,7 +15,7 @@ FxBrowserOverlay::FxBrowserOverlay()
         { "Stasis Cloud", "Freeze",     "Spectral Freeze",   "Friert das Spektrum ein und formt eine stehende Klangwolke.", juce::Colour(0xFF06B6D4) },
         { "Prism Focus",  "Contrast",   "Spectral Dynamics", "Regelt den spektralen Kontrast uber die Frequenzbins.",    juce::Colour(0xFFD946EF) },
         { "Stasis Cloud", "Freeze",     "Spectral Freeze",   "Friert das Spektrum ein. Erzeugt unendliche Flachen.",     juce::Colour(0xFF06B6D4) },
-        { "Fluid Grain",  "Perlin",     "Noise Gen",         "Mathematisch fliessendes Perlin-Rauschen.",                juce::Colour(0xFF84CC16) },
+        { "Fluid Spectra", "FluidSpectra", "Spectral Motion",  "Organische 2D-Noise-Texturen fur Drift, Bloom und Stereo-Flow.", juce::Colour(0xFF84CC16) },
         { "Chaos Float",  "Brownian",   "Noise Gen",         "Unberechenbare Brown'sche Molekularbewegung.",             juce::Colour(0xFF8B5CF6) }
     };
 }

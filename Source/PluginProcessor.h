@@ -14,6 +14,7 @@
 #include "DSP/HeatGlow.h"
 #include "DSP/GritEdge.h"
 #include "DSP/StasisCloud.h"
+#include "DSP/FluidSpectra.h"
 #include <memory>
 #include <deque>
 #include <unordered_map>
@@ -21,7 +22,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 9;
-constexpr int VERSION_BUILD = 17;
+constexpr int VERSION_BUILD = 20;
 
 class PluginProcessor : public juce::AudioProcessor,
                         public juce::ChangeBroadcaster
@@ -354,6 +355,8 @@ private:
     std::array<std::unordered_map<int, heat_glow::State>, 2> heatGlowStateByChannel;
     std::unordered_map<int, grit_edge::Settings> gritEdgeFxByObject;
     std::array<std::unordered_map<int, grit_edge::State>, 2> gritEdgeStateByChannel;
+    std::unordered_map<int, fluid_spectra::Settings> fluidSpectraFxByObject;
+    std::array<std::unordered_map<int, fluid_spectra::State>, 2> fluidSpectraStateByChannel;
     std::unordered_map<int, stasis_cloud::Settings> stasisCloudFxByObject;
     std::unordered_map<int, echo_bleed::Settings> delayFxByObject;
     std::array<std::unordered_map<int, echo_bleed::State>, 2> echoBleedStateByChannel;

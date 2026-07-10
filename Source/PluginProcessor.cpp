@@ -282,6 +282,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         transformSmoothStates[ch].clear();
         heatGlowStateByChannel[ch].clear();
         gritEdgeStateByChannel[ch].clear();
+        fluidSpectraStateByChannel[ch].clear();
     }
 
     objectSpectrumScratch.assign(static_cast<size_t>(2 * fftSize), 0.0f);
@@ -300,6 +301,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     compressorParamsByObject.clear();
     heatGlowFxByObject.clear();
     gritEdgeFxByObject.clear();
+    fluidSpectraFxByObject.clear();
     stasisCloudFxByObject.clear();
     delayFxByObject.clear();
     echoBleedStateByChannel[0].clear();
@@ -363,6 +365,7 @@ void PluginProcessor::updateTargetBinGains()
     compressorParamsByObject.clear();
     heatGlowFxByObject.clear();
     gritEdgeFxByObject.clear();
+    fluidSpectraFxByObject.clear();
     delayFxByObject.clear();
     spaceBlurFxByObject.clear();
 
@@ -592,6 +595,21 @@ void PluginProcessor::updateTargetBinGains()
                 gritSettings.asymmetry = juce::jlimit(0.0f, 1.0f, asymNorm);
                 gritSettings.mix = juce::jlimit(0.0f, 1.0f, mixNorm);
                 gritEdgeFxByObject[item.id] = gritSettings;
+            }
+
+            if (isFxEnabled("FluidSpectra") || isFxEnabled("Fluid Spectra"))
+            {
+                const float driftNorm = getModulatedNorm(item.id, "FluidSpectra", "Spectral Drift", 0.30f);
+                const float bloomNorm = getModulatedNorm(item.id, "FluidSpectra", "Harmonic Bloom", 0.25f);
+                const float flowNorm = getModulatedNorm(item.id, "FluidSpectra", "Stereo Flow", 0.35f);
+                const float mixNorm = getModulatedNorm(item.id, "FluidSpectra", "Mix", 0.45f);
+
+                fluid_spectra::Settings fluidSettings;
+                fluidSettings.drift = juce::jlimit(0.0f, 1.0f, driftNorm);
+                fluidSettings.bloom = juce::jlimit(0.0f, 1.0f, bloomNorm);
+                fluidSettings.flow = juce::jlimit(0.0f, 1.0f, flowNorm);
+                fluidSettings.mix = juce::jlimit(0.0f, 1.0f, mixNorm);
+                fluidSpectraFxByObject[item.id] = fluidSettings;
             }
 
             if (isFxEnabled("Freeze"))
@@ -1117,7 +1135,7 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
     //   re(k) = fftData[2*k], im(k) = fftData[2*k+1]
     // For real input, bins k=0..N/2 are independent.
 
-    auto applyBinGain = [this, channel](int bin)
+    auto applyBinGain = [this, channel, nyquistBin](int bin)
     {
         float &smoothGain = currentBinGains[channel][static_cast<size_t>(bin)];
         smoothGain = maskSmoothAlpha * targetBinGains[static_cast<size_t>(bin)] + (1.0f - maskSmoothAlpha) * smoothGain;
@@ -1164,6 +1182,21 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
         const auto gritIt = gritEdgeFxByObject.find(objectId);
         // GritEdge is now handled post-ISTFT in applyPostIstftChain (time domain).
         juce::ignoreUnused(gritIt);
+
+        const auto fluidIt = fluidSpectraFxByObject.find(objectId);
+        if (fluidIt != fluidSpectraFxByObject.end())
+        {
+            auto& state = fluidSpectraStateByChannel[channel][objectId];
+            fluid_spectra::processBin(bin,
+                                      nyquistBin,
+                                      channel,
+                                      fluidIt->second,
+                                      state,
+                                      outRe,
+                                      outIm,
+                                      outRe,
+                                      outIm);
+        }
 
         fftData[reIdx] = outRe;
         fftData[imIdx] = outIm;
