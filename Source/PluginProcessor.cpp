@@ -1229,6 +1229,24 @@ void PluginProcessor::reconstructAndOverlapAdd(int channel, int64_t currentSampl
         if (std::find(owners.begin(), owners.end(), id) == owners.end())
             owners.push_back(id);
     }
+        for (const auto& fxPair : spaceBlurFxByObject)
+    {
+        const int id = fxPair.first;
+        if (std::find(owners.begin(), owners.end(), id) == owners.end())
+            owners.push_back(id);
+    }
+    for (const auto& fxPair : delayFxByObject)
+    {
+        const int id = fxPair.first;
+        if (std::find(owners.begin(), owners.end(), id) == owners.end())
+            owners.push_back(id);
+    }
+    for (const auto& fxPair : stasisCloudFxByObject)
+    {
+        const int id = fxPair.first;
+        if (std::find(owners.begin(), owners.end(), id) == owners.end())
+            owners.push_back(id);
+    }
 
     // Causal OLA write position: never write into the past.
     const int64_t writeBase64 = currentSampleIndex;
@@ -1740,8 +1758,8 @@ inputPeakDb.store(
 
             const float norm = outputNormBuffers[ch][bufferPos];
             const float stftSample = (norm > 1.0e-9f)
-                                         ? (outputBuffers[ch][bufferPos] / norm)
-                                         : inputSample;
+                             ? (outputBuffers[ch][bufferPos] / norm)
+                             : outputBuffers[ch][bufferPos]; // ✅ FIX: Tail nicht durch inputSample killen!
 
             // Smoothly crossfade STFT path in/out.
             // Fast attack (~30ms) when going wet; slow release (~3.5s) when going dry.

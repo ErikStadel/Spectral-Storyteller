@@ -49,7 +49,7 @@ void ensureState(State& state, double sampleRate)
 
     const int maxPreSamp  = static_cast<int>(safeSr * 0.150) + 128; // 150ms max
     const int maxDispSamp = static_cast<int>(safeSr * 0.015) + 64;  // 15ms max
-    const int maxCombSamp = static_cast<int>(safeSr * 0.150) + 256; // 150ms max
+    const int maxCombSamp = static_cast<int>(safeSr * 0.350) + 256; 
     const int maxAPFSamp  = static_cast<int>(safeSr * 0.095) + 128; // 95ms max für breiteren Wash
 
     state.preDelayLine.assign(static_cast<size_t>(maxPreSamp), 0.0f);
@@ -94,7 +94,7 @@ void processBlock(const Settings& settings, State& state, double sampleRate, int
     // Spring (blur=0): geclustert -> metallische Resonanzen
     // Hall (blur=1): weit & teilerfremd -> offener, weicher Decay
     static constexpr float springCombMs[8] = { 21.3f, 25.7f, 29.1f, 33.8f, 38.2f, 42.5f, 47.9f, 53.1f };
-    static constexpr float hallCombMs[8]   = { 35.1f, 41.8f, 49.2f, 58.7f, 67.4f, 78.9f, 89.1f, 102.5f };
+    static constexpr float hallCombMs[8]   = { 75.1f, 91.8f, 119.2f, 148.7f, 177.4f, 208.9f, 249.1f, 292.5f };
     
     const float stereoOff = (channel == 0) ? 0.0f : (2.5f + 8.5f * blur); // 2.5ms bei Spring, 11ms bei Hall
     const float sizeScale = 0.5f + 1.5f * size; 
@@ -127,17 +127,17 @@ void processBlock(const Settings& settings, State& state, double sampleRate, int
 
     // === 4. HF Damping (Air Absorption) ===================================
     // Spring: hell/metallisch (hohe Grenzfrequenz). Hall: warm/offen (tiefe GF).
-    const float lpCutoff = 16000.0f * std::pow(4500.0f / 16000.0f, blur * 0.75f); 
+    const float lpCutoff = 18000.0f * std::pow(9000.0f / 18000.0f, blur * 0.6f); 
     const float lpAlpha = juce::jlimit(0.0f, 0.9999f,
         1.0f - std::exp(-juce::MathConstants<float>::twoPi * lpCutoff / sr));
 
     // === 5. RT60 Feedback Gain ============================================
-    const float rt60Sec = 0.3f + 4.2f * decay; // 0.3s bis exakt 4.5s Nachhallzeit 
+    const float rt60Sec = 0.3f + 5.7f * decay; // 0.3s bis exakt 6.0s Nachhallzeit
     const float feedbackGain = juce::jlimit(0.10f, 0.98f,
         std::pow(10.0f, -3.0f * avgCombDelaySec / rt60Sec));
 
     // === 6. LFO Modulation ================================================
-    const float lfoDepth = (1.0f - blur * 0.3f) * size * (3.0f + 5.0f * blur); // Stärkerer Pitch-Drift im Hall
+   const float lfoDepth = (1.0f - blur * 0.2f) * size * (4.0f + 8.0f * blur); 
     const float lfoInc1 = juce::MathConstants<float>::twoPi * (0.4f + 0.8f * blur) / sr;
     const float lfoInc2 = juce::MathConstants<float>::twoPi * (0.55f + 0.9f * blur) / sr;
 
@@ -165,7 +165,7 @@ void processBlock(const Settings& settings, State& state, double sampleRate, int
 
     // Mix Gains
     const float dryGain = std::cos(mix * juce::MathConstants<float>::halfPi);
-    const float wetGain = std::sin(mix * juce::MathConstants<float>::halfPi)
+    const float wetGain = std::sin(mix * juce::MathConstants<float>::halfPi) * 0.65f
                         * juce::jlimit(0.05f, 0.6f, (1.0f - feedbackGain) * 2.5f);
 
     // === Per-Sample Processing ============================================

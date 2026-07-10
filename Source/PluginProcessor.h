@@ -21,7 +21,7 @@
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
 constexpr int VERSION_MINOR = 9;
-constexpr int VERSION_BUILD = 13;
+constexpr int VERSION_BUILD = 17;
 
 class PluginProcessor : public juce::AudioProcessor,
                         public juce::ChangeBroadcaster
@@ -43,7 +43,7 @@ public:
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    double getTailLengthSeconds() const override { return 0.0; }
+    double getTailLengthSeconds() const override { return 30.0; }
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
