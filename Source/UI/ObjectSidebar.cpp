@@ -355,7 +355,7 @@ void ObjectSidebar::showTransformMenu()
     menu.addItem(wtSquare, "Wavetable: Square");
     menu.addItem(wtTriangle, "Wavetable: Triangle");
     menu.addSeparator();
-    menu.addItem(loadFile, "Datei laden...");
+    menu.addItem(loadFile, "Load file...");
     menu.addSeparator();
     menu.addItem(createTransient, "Transient");
 

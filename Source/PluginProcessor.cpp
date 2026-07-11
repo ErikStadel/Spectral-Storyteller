@@ -477,28 +477,16 @@ void PluginProcessor::updateTargetBinGains()
         return item.timeMaskFrameMasks[selectedIndex];
     };
 
-    const int selectedIdSnapshot = selectedObjectId.load();
-
-    const auto getModulatedNorm = [this, nowSec, selectedIdSnapshot](int objectId,
-                                                                      const juce::String& fxName,
-                                                                      const juce::String& paramName,
-                                                                      float fallback)
+    const auto getModulatedNorm = [this, nowSec](int objectId,
+                                                   const juce::String& fxName,
+                                                   const juce::String& paramName,
+                                                   float fallback)
     {
-        float base = objectDatabase->getInterpolatedAutomationValue(objectId,
-                                                                    fxName.toStdString(),
-                                                                    paramName.toStdString(),
-                                                                    nowSec,
-                                                                    fallback);
-
-        if (objectId == selectedIdSnapshot)
-        {
-            if (const char* hostParamId = findHostFxParameterId(fxName, paramName))
-            {
-                if (auto* hostParam = parameters.getRawParameterValue(hostParamId))
-                    base = hostParam->load();
-            }
-        }
-
+        const float base = objectDatabase->getInterpolatedAutomationValue(objectId,
+                                                                          fxName.toStdString(),
+                                                                          paramName.toStdString(),
+                                                                          nowSec,
+                                                                          fallback);
         const float mod = modMatrix.getModulation(objectId, fxName, paramName);
         return juce::jlimit(0.0f, 1.0f, base + mod);
     };
