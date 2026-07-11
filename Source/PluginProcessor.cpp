@@ -1719,31 +1719,9 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
     currentTempoBpm.store(static_cast<float>(bpm));
     modMatrix.setTransport(ppq, bpm, playing);
 
-    for (int i = 0; i < ModulationMatrix::NUM_LFOS; ++i)
-    {
-        const juce::String idx = juce::String(i + 1);
-        auto& l = modMatrix.lfo(i);
-
-        if (auto* p = parameters.getRawParameterValue("mod.lfo" + idx + ".rate"))
-            l.rateIndex.store(juce::jlimit(0, 8, static_cast<int>(std::round(p->load()))));
-        if (auto* p = parameters.getRawParameterValue("mod.lfo" + idx + ".shape"))
-            l.shape.store(juce::jlimit(0, 3, static_cast<int>(std::round(p->load()))));
-        if (auto* p = parameters.getRawParameterValue("mod.lfo" + idx + ".amount"))
-            l.amount.store(juce::jlimit(0.0f, 1.0f, p->load()));
-        if (auto* p = parameters.getRawParameterValue("mod.lfo" + idx + ".phase"))
-            l.phaseOffset.store(juce::jlimit(0.0f, 1.0f, p->load()));
-    }
-
-    for (int i = 0; i < ModulationMatrix::NUM_XY; ++i)
-    {
-        const juce::String idx = juce::String(i + 1);
-        auto& s = modMatrix.xy(i);
-
-        if (auto* p = parameters.getRawParameterValue("mod.xy" + idx + ".x"))
-            s.x.store(juce::jlimit(0.0f, 1.0f, p->load()));
-        if (auto* p = parameters.getRawParameterValue("mod.xy" + idx + ".y"))
-            s.y.store(juce::jlimit(0.0f, 1.0f, p->load()));
-    }
+    // LFO and XY state is owned by ModulationMatrix and written directly by the
+    // ModulationPanel UI.  Host-parameter reads would overwrite those values with
+    // stale defaults every tick – do NOT mirror them here.
 
 
 

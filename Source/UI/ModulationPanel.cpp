@@ -289,65 +289,36 @@ void ModulationPanel::rebuildTargetMenu(juce::ComboBox& cb)
     while (id == noneItemId)
         ++id;
 
-    // 🔥 NEU: Hole das aktuell "gehighlightete" FX-Modul
-    const juce::String activeFx = processor.getActiveFxEffectName();
+    // Build a flat "FxName · ParamName" list for ALL enabled FX modules so that
+    // every parameter is always reachable as a modulation target.
+    // The currently active FX/param (from the rack click) is only used for
+    // pre-selection – it must not filter the list.
+    const juce::String activeFx    = processor.getActiveFxEffectName();
     const juce::String activeParam = processor.getActiveFxParameterName();
 
-    // Wenn ein FX-Parameter selektiert ist, zeigen wir NUR dieses Modul
-    if (activeFx.isNotEmpty())
-    {
-        for (const auto& fx : processor.getFxChainForSelectedObject())
-        {
-            if (!fx.enabled)
-                continue;
+    int preSelectId = noneItemId;
 
-            // Filter: Nur das aktive Modul durchlassen
-            if (fx.name == activeFx)
-            {
-                for (const auto& p : fx.parameters)
-                {
-                    cb.addItem(juce::String(fx.name) + " · " + juce::String(p.name), id++);
-                    if (id == noneItemId) ++id;
-                }
-                break; // Wir haben das Modul gefunden, Rest überspringen
-            }
-        }
-    }
-    else
+    for (const auto& fx : processor.getFxChainForSelectedObject())
     {
-        // 🔥 FALLBACK: Wenn KEIN FX-Parameter selektiert ist, zeige die Basisparameter
-        // (Hier müsstest du deine Basisparameter-Namen eintragen, z.B. "Base", "Input Gain" etc.)
-        // Beispiel:
-        // cb.addItem("Base · Input Gain", id++);
-        // cb.addItem("Base · Output Gain", id++);
-        // cb.addItem("Base · Dry/Wet", id++);
-        
-        // Alternativ: Zeige einfach alle Module, aber gruppiert
-        for (const auto& fx : processor.getFxChainForSelectedObject())
+        if (!fx.enabled)
+            continue;
+
+        for (const auto& p : fx.parameters)
         {
-            if (!fx.enabled) continue;
-            cb.addSectionHeading(fx.name);
-            for (const auto& p : fx.parameters)
-            {
-                cb.addItem(juce::String(p.name), id++);
-                if (id == noneItemId) ++id;
-            }
+            const juce::String label = juce::String(fx.name) + " \xc2\xb7 " + juce::String(p.name);
+            cb.addItem(label, id);
+
+            // Pre-select the parameter that was last clicked in the rack.
+            if (activeFx == juce::String(fx.name) && activeParam == juce::String(p.name))
+                preSelectId = id;
+
+            ++id;
+            if (id == noneItemId) ++id;
         }
     }
-    
-    // Optional: Wenn wir ein aktives Modul haben, aber noch kein Target gesetzt ist,
-    // könnten wir automatisch den zuletzt angeklickten Parameter vorauswählen
-    if (activeFx.isNotEmpty() && activeParam.isNotEmpty())
-    {
-        for (int i = 0; i < cb.getNumItems(); ++i)
-        {
-            if (cb.getItemText(i).contains(activeParam))
-            {
-                cb.setSelectedId(cb.getItemId(i), juce::dontSendNotification);
-                break;
-            }
-        }
-    }
+
+    if (preSelectId != noneItemId)
+        cb.setSelectedId(preSelectId, juce::dontSendNotification);
 }
 
 void ModulationPanel::applyTargetFromMenu(juce::ComboBox& cb, ModulationMatrix::Target& dst)
