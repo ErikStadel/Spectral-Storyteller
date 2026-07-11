@@ -1,4 +1,4 @@
-#include "PluginProcessor.h"
+﻿#include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <thread>
@@ -594,15 +594,15 @@ void PluginProcessor::updateTargetBinGains()
                                                     (lowBin >= 0 && highBin >= lowBin)
                                                         ? 0.5f * static_cast<float>(lowBin + highBin)
                                                         : 1.0f);
-            // Gentle tilt: 0.5× strength keeps the effect musical (≈ ±3 dB/octave at max)
+            // Gentle tilt: 0.5├ù strength keeps the effect musical (Ôëê ┬▒3 dB/octave at max)
             // without creating extreme spectral distortion that feeds into the reverb.
-            // tiltExp = 0 at brightness=0.5 (neutral), ±0.5 at the knob extremes.
+            // tiltExp = 0 at brightness=0.5 (neutral), ┬▒0.5 at the knob extremes.
             spectralSettings.tiltExp = brightness * 0.5f;
 
-            // Fixed compensation anchors the centre bin at ≈ 0.9 (−0.9 dB) so that
+            // Fixed compensation anchors the centre bin at Ôëê 0.9 (ÔêÆ0.9 dB) so that
             // everything around the centre of the object stays at a natural level.
             // This prevents the old over-normalisation that drove the centre bin to
-            // −18 dB and starved the reverb of mid-frequency energy.
+            // ÔêÆ18 dB and starved the reverb of mid-frequency energy.
             spectralSettings.brightnessCompensation = 0.90f;
             spectralFxByObject[item.id] = spectralSettings;
 
@@ -1041,7 +1041,7 @@ void PluginProcessor::updateTargetBinGains()
         for (int k = -radius; k <= radius; ++k)
         {
             const int idx = juce::jlimit(0, ObjectDatabase::NUM_BINS - 1, bin + k);
-            // Cosine weight: 1 at centre, 0 at ±(radius+1)
+            // Cosine weight: 1 at centre, 0 at ┬▒(radius+1)
             const float w = 0.5f * (1.0f + std::cos(juce::MathConstants<float>::pi * static_cast<float>(k) / static_cast<float>(radius + 1)));
             weighted += raw[static_cast<size_t>(idx)] * w;
             totalWeight += w;
@@ -1410,7 +1410,7 @@ void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* time
     const float hopSeconds = static_cast<float>(hopSize)
                            / static_cast<float>(juce::jmax(1.0, currentSampleRate));
 
-    // StasisCloud (Freeze) — granular freeze, first so it can act as a source.
+    // StasisCloud (Freeze) ÔÇö granular freeze, first so it can act as a source.
     // When freeze is ON, it replaces the per-object audio with looped frozen grains.
     // When OFF, it continuously captures incoming audio and passes through.
     const auto freezeIt = stasisCloudFxByObject.find(objectId);
@@ -1420,7 +1420,7 @@ void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* time
         stasis_cloud::processBlock(freezeIt->second, state, channel, timeFrame, numSamples);
     }
 
-    // HeatGlow (Saturation) — waveshaper.
+    // HeatGlow (Saturation) ÔÇö waveshaper.
     const auto heatIt = heatGlowFxByObject.find(objectId);
     if (heatIt != heatGlowFxByObject.end())
     {
@@ -1428,7 +1428,7 @@ void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* time
         heat_glow::processBlock(heatIt->second, state, timeFrame, numSamples);
     }
 
-    // MassForge (Compressor) — apply per-frame envelope params computed from
+    // MassForge (Compressor) ÔÇö apply per-frame envelope params computed from
     // spectral analysis in updateTargetBinGains. No new per-sample state needed:
     // processSample is stateless given the pre-computed FrameParams.
     const auto compParamsIt = compressorParamsByObject.find(objectId);
@@ -1439,7 +1439,7 @@ void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* time
             timeFrame[i] = mass_forge::processSample(timeFrame[i], params);
     }
 
-    // GritEdge (Distortion) — time-domain waveshaper + biquad 4kHz Edge EQ.
+    // GritEdge (Distortion) ÔÇö time-domain waveshaper + biquad 4kHz Edge EQ.
     const auto gritIt = gritEdgeFxByObject.find(objectId);
     if (gritIt != gritEdgeFxByObject.end())
     {
@@ -1447,7 +1447,7 @@ void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* time
         grit_edge::processBlock(gritIt->second, state, currentSampleRate, timeFrame, numSamples);
     }
 
-    // EchoBleed (Delay) — frame-domain delay line with tape/digital character.
+    // EchoBleed (Delay) ÔÇö frame-domain delay line with tape/digital character.
     const auto delayIt = delayFxByObject.find(objectId);
     if (delayIt != delayFxByObject.end())
     {
@@ -1457,7 +1457,7 @@ void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* time
                                  timeFrame, numSamples);
     }
 
-    // SpaceBlur (Reverb) — time-domain reverb, last in the post chain.
+    // SpaceBlur (Reverb) ÔÇö time-domain reverb, last in the post chain.
     const auto reverbIt = spaceBlurFxByObject.find(objectId);
     if (reverbIt != spaceBlurFxByObject.end())
     {
@@ -1522,7 +1522,7 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
                     sourceWeight += 1.0f;
                 }
 
-                // RMS als absolute Magnitude – gleiche Einheit wie carrierMag
+                // RMS als absolute Magnitude ÔÇô gleiche Einheit wie carrierMag
                 modMag = (sourceWeight > 0.0f)
                              ? std::sqrt(sourceEnergySq / sourceWeight)
                              : 0.0f;
@@ -1530,8 +1530,8 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
         }
         else if (settings.sourceObjectId == ObjectDatabase::FILE_SOURCE_ID || settings.sourceObjectId == -3)
         {
-            // Externer Sound: nur abspielen, wenn der Source-Transport läuft.
-            // -3 = interne Preset-Quelle (statisches Spektrum) → immer aktiv.
+            // Externer Sound: nur abspielen, wenn der Source-Transport l├ñuft.
+            // -3 = interne Preset-Quelle (statisches Spektrum) ÔåÆ immer aktiv.
             const bool isExternalFile = (settings.sourceObjectId == ObjectDatabase::FILE_SOURCE_ID);
             if (isExternalFile && !sourceIsPlaying)
             {
@@ -1599,7 +1599,7 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
         const float carrierMag = std::sqrt(re * re + im * im);
         const float carrierPhase = std::atan2(im, re);
 
-        // Fix C: gedämpftes RMS-Matching.
+        // Fix C: ged├ñmpftes RMS-Matching.
         // Ziel-RMS der Modulator-Normalisierung beim Laden = 0.1 (-20 dBFS).
         // Mit sqrt() begrenzen wir den Aufschaukel-Effekt bei lauten Carriern,
         // und jlimit kappt Extremwerte (Stille / Peaks).
@@ -1684,21 +1684,21 @@ void PluginProcessor::applyPhaseVocoderPitchShift(int channel)
 void PluginProcessor::applyStasisCloud(int channel)
 {
     // StasisCloud has been ported to the time-domain post-ISTFT chain.
-    // Processing now happens in applyPostIstftChain → stasis_cloud::processBlock.
+    // Processing now happens in applyPostIstftChain ÔåÆ stasis_cloud::processBlock.
     juce::ignoreUnused(channel);
 }
 
 void PluginProcessor::applyEchoBleedDelay(int channel)
 {
     // EchoBleed has been ported to the time-domain post-ISTFT chain.
-    // Processing now happens in applyPostIstftChain → echo_bleed::processBlock.
+    // Processing now happens in applyPostIstftChain ÔåÆ echo_bleed::processBlock.
     juce::ignoreUnused(channel);
 }
 
 void PluginProcessor::applySpaceBlur(int channel)
 {
     // SpaceBlur has been ported to the time-domain post-ISTFT chain.
-    // Processing now happens in applyPostIstftChain → space_blur::processBlock.
+    // Processing now happens in applyPostIstftChain ÔåÆ space_blur::processBlock.
     juce::ignoreUnused(channel);
 }
 
@@ -1869,7 +1869,7 @@ inputPeakDb.store(
             const float norm = outputNormBuffers[ch][bufferPos];
             const float stftSample = (norm > 1.0e-9f)
                              ? (outputBuffers[ch][bufferPos] / norm)
-                             : outputBuffers[ch][bufferPos]; // ✅ FIX: Tail nicht durch inputSample killen!
+                             : outputBuffers[ch][bufferPos]; // Ô£à FIX: Tail nicht durch inputSample killen!
 
             // Smoothly crossfade STFT path in/out.
             // Fast attack (~30ms) when going wet; slow release (~3.5s) when going dry.
@@ -1889,7 +1889,7 @@ inputPeakDb.store(
     }
 
     totalSamplesProcessed += numSamples;
-    // Soft-Limit auf -1 dBFS, hartes Clip darüber
+    // Soft-Limit auf -1 dBFS, hartes Clip dar├╝ber
     const float ceiling = 0.89f; // ~ -1 dBFS
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
@@ -2082,12 +2082,12 @@ void PluginProcessor::setActiveFxSelection(const juce::String& effectName, const
 {
     const juce::ScopedLock sl(activeFxLock);
     
-    // Nur feuern, wenn sich wirklich etwas geändert hat
+    // Nur feuern, wenn sich wirklich etwas ge├ñndert hat
     if (activeFxEffectName != effectName || activeFxParameterName != parameterName)
     {
         activeFxEffectName = effectName;
         activeFxParameterName = parameterName;
-        sendChangeMessage(); // 🔥 Benachrichtigt das ModulationPanel!
+        sendChangeMessage(); // ­ƒöÑ Benachrichtigt das ModulationPanel!
     }
 }
 
@@ -2264,7 +2264,7 @@ for (int ch = 0; ch < numChannels; ++ch) {
 double rms  = std::sqrt(sumSq / juce::jmax(1, numChannels*numSamps));
 float  peak = (numChannels > 0) ? fileAudio.getMagnitude(0, numSamps) : 0.0f;
 
-// Ziel-RMS = -20 dBFS  (≈ 0.1) statt 1.0
+// Ziel-RMS = -20 dBFS  (Ôëê 0.1) statt 1.0
 const double targetRms = 0.1;
 float scale = (rms > 1.0e-7) ? (float)(targetRms / rms) : 1.0f;
 
@@ -2914,8 +2914,8 @@ void PluginProcessor::analyseSegmentationFrame(const float *fftInterleaved, int6
                 0.88f * tonalPersistence[static_cast<size_t>(k)] + 0.12f * tonalCandidate;
         }
 
-        // Nur während aktiver Detection akkumulieren
-        // Basiert auf dem rohen tonalCandidate – BEVOR er gegen Noise/Transienten konkurriert
+        // Nur w├ñhrend aktiver Detection akkumulieren
+        // Basiert auf dem rohen tonalCandidate ÔÇô BEVOR er gegen Noise/Transienten konkurriert
         if (autoDetectActive || autoDetectRecording)
         {
             const float kNorm = static_cast<float>(k) / static_cast<float>(numBins - 1);
@@ -2931,10 +2931,10 @@ void PluginProcessor::analyseSegmentationFrame(const float *fftInterleaved, int6
             const bool percussiveLike = !lowBandExempt && ((strongFlux && (strongPercussive || fastAttack)) || (strongPercussive && fastAttack) || (veryStrongFlux && kNorm > 0.20f) || (strongFlux && kNorm > 0.45f) || snareLike);
 
             const float tonalCandidateMin = snareBand ? 0.16f : 0.12f;
-            if (tonalCandidate > tonalCandidateMin && !percussiveLike) // Nur echte Sustain-Kandidaten zählen
+            if (tonalCandidate > tonalCandidateMin && !percussiveLike) // Nur echte Sustain-Kandidaten z├ñhlen
             {
                 tonalDetectionCount[static_cast<size_t>(k)] += 1.0f;
-                // Magnitude als Gewichtung: stärkere Töne bekommen mehr Einfluss
+                // Magnitude als Gewichtung: st├ñrkere T├Âne bekommen mehr Einfluss
                 tonalDetectionMagnitude[static_cast<size_t>(k)] += tonalCandidate;
             }
         }
@@ -2971,7 +2971,7 @@ void PluginProcessor::analyseSegmentationFrame(const float *fftInterleaved, int6
         noiseMask[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f, noiseScore);
     }
 
-    // === Smoothing & Overlay (unverändert) ===
+    // === Smoothing & Overlay (unver├ñndert) ===
     std::array<float, numBins> smoothTransient{}, smoothTonal{}, smoothNoise{};
     applyCosineMaskSmoothing(transientMask, smoothTransient);
     applyCosineMaskSmoothing(tonalMask, smoothTonal);
@@ -3115,16 +3115,16 @@ void PluginProcessor::finalizeAutoDetectedObjects()
     std::array<bool, numBins> tonalMask{};
     std::array<bool, numBins> noiseMask{};
 
-    // Transients: broadband gate, unverändert
+    // Transients: broadband gate, unver├ñndert
     for (int k = 0; k < numBins; ++k)
         transientMask[static_cast<size_t>(k)] = true;
 
     if (numFrames >= 4)
     {
         // ================================================================
-        // SCHRITT 1: Mittlere Energie und Varianz pro Bin über alle Frames
-        // rawMagLin ist linear + absolut → wir rechnen in dB für
-        // skalierungsunabhängige Statistik.
+        // SCHRITT 1: Mittlere Energie und Varianz pro Bin ├╝ber alle Frames
+        // rawMagLin ist linear + absolut ÔåÆ wir rechnen in dB f├╝r
+        // skalierungsunabh├ñngige Statistik.
         //
         // Performance: mean/variance are computed in one pass (Welford),
         // which preserves the metric while avoiding a second full log pass.
@@ -3158,8 +3158,8 @@ void PluginProcessor::finalizeAutoDetectedObjects()
         }
 
         // ================================================================
-        // SCHRITT 2: Globale Energie-Referenz für Noise-Floor-Cutoff
-        // Bins deutlich unter dem globalen Schnitt werden ignoriert –
+        // SCHRITT 2: Globale Energie-Referenz f├╝r Noise-Floor-Cutoff
+        // Bins deutlich unter dem globalen Schnitt werden ignoriert ÔÇô
         // sonst wird stilles Rauschen als "stabil = tonal" erkannt.
         // ================================================================
         float globalMeanLin = 0.0f;
@@ -3167,8 +3167,8 @@ void PluginProcessor::finalizeAutoDetectedObjects()
             globalMeanLin += meanLin[static_cast<size_t>(k)];
         globalMeanLin /= static_cast<float>(numBins);
 
-        // Bins müssen genug absolute Energie haben, aber im Low-End etwas weniger
-        // streng behandelt werden, damit Grundtöne nicht verschwinden.
+        // Bins m├╝ssen genug absolute Energie haben, aber im Low-End etwas weniger
+        // streng behandelt werden, damit Grundt├Âne nicht verschwinden.
         std::array<float, numBins> localFlatness{};
         std::array<float, numBins> energyFloorPerBin{};
         for (int k = 0; k < numBins; ++k)
@@ -3198,13 +3198,13 @@ void PluginProcessor::finalizeAutoDetectedObjects()
         // ================================================================
         // SCHRITT 3: Tonal-Score pro Bin
         //
-        // Stabilitätsmaß: stdDev in dB. Kleine stdDev = stabile Hüllkurve.
-        // Schwelle: 6 dB stdDev entspricht einer Hüllkurve die um ±6 dB
-        // schwankt – das ist die Grenze zwischen Sustain und Attack/Decay.
+        // Stabilit├ñtsma├ƒ: stdDev in dB. Kleine stdDev = stabile H├╝llkurve.
+        // Schwelle: 6 dB stdDev entspricht einer H├╝llkurve die um ┬▒6 dB
+        // schwankt ÔÇô das ist die Grenze zwischen Sustain und Attack/Decay.
         //
-        //   stdDb < 3 dB  → sehr stabil  → Score nahe 1.0
-        //   stdDb = 6 dB  → Grenzbereich → Score 0.0
-        //   stdDb > 6 dB  → instabil     → kein Tonal
+        //   stdDb < 3 dB  ÔåÆ sehr stabil  ÔåÆ Score nahe 1.0
+        //   stdDb = 6 dB  ÔåÆ Grenzbereich ÔåÆ Score 0.0
+        //   stdDb > 6 dB  ÔåÆ instabil     ÔåÆ kein Tonal
         // ================================================================
         std::array<float, numBins> tonalScore{};
         std::array<float, numBins> baselineStabilityScore{};
@@ -3249,9 +3249,9 @@ void PluginProcessor::finalizeAutoDetectedObjects()
 
         // ================================================================
         // SCHRITT 4: Lokale Peak-Bedingung
-        // Ein tonaler Bin muss auch spektral herausragen – nicht nur stabil
-        // sein. Das trennt breite Noise-Plateaus von echten Tönen.
-        // Wir prüfen ob der Bin in einem 5-Bin-Fenster ein lokaler Peak ist
+        // Ein tonaler Bin muss auch spektral herausragen ÔÇô nicht nur stabil
+        // sein. Das trennt breite Noise-Plateaus von echten T├Ânen.
+        // Wir pr├╝fen ob der Bin in einem 5-Bin-Fenster ein lokaler Peak ist
         // (auf dem mittleren Energie-Wert, nicht frame-by-frame).
         // ================================================================
         std::array<float, numBins> tonalScoreFinal{};
@@ -3295,7 +3295,7 @@ void PluginProcessor::finalizeAutoDetectedObjects()
             if (prominenceDb < requiredProminenceDb && !strongRecurringEvidence)
                 continue;
 
-            // Score = Stabilität * normierte Prominenz
+            // Score = Stabilit├ñt * normierte Prominenz
             const float promScore = juce::jlimit(0.0f, 1.0f, (prominenceDb - requiredProminenceDb) / 7.0f);
             const float peakDrivenScore = tonalScore[static_cast<size_t>(k)] * (0.62f + 0.38f * promScore);
             const float recurringFallback = strongRecurringEvidence
@@ -3306,8 +3306,8 @@ void PluginProcessor::finalizeAutoDetectedObjects()
 
         // ================================================================
         // SCHRITT 5: Harmonische Bindung
-        // Erkannte Grundtöne ziehen ihre Obertöne mit.
-        // Läuft von unten nach oben damit Grundtöne zuerst etabliert sind.
+        // Erkannte Grundt├Âne ziehen ihre Obert├Âne mit.
+        // L├ñuft von unten nach oben damit Grundt├Âne zuerst etabliert sind.
         // ================================================================
         for (int k = 2; k < numBins / 2; ++k)
         {
@@ -3320,7 +3320,7 @@ void PluginProcessor::finalizeAutoDetectedObjects()
                 if (hBin >= numBins)
                     break;
 
-                // Oberton erbt 65% des Grundton-Scores wenn er selbst schwächer ist
+                // Oberton erbt 65% des Grundton-Scores wenn er selbst schw├ñcher ist
                 const float inherited = tonalScoreFinal[static_cast<size_t>(k)] * 0.72f;
                 if (inherited > tonalScoreFinal[static_cast<size_t>(hBin)])
                     tonalScoreFinal[static_cast<size_t>(hBin)] = inherited;
@@ -3369,8 +3369,8 @@ void PluginProcessor::finalizeAutoDetectedObjects()
 
         // ================================================================
         // SCHRITT 6: Ambient-Score pro Bin
-        // Ambient ist eigene Klasse (nicht bloß Residual): hohe Flatness,
-        // wenig Tonalität und geringe Kopplung an gate-offene Frames.
+        // Ambient ist eigene Klasse (nicht blo├ƒ Residual): hohe Flatness,
+        // wenig Tonalit├ñt und geringe Kopplung an gate-offene Frames.
         // ================================================================
         std::array<float, numBins> ambientScore{};
         for (int k = 0; k < numBins; ++k)
@@ -3416,7 +3416,7 @@ void PluginProcessor::finalizeAutoDetectedObjects()
 
         // ================================================================
         // SCHRITT 7: Masken aus Scores
-        // Tonal bleibt führend auf tonal geprägten Bins.
+        // Tonal bleibt f├╝hrend auf tonal gepr├ñgten Bins.
         // Ambient folgt eigener Noise-Wahrscheinlichkeit.
         // ================================================================
         for (int k = 0; k < numBins; ++k)
@@ -3489,7 +3489,7 @@ void PluginProcessor::createHannWindow()
 {
     // sqrt-Hann window for both analysis and synthesis.
     // Analysis * Synthesis = sqrt-Hann * sqrt-Hann = Hann.
-    // OLA normalization divides by sum(Hann) ≈ 2.0 at steady state
+    // OLA normalization divides by sum(Hann) Ôëê 2.0 at steady state
     // (75% overlap), giving perfect reconstruction for any smooth mask.
     for (int i = 0; i < fftSize; ++i)
     {

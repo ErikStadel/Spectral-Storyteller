@@ -70,6 +70,26 @@ void SpectralView::setPaused(bool shouldPause)
     isPaused = shouldPause;
 }
 
+void SpectralView::mouseMove(const juce::MouseEvent& e)
+{
+    cursorY = e.position.toInt().y;
+    showCursorReadout = true;
+    repaint();
+}
+
+void SpectralView::mouseExit(const juce::MouseEvent&)
+{
+    showCursorReadout = false;
+    repaint();
+}
+
+void SpectralView::setExternalCursorPosition(int y, bool active)
+{
+    cursorY = y;
+    showCursorReadout = active && y >= 0;
+    repaint();
+}
+
 void SpectralView::setSegmentationOverlayProvider(std::function<bool(std::array<float, SpectralFrameBuffer::NUM_BINS>&,
                                                                      std::array<float, SpectralFrameBuffer::NUM_BINS>&,
                                                                      std::array<float, SpectralFrameBuffer::NUM_BINS>&)> provider)
@@ -370,10 +390,11 @@ void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
         float& smooth = smoothedRowDb[static_cast<size_t>(y)];
         smooth = smooth + temporalSmoothing * (emphasizedDb - smooth);
 
-        const bool underGate = rawDb <= gateDb + 1.0f;
-        const float clippedDb = underGate
-            ? magnitudeMin
-            : juce::jlimit(magnitudeMin, magnitudeMax, smooth);
+        // Sanftes Fade-Out statt hartem Cutoff am Gate: vermeidet eine sichtbare
+        // Kante/Banding an der Rauschgrenze. Übergang über kGateFadeRangeDb.
+        const float gateFadeAmount = juce::jlimit(0.0f, 1.0f, (rawDb - gateDb) / kGateFadeRangeDb);
+        const float targetDb = juce::jlimit(magnitudeMin, magnitudeMax, smooth);
+        const float clippedDb = magnitudeMin + gateFadeAmount * (targetDb - magnitudeMin);
         auto pixel = magnitudeToColour(clippedDb);
 
         // FIX 1 & 2: Overlay nur zeichnen, wenn Objekte existieren UND Signal laut genug ist
@@ -401,7 +422,7 @@ void SpectralView::appendFrameColumn(const SpectralFrameBuffer::Frame& frame)
             const float alphaN = juce::jlimit(0.0f, 0.45f, n * 0.45f * gateFade);
 
             pixel = pixel.interpolatedWith(juce::Colour(0xFFFF5252), alphaT);   // Transient (Rot)
-            pixel = pixel.interpolatedWith(juce::Colour(0xFF4AA3FF), alphaTN);  // Tonal (Cyan)
+            pixel = pixel.interpolatedWith(juce::Colour(0xFF2FE0FF), alphaTN);  // Tonal (Cyan)
             pixel = pixel.interpolatedWith(juce::Colour(0xFF4FD16A), alphaN);   // Noise (Grün)
         }
 
@@ -645,11 +666,64 @@ void SpectralView::drawGrid(juce::Graphics& g)
         g.setColour(juce::Colour(0x18FFFFFF));
         g.drawHorizontalLine(y, static_cast<float>(width - 36), static_cast<float>(width));
 
-        g.setColour(juce::Colour(0x99AAAAAA));
-        g.drawText(juce::String(static_cast<int>(db)) + "dB",
-                   width - 35, y - 6, 33, 12,
+        const int dbLabelW = 34;
+        const int dbLabelH = 12;
+        const int dbLabelY = juce::jlimit(0, height - dbLabelH, y - dbLabelH / 2);
+        const int dbLabelX = width - dbLabelW - 2;
+
+        g.setColour(juce::Colour(0x88000000));
+        g.fillRect(dbLabelX, dbLabelY, dbLabelW, dbLabelH);
+
+        g.setColour(juce::Colour(0xBBCCCCCC));
+        g.drawText(juce::String(static_cast<int>(db)) + " dB",
+                   dbLabelX, dbLabelY, dbLabelW, dbLabelH,
                    juce::Justification::centredRight, false);
     }
+}
+
+// =============================================================================
+// drawCursorReadout  –  Frequenz-Crosshair unter der Maus
+// =============================================================================
+
+void SpectralView::drawCursorReadout(juce::Graphics& g)
+{
+    const int width  = getWidth();
+    const int height = getHeight();
+    if (width < 2 || height < 2 || cursorY < 0 || cursorY >= height)
+        return;
+
+    // Selbe Bin-Position wie im Renderer (yToBinF), damit die Anzeige exakt
+    // dem entspricht, was gerade auf dem Bildschirm zu sehen ist.
+    const int bin = getBinForY(cursorY);
+    const float nyquist = kSampleRate * 0.5f;
+    const float freq = (static_cast<float>(bin) / static_cast<float>(SpectralFrameBuffer::NUM_BINS - 1)) * nyquist;
+
+    juce::String label = (freq >= 1000.0f)
+        ? (juce::String(freq / 1000.0f, 2) + " kHz")
+        : (juce::String(static_cast<int>(freq)) + " Hz");
+
+    // Gestrichelte Fadenkreuz-Linie
+    juce::Path straight;
+    straight.startNewSubPath(0.0f, static_cast<float>(cursorY) + 0.5f);
+    straight.lineTo(static_cast<float>(width), static_cast<float>(cursorY) + 0.5f);
+    juce::Path dashed;
+    const float dashLengths[] = { 4.0f, 3.0f };
+    juce::PathStrokeType(1.0f).createDashedStroke(dashed, straight, dashLengths, 2);
+    g.setColour(juce::Colour(0x55FFFFFF));
+    g.fillPath(dashed);
+
+    // Readout-Chip
+    g.setFont(juce::Font(11.0f, juce::Font::bold));
+    const int labelW = 64;
+    const int labelH = 16;
+    const int labelY = juce::jlimit(0, height - labelH, cursorY - labelH / 2);
+    const int labelX = width - labelW - 6;
+
+    g.setColour(juce::Colour(0xDD000000));
+    g.fillRoundedRectangle(static_cast<float>(labelX), static_cast<float>(labelY),
+                           static_cast<float>(labelW), static_cast<float>(labelH), 3.0f);
+    g.setColour(juce::Colours::white);
+    g.drawText(label, labelX, labelY, labelW, labelH, juce::Justification::centred, false);
 }
 
 // =============================================================================
@@ -668,6 +742,9 @@ void SpectralView::paint(juce::Graphics& g)
 
     if (showGrid)
         drawGrid(g);
+
+    if (showCursorReadout)
+        drawCursorReadout(g);
 }
 
 void SpectralView::resized()

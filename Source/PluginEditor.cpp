@@ -117,6 +117,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (spectralView)
             spectralView->setPaused(false);
     });
+    spectralSelector->setOnHoverPositionChanged([this](int y, bool active)
+    {
+        if (spectralView)
+            spectralView->setExternalCursorPosition(y, active);
+    });
     spectralSelector->setOnSelectionComplete([this](int minBin, int maxBin)
     {
         // Create new object from selection
@@ -253,6 +258,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             modulationPanel->refresh();
     });
     addAndMakeVisible(*spectralSelector);
+    addAndMakeVisible(toolGroupPanel);
 
     for (auto* button : { &rectSelectButton, &lassoSelectButton })
     {
@@ -262,12 +268,13 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF3F3F46));
         button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
         button->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
+        button->setLookAndFeel(&toolbarButtonLookAndFeel);
         addAndMakeVisible(*button);
     }
 
     rectSelectButton.setToggleState(true, juce::dontSendNotification);
-    rectSelectButton.setTooltip("Rechteck-Auswahl: erzeugt die bisherige 1D-Frequenzmaske");
-    lassoSelectButton.setTooltip("Pinsel-Auswahl: erzeugt eine echte 2D-Zeit-Frequenz-Maske; Shift+Scroll aendert den Durchmesser");
+    rectSelectButton.setTooltip("Rectangle Selector: creates a 1D mask");
+    lassoSelectButton.setTooltip("Brush Selector: creates a true 2D time-frequency mask; Shift+Scroll changes the diameter");
 
     rectSelectButton.onClick = [this]()
     {
@@ -284,11 +291,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     viewModeButton.setClickingTogglesState(true);
     viewModeButton.setToggleState(false, juce::dontSendNotification);
     viewModeButton.setButtonText("Source");
-    viewModeButton.setTooltip("Umschalten zwischen Spectral View und Source View");
+    viewModeButton.setTooltip("Toggle between Spectral View and Source View");
     viewModeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF27272A));
     viewModeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF3F3F46));
     viewModeButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
     viewModeButton.setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
+    viewModeButton.setLookAndFeel(&toolbarButtonLookAndFeel);
     viewModeButton.onClick = [this]()
     {
         updateViewMode();
@@ -464,8 +472,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     dryWetLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF71717A));
     addAndMakeVisible(dryWetLabel);
 
-    // View gain slider (vertical, bottom-right in spectral view)
-    gateSlider.setSliderStyle(juce::Slider::LinearVertical);
+    // View gain lives in the same HUD row as the mode tools so it feels
+    // attached to the spectrogram instead of floating in a separate corner.
+    gateSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     gateSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     gateSlider.setRange(-180.0, 6.0, 1.0);
     gateSlider.setValue(-96.0);
@@ -511,6 +520,9 @@ PluginEditor::~PluginEditor()
 {
     inputGainSlider.setLookAndFeel(nullptr);
     outputGainSlider.setLookAndFeel(nullptr);
+    rectSelectButton.setLookAndFeel(nullptr);
+    lassoSelectButton.setLookAndFeel(nullptr);
+    viewModeButton.setLookAndFeel(nullptr);
 }
 
 void PluginEditor::paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area)
@@ -579,6 +591,7 @@ void PluginEditor::updateViewMode()
     gateSlider.setVisible(!showSourceView);
     gateLabel.setVisible(!showSourceView);
 
+    resized();
     repaint();
 }
 
@@ -616,26 +629,37 @@ void PluginEditor::resized()
     if (storyTimeline)
         storyTimeline->setBounds(timelineArea);
 
-    // Spectral view controls in the corners of the main view
-    juce::Rectangle<int> toolArea(spectralBounds.getX() + 8, spectralBounds.getY() + 8, 116, 20);
-    rectSelectButton.setBounds(toolArea.removeFromLeft(54));
-    toolArea.removeFromLeft(6);
-    lassoSelectButton.setBounds(toolArea.removeFromLeft(56));
+    const bool showSourceView = viewModeButton.getToggleState();
+    const int toolbarHeight = 32;
+    const int toolbarWidth = showSourceView ? 92 : 336;
+    auto toolbarBounds = juce::Rectangle<int>(spectralBounds.getX() + 10,
+                                              spectralBounds.getBottom() - toolbarHeight - 10,
+                                              toolbarWidth,
+                                              toolbarHeight);
+    toolGroupPanel.setBounds(toolbarBounds);
 
-    viewModeButton.setBounds(spectralBounds.getRight() - 94, spectralBounds.getY() + 8, 86, 20);
+    auto toolbarContent = toolbarBounds.reduced(6, 5);
 
-    // View gain control as a vertical slider at the lower-right corner.
-    juce::Rectangle<int> viewGainLabelArea(spectralBounds.getRight() - 36,
-                                           spectralBounds.getBottom() - 34,
-                                           28,
-                                           12);
-    gateLabel.setBounds(viewGainLabelArea);
-
-    juce::Rectangle<int> viewGainSliderArea(spectralBounds.getRight() - 30,
-                                            spectralBounds.getBottom() - 132,
-                                            20,
-                                            92);
-    gateSlider.setBounds(viewGainSliderArea);
+    if (showSourceView)
+    {
+        viewModeButton.setBounds(toolbarContent);
+        rectSelectButton.setBounds(0, 0, 0, 0);
+        lassoSelectButton.setBounds(0, 0, 0, 0);
+        gateLabel.setBounds(0, 0, 0, 0);
+        gateSlider.setBounds(0, 0, 0, 0);
+    }
+    else
+    {
+        rectSelectButton.setBounds(toolbarContent.removeFromLeft(50));
+        toolbarContent.removeFromLeft(4);
+        lassoSelectButton.setBounds(toolbarContent.removeFromLeft(56));
+        toolbarContent.removeFromLeft(10);
+        gateLabel.setBounds(toolbarContent.removeFromLeft(28));
+        toolbarContent.removeFromLeft(6);
+        gateSlider.setBounds(toolbarContent.removeFromLeft(100));
+        toolbarContent.removeFromLeft(10);
+        viewModeButton.setBounds(toolbarContent.removeFromLeft(72));
+    }
 
     // Dry/Wet remains attached but hidden from the mockup-centric surface
     dryWetLabel.setBounds(0, 0, 0, 0);

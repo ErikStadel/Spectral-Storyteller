@@ -37,8 +37,18 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void timerCallback() override;
+    void mouseMove(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
     void setOverlayVisibility(bool shouldBeVisible);
     bool hasActiveSpectralMasks() const;
+
+    /**
+     * Crosshair-Position von außen setzen. Notwendig, weil SpectralSelector
+     * als Overlay über diesem Component liegt und alle Mausereignisse
+     * abfängt – eigenes mouseMove kommt hier praktisch nie an.
+     * y < 0 oder active=false blendet den Crosshair aus.
+     */
+    void setExternalCursorPosition(int y, bool active);
 
     // -------------------------------------------------------------------------
     // Public API
@@ -76,6 +86,10 @@ private:
     bool  showGrid             = true;
     bool  isPaused             = false;
     bool isOverlayVisible = false;
+
+    // Cursor-Frequenz-Readout (Hover-Crosshair)
+    bool showCursorReadout = false;
+    int  cursorY           = -1;
 
     juce::Image spectrogramImage;
 
@@ -120,6 +134,7 @@ private:
     static constexpr float kMinFreq          =    20.0f;
     static constexpr float lowFreqEmphasisDb =     4.0f;
     static constexpr float temporalSmoothing =    0.28f;
+    static constexpr float kGateFadeRangeDb  =    6.0f;   // Übergangsbreite [dB] für weiches Gate-Fade
 
     // Grid-Frequenzmarkierungen [Hz]
     static constexpr std::array<int, 10> kGridFreqs = {
@@ -146,6 +161,9 @@ private:
 
     /** Grid-Linien und Labels über das Spektrogramm zeichnen. */
     void drawGrid(juce::Graphics& g);
+
+    /** Frequenz-Crosshair + Hz-Readout an der Mausposition zeichnen. */
+    void drawCursorReadout(juce::Graphics& g);
 
     /** dB-Wert → Farbe via LUT. */
     [[nodiscard]] juce::Colour magnitudeToColour(float magDb) const noexcept;

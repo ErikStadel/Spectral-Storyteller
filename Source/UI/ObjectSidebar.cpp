@@ -197,7 +197,7 @@ ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
     autoDetectButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFFFA333));
     autoDetectButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE4E4E7));
     autoDetectButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF111111));
-    autoDetectButton->setTooltip("Neu-Detection fuer Record-aktive Objekte starten");
+    autoDetectButton->setTooltip("Auto-detect for record-active objects");
     autoDetectButton->onClick = [this]()
     {
         if (onAutoDetectClicked)
@@ -209,7 +209,7 @@ ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
     transformButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF3F3F46));
     transformButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF4A76B7));
     transformButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE4E4E7));
-    transformButton->setTooltip("Objekt-Menue (Transform / Transient)");
+    transformButton->setTooltip("Object-Menu (Transform / Transient)");
     transformButton->onClick = [this]()
     {
         showTransformMenu();
@@ -249,7 +249,7 @@ void ObjectSidebar::paint(juce::Graphics& g)
 
     g.setColour(juce::Colour(0xFFA1A1AA));
     g.setFont(juce::Font(10.0f, juce::Font::bold));
-    g.drawText("OBJEKT-DATENBANK", 10, PADDING, getWidth() - 20, HEADER_BUTTON_HEIGHT,
+    g.drawText("OBJECT DATABASE", 10, PADDING, getWidth() - 20, HEADER_BUTTON_HEIGHT,
                juce::Justification::centredLeft, false);
 
     // Draw object cards (variable height: transient rows are twice as tall)
@@ -376,7 +376,7 @@ void ObjectSidebar::showTransformMenu()
                            {
                                if (onCreateTransformObject == nullptr)
                                    return;
-                               transformFileChooser = std::make_unique<juce::FileChooser>("Transform-Datei laden",
+                               transformFileChooser = std::make_unique<juce::FileChooser>("Load transform file",
                                                                                            juce::File(),
                                                                                            "*.wav;*.aif;*.aiff;*.flac;*.mp3");
                                transformFileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,

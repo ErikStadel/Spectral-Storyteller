@@ -72,6 +72,18 @@ public:
     }
 
     /**
+     * SpectralSelector liegt als Overlay über SpectralView und fängt alle
+     * Mausereignisse ab – SpectralView bekommt dadurch nie eigene mouseMove-
+     * Events. Dieser Callback meldet Hover-Position (bzw. active=false bei
+     * mouseExit) nach außen, damit der Besitzer (Editor) den Frequenz-
+     * Crosshair im SpectralView darüber ansteuern kann.
+     */
+    void setOnHoverPositionChanged(std::function<void(int y, bool active)> callback)
+    {
+        onHoverPositionChanged = callback;
+    }
+
+    /**
      * Clear the current selection.
      */
     void clearSelection();
@@ -110,6 +122,7 @@ private:
     std::function<void()> onSelectionStarted;
     std::function<void()> onSelectionFinished;
     std::function<int(int, int)> yToBinMapper;
+    std::function<void(int y, bool active)> onHoverPositionChanged;
 
     void ensureBrushMaskImage();
     void stampBrushAt(juce::Point<int> point);

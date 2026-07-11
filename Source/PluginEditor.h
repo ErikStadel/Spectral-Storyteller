@@ -16,6 +16,64 @@
 
 class PluginProcessor;
 
+/**
+ * HudPanel: dünne, halbtransparente Trägerfläche für Controls, die direkt
+ * auf dem Spektrogramm schweben (Tool-Buttons, View-Gain-Slider).
+ * Ohne diese Fläche wirken die Controls wie lose Fremdkörper über dem
+ * bunten, sich bewegenden Spektrogramm-Inhalt. setInterceptsMouseClicks
+ * ist bewusst aus, damit die eigentlichen Controls (die als spätere
+ * Geschwister-Components darüber liegen) weiterhin klickbar bleiben.
+ */
+class HudPanel : public juce::Component
+{
+public:
+    HudPanel() { setInterceptsMouseClicks(false, false); }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat();
+        g.setColour(juce::Colour(0xCC18181B));
+        g.fillRoundedRectangle(r, 5.0f);
+        g.setColour(juce::Colour(0xFF3F3F46));
+        g.drawRoundedRectangle(r.reduced(0.5f), 5.0f, 1.0f);
+    }
+};
+
+/**
+ * ToolbarButtonLookAndFeel: vereinheitlicht Font-Skala und Eckenradius der
+ * Tool-Buttons (Rect/Brush/Source) mit dem Rest der Oberfläche (Labels
+ * durchgängig 9-10pt bold, kleiner Radius wie bei den Label-Boxen im
+ * Spektrogramm). Ersetzt JUCEs generisches Default-Button-Chrome, das
+ * bisher stilistisch nicht zum neumorphen/dunklen Look passte.
+ */
+class ToolbarButtonLookAndFeel : public juce::LookAndFeel_V4
+{
+public:
+    juce::Font getTextButtonFont(juce::TextButton&, int) override
+    {
+        return juce::Font(11.0f, juce::Font::bold);
+    }
+
+    void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour,
+                              bool /*shouldDrawButtonAsHighlighted*/, bool shouldDrawButtonAsDown) override
+    {
+        auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
+        constexpr float corner = 4.0f;
+
+        g.setColour(backgroundColour);
+        g.fillRoundedRectangle(bounds, corner);
+
+        g.setColour(juce::Colour(0xFF52525B));
+        g.drawRoundedRectangle(bounds, corner, 1.0f);
+
+        if (shouldDrawButtonAsDown)
+        {
+            g.setColour(juce::Colours::black.withAlpha(0.15f));
+            g.fillRoundedRectangle(bounds, corner);
+        }
+    }
+};
+
 class LevelMeter : public juce::Component, private juce::Timer
 {
 public:
@@ -97,6 +155,10 @@ private:
     juce::TextButton rectSelectButton { "Rect" };
     juce::TextButton lassoSelectButton { "Brush" };
     juce::TextButton viewModeButton { "Source" };
+    ToolbarButtonLookAndFeel toolbarButtonLookAndFeel;
+    HudPanel toolGroupPanel;
+    HudPanel viewModePanel;
+    HudPanel viewGainPanel;
     std::unique_ptr<ObjectSidebar> objectSidebar;
     std::unique_ptr<StoryTimelineComponent> storyTimeline;
     std::unique_ptr<ModulationPanel> modulationPanel;

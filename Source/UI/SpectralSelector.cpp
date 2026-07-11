@@ -1,5 +1,7 @@
 #include "SpectralSelector.h"
 
+#include <cmath>
+
 SpectralSelector::SpectralSelector()
 {
     setOpaque(false);
@@ -11,6 +13,7 @@ void SpectralSelector::ensureBrushMaskImage()
 {
     const int w = juce::jmax(1, getWidth());
     const int h = juce::jmax(1, getHeight());
+
     if (!brushMaskImage.isValid() || brushMaskImage.getWidth() != w || brushMaskImage.getHeight() != h)
         brushMaskImage = juce::Image(juce::Image::ARGB, w, h, true);
 }
@@ -69,9 +72,6 @@ void SpectralSelector::paint(juce::Graphics& g)
                           1.5f);
         }
 
-        if (!isActive)
-            return;
-
         return;
     }
 
@@ -121,6 +121,9 @@ void SpectralSelector::mouseDrag(const juce::MouseEvent& event)
     hoverPoint = event.getPosition();
     hasHoverPoint = true;
 
+    if (onHoverPositionChanged)
+        onHoverPositionChanged(event.y, true);
+
     if (toolMode == ToolMode::Brush)
     {
         stampBrushLine(lastBrushPoint, event.getPosition());
@@ -141,7 +144,6 @@ void SpectralSelector::mouseUp(const juce::MouseEvent& event)
     selectedMinY = minY;
     selectedMaxY = maxY;
 
-    // Convert pixel Y to bin indices
     selectedMinBin = yPixelToBin(minY, getHeight());
     selectedMaxBin = yPixelToBin(maxY, getHeight());
 
@@ -160,7 +162,9 @@ void SpectralSelector::mouseUp(const juce::MouseEvent& event)
             onBrushComplete(brushMaskImage);
     }
     else if (onSelectionComplete)
+    {
         onSelectionComplete(selectedMinBin, selectedMaxBin);
+    }
 
     brushMaskImage = juce::Image();
 }
@@ -169,6 +173,10 @@ void SpectralSelector::mouseMove(const juce::MouseEvent& event)
 {
     hoverPoint = event.getPosition();
     hasHoverPoint = true;
+
+    if (onHoverPositionChanged)
+        onHoverPositionChanged(event.y, true);
+
     repaint();
 }
 
@@ -176,6 +184,10 @@ void SpectralSelector::mouseExit(const juce::MouseEvent& event)
 {
     juce::ignoreUnused(event);
     hasHoverPoint = false;
+
+    if (onHoverPositionChanged)
+        onHoverPositionChanged(-1, false);
+
     repaint();
 }
 
@@ -219,8 +231,6 @@ int SpectralSelector::yPixelToBin(int y, int height) const
     if (height <= 1)
         return 0;
 
-    // Linear mapping: y=0 (top, high freq) → bin NUM_BINS-1
-    //                 y=height-1 (bottom, low freq) → bin 0
     const float normY = static_cast<float>(y) / static_cast<float>(height - 1);
     const int bin = juce::jlimit(0, NUM_BINS - 1,
         static_cast<int>((1.0f - normY) * static_cast<float>(NUM_BINS - 1)));
@@ -235,7 +245,8 @@ void SpectralSelector::getSelectedBinRange(int& minBin, int& maxBin) const
 
 void SpectralSelector::getSelectedFreqRange(float& minFreq, float& maxFreq, int height) const
 {
-    // Simple approximation: bin → frequency assuming Nyquist = 24kHz @ 48kHz SR
+    juce::ignoreUnused(height);
+
     constexpr float kSampleRate = 48000.0f;
     constexpr float kNyquist = kSampleRate * 0.5f;
     const float binWidth = kNyquist / static_cast<float>(NUM_BINS - 1);
