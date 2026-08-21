@@ -17,10 +17,10 @@ bool targetMatches(const ModulationMatrix::Target& t, const juce::String& text)
 ModulationPanel::ModulationPanel(PluginProcessor& p) : processor(p)
 {
     addAndMakeVisible(slotCombo);
-    slotCombo.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF18181B));
-    slotCombo.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xFF3F3F46));
+    slotCombo.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF004040));
+    slotCombo.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xFF004953));
     slotCombo.setColour(juce::ComboBox::textColourId, juce::Colour(0xFFD4D4D8));
-    slotCombo.setColour(juce::ComboBox::arrowColourId, juce::Colour(0xFFA1A1AA));
+    slotCombo.setColour(juce::ComboBox::arrowColourId, juce::Colour(0xFF00A0A0));
     slotCombo.setJustificationType(juce::Justification::centredRight);
     for (int i = 0; i < ModulationMatrix::NUM_LFOS; ++i)
         slotCombo.addItem("LFO " + juce::String(i + 1), 1 + i);
@@ -65,10 +65,10 @@ ModulationPanel::ModulationPanel(PluginProcessor& p) : processor(p)
 
     for (auto* cb : { &lfoRateCombo, &lfoShapeCombo, &lfoTargetCombo, &xyTargetXCombo, &xyTargetYCombo })
     {
-        cb->setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF18181B));
-        cb->setColour(juce::ComboBox::outlineColourId, juce::Colour(0xFF3F3F46));
+        cb->setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF004040));
+        cb->setColour(juce::ComboBox::outlineColourId, juce::Colour(0xFF004953));
         cb->setColour(juce::ComboBox::textColourId, juce::Colour(0xFFD4D4D8));
-        cb->setColour(juce::ComboBox::arrowColourId, juce::Colour(0xFFA1A1AA));
+        cb->setColour(juce::ComboBox::arrowColourId, juce::Colour(0xFF00A0A0));
     }
 
     auto setupValueField = [](juce::Slider& s)
@@ -79,7 +79,7 @@ ModulationPanel::ModulationPanel(PluginProcessor& p) : processor(p)
         s.setNumDecimalPlacesToDisplay(3);
         s.setColour(juce::Slider::thumbColourId, juce::Colour(0xFFE0A96D));
         s.setColour(juce::Slider::trackColourId, juce::Colour(0xFFE0A96D));
-        s.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF27272A));
+        s.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF003030));
     };
 
     setupValueField(lfoAmountValue);
@@ -89,7 +89,7 @@ ModulationPanel::ModulationPanel(PluginProcessor& p) : processor(p)
     {
         label->setJustificationType(juce::Justification::centredLeft);
         label->setFont(juce::Font(10.0f));
-        label->setColour(juce::Label::textColourId, juce::Colour(0xFFA1A1AA));
+        label->setColour(juce::Label::textColourId, juce::Colour(0xFF00A0A0));
     }
 
     lfoTargetLabel.setFont(juce::Font(9.0f, juce::Font::bold));
@@ -414,7 +414,7 @@ void ModulationPanel::paint(juce::Graphics& g)
     auto r = getLocalBounds().toFloat();
     g.setColour(juce::Colour(0xCC27272A));
     g.fillRoundedRectangle(r, 0.0f);
-    g.setColour(juce::Colour(0xFF3F3F46));
+    g.setColour(juce::Colour(0xFF004953));
     g.drawRect(r, 1.0f);
 
     // Header with accent colour
@@ -424,7 +424,7 @@ void ModulationPanel::paint(juce::Graphics& g)
     g.drawText("MODULATION HUB", headerBounds, juce::Justification::centredLeft, false);
 
     // Separator
-    g.setColour(juce::Colour(0xFF3F3F46));
+    g.setColour(juce::Colour(0xFF004953));
     g.drawHorizontalLine(headerBounds.getBottom() + 2, r.getX() + 6.0f, r.getRight() - 6.0f);
 
     juce::String headerText;
@@ -513,7 +513,7 @@ void ModulationPanel::resized()
 void ModulationPanel::LFOScope::paint(juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
-    g.setColour(juce::Colour(0xFF0C0A09));
+    g.setColour(juce::Colour(0xFF002828));
     g.fillRoundedRectangle(r, 4.0f);
 
     juce::Path p;

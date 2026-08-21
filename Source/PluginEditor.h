@@ -10,7 +10,7 @@
 #include "UI/ModulationPanel.h"
 #include "UI/FxRackPanel.h"
 #include "UI/FxBrowserOverlay.h"
-#include "UI/NeumorphicKnobLookAndFeel.h"
+#include "UI/HardwareLookAndFeel.h"
 #include <atomic>
 #include <memory>
 
@@ -32,10 +32,10 @@ public:
     void paint(juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat();
-        g.setColour(juce::Colour(0xCC18181B));
-        g.fillRoundedRectangle(r, 5.0f);
-        g.setColour(juce::Colour(0xFF3F3F46));
-        g.drawRoundedRectangle(r.reduced(0.5f), 5.0f, 1.0f);
+        g.setColour(juce::Colour(0xFF003838)); // Solid petrol background
+        g.fillRoundedRectangle(r, 4.0f);
+        g.setColour(juce::Colour(0xFF004953)); // Highlight petrol border
+        g.drawRoundedRectangle(r.reduced(0.5f), 4.0f, 1.0f);
     }
 };
 
@@ -63,12 +63,12 @@ public:
         g.setColour(backgroundColour);
         g.fillRoundedRectangle(bounds, corner);
 
-        g.setColour(juce::Colour(0xFF52525B));
+        g.setColour(juce::Colour(0xFF004953)); // Petrol highlight border
         g.drawRoundedRectangle(bounds, corner, 1.0f);
 
         if (shouldDrawButtonAsDown)
         {
-            g.setColour(juce::Colours::black.withAlpha(0.15f));
+            g.setColour(juce::Colours::black.withAlpha(0.25f));
             g.fillRoundedRectangle(bounds, corner);
         }
     }
@@ -184,7 +184,7 @@ private:
 
     juce::Label versionLabel;
     juce::TooltipWindow tooltipWindow;
-    NeumorphicKnobLookAndFeel knobLookAndFeel;
+    HardwareLookAndFeel knobLookAndFeel;
 
     void paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area);
     void paintMeterStrip(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& label);

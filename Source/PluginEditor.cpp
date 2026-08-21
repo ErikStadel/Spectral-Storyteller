@@ -264,9 +264,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         button->setClickingTogglesState(true);
         button->setRadioGroupId(9001);
-        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF27272A));
-        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF3F3F46));
-        button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
+        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF003030));
+        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF004953));
+        button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF00A0A0));
         button->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         button->setLookAndFeel(&toolbarButtonLookAndFeel);
         addAndMakeVisible(*button);
@@ -292,9 +292,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     viewModeButton.setToggleState(false, juce::dontSendNotification);
     viewModeButton.setButtonText("Source");
     viewModeButton.setTooltip("Toggle between Spectral View and Source View");
-    viewModeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF27272A));
-    viewModeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF3F3F46));
-    viewModeButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFA1A1AA));
+    viewModeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF003030));
+    viewModeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF004953));
+    viewModeButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF00A0A0));
     viewModeButton.setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
     viewModeButton.setLookAndFeel(&toolbarButtonLookAndFeel);
     viewModeButton.onClick = [this]()
@@ -479,9 +479,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     gateSlider.setRange(-180.0, 6.0, 1.0);
     gateSlider.setValue(-96.0);
     gateSlider.setTooltip("View Gain (dB)");
-    gateSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xFFE0A96D));
-    gateSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xFFE0A96D));
-    gateSlider.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF27272A));
+    gateSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xFF00A0A0));
+    gateSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00A0A0));
+    gateSlider.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF002828));
     gateSlider.onValueChange = [this]
     {
         if (spectralView)
@@ -492,7 +492,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     gateLabel.setText("View", juce::dontSendNotification);
     gateLabel.setJustificationType(juce::Justification::centred);
     gateLabel.setFont(juce::Font(9.0f, juce::Font::bold));
-    gateLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFA1A1AA));
+    gateLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF00A0A0));
     addAndMakeVisible(gateLabel);
 
     // Attachments for parameter binding
@@ -527,10 +527,10 @@ PluginEditor::~PluginEditor()
 
 void PluginEditor::paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area)
 {
-    g.setColour(juce::Colour(0xE527272A));
+    g.setColour(juce::Colour(0xFF003030)); // Petrol header
     g.fillRect(area.toFloat());
 
-    g.setColour(juce::Colour(0xFF3F3F46));
+    g.setColour(juce::Colour(0xFF004953)); // Highlight border
     g.drawHorizontalLine(area.getBottom() - 1, static_cast<float>(area.getX()), static_cast<float>(area.getRight()));
 
     // Plugin name with gradient
@@ -551,26 +551,26 @@ void PluginEditor::paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area)
 void PluginEditor::paintMeterStrip(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& label)
 {
     juce::ignoreUnused(label);
-    g.setColour(juce::Colour(0xB31C1917));
+    g.setColour(juce::Colour(0xFF002828)); // Darker petrol
     g.fillRect(area.toFloat());
-    g.setColour(juce::Colour(0xFF3F3F46));
+    g.setColour(juce::Colour(0xFF004953)); // Highlight border
     g.drawRect(area.toFloat(), 1.0f);
 }
 
 void PluginEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF18181B));
+    g.fillAll(juce::Colour(0xFF004040)); // Main dark petrol background
 
     // Header bar
     paintHeaderBar(g, getLocalBounds().removeFromTop(headerHeight));
 
     // Footer separator
     auto footerTop = getHeight() - footerHeight;
-    g.setColour(juce::Colour(0xFF3F3F46));
+    g.setColour(juce::Colour(0xFF004953)); // Highlight border
     g.drawHorizontalLine(footerTop, 0.0f, static_cast<float>(getWidth()));
 
     // Sidebar border
-    g.setColour(juce::Colour(0xFF3F3F46));
+    g.setColour(juce::Colour(0xFF004953)); // Highlight border
     g.drawVerticalLine(sidebarWidth, static_cast<float>(headerHeight), static_cast<float>(getHeight()));
 }
 
@@ -617,6 +617,11 @@ void PluginEditor::resized()
     auto centerColumn = center;
     auto timelineArea = centerColumn.removeFromBottom(timelineHeight).reduced(2, 2);
     centerColumn.removeFromBottom(2);
+
+    const int toolbarHeight = 36;
+    auto toolbarArea = centerColumn.removeFromBottom(toolbarHeight).reduced(2, 2);
+    centerColumn.removeFromBottom(2);
+
     auto spectralArea = centerColumn.reduced(2, 2);
 
     const auto spectralBounds = spectralArea;
@@ -630,12 +635,8 @@ void PluginEditor::resized()
         storyTimeline->setBounds(timelineArea);
 
     const bool showSourceView = viewModeButton.getToggleState();
-    const int toolbarHeight = 32;
     const int toolbarWidth = showSourceView ? 92 : 336;
-    auto toolbarBounds = juce::Rectangle<int>(spectralBounds.getX() + 10,
-                                              spectralBounds.getBottom() - toolbarHeight - 10,
-                                              toolbarWidth,
-                                              toolbarHeight);
+    auto toolbarBounds = toolbarArea.withSizeKeepingCentre(toolbarWidth, 32);
     toolGroupPanel.setBounds(toolbarBounds);
 
     auto toolbarContent = toolbarBounds.reduced(6, 5);

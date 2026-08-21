@@ -61,33 +61,33 @@ int FxBrowserOverlay::getContentHeight() const
 void FxBrowserOverlay::paint(juce::Graphics& g)
 {
     // Dimmed backdrop
-    g.fillAll(juce::Colour(0xD909090B));
+    g.fillAll(juce::Colour(0xD9002020)); // Dimmed petrol background
 
     auto panel = getPanelBounds();
-    g.setColour(juce::Colour(0xFF18181B));
+    g.setColour(juce::Colour(0xFF004040));
     g.fillRoundedRectangle(panel.toFloat(), 12.0f);
-    g.setColour(juce::Colour(0xFF3F3F46));
+    g.setColour(juce::Colour(0xFF004953));
     g.drawRoundedRectangle(panel.toFloat(), 12.0f, 1.0f);
 
     // Header
     auto header = panel.removeFromTop(40);
-    g.setColour(juce::Colour(0xE527272A));
+    g.setColour(juce::Colour(0xFF003535));
     g.fillRoundedRectangle(header.toFloat().withTrimmedBottom(-6.0f), 12.0f);
-    g.setColour(juce::Colour(0xFF71717A));
+    g.setColour(juce::Colour(0xFF008080));
     g.setFont(juce::Font(10.0f));
     g.drawText("ROUTING", header.withTrimmedLeft(16).removeFromLeft(70), juce::Justification::centredLeft, false);
     g.setColour(juce::Colour(0xFFE4E4E7));
     g.setFont(juce::Font(12.0f, juce::Font::bold));
     g.drawText("LOAD SPECTRAL FX PROCESSOR", header.withTrimmedLeft(84), juce::Justification::centredLeft, false);
-    g.setColour(juce::Colour(0xFF71717A));
+    g.setColour(juce::Colour(0xFF008080));
     g.setFont(juce::Font(10.0f));
     g.drawText("[ESC] CLOSE", header.withTrimmedRight(14), juce::Justification::centredRight, false);
 
     // Footer
     auto footer = panel.removeFromBottom(24);
-    g.setColour(juce::Colour(0xFF09090B));
+    g.setColour(juce::Colour(0xFF002020));
     g.fillRect(footer);
-    g.setColour(juce::Colour(0xFF52525B));
+    g.setColour(juce::Colour(0xFF004953));
     g.setFont(juce::Font(9.0f));
     g.drawText("Tip: Click an effect card to add it to the selected object's rack.",
                footer.withTrimmedLeft(14), juce::Justification::centredLeft, false);
@@ -106,9 +106,9 @@ void FxBrowserOverlay::paint(juce::Graphics& g)
             continue;
 
         const auto& c = cards[static_cast<size_t>(i)];
-        g.setColour(juce::Colour(0xCC0A0A0A));
+        g.setColour(juce::Colour(0xCC002828));
         g.fillRoundedRectangle(card.toFloat(), 8.0f);
-        g.setColour(juce::Colour(0xFF3F3F46));
+        g.setColour(juce::Colour(0xFF004953));
         g.drawRoundedRectangle(card.toFloat(), 8.0f, 1.0f);
 
         auto inner = card.reduced(10, 8);
@@ -119,11 +119,11 @@ void FxBrowserOverlay::paint(juce::Graphics& g)
         g.setColour(c.accent);
         g.fillEllipse(static_cast<float>(titleRow.getRight() - 8), static_cast<float>(titleRow.getY() + 4), 6.0f, 6.0f);
 
-        g.setColour(juce::Colour(0xFF71717A));
+        g.setColour(juce::Colour(0xFF008080));
         g.setFont(juce::Font(8.5f));
         g.drawText(c.category.toUpperCase(), inner.removeFromTop(12), juce::Justification::centredLeft, false);
 
-        g.setColour(juce::Colour(0xFFA1A1AA));
+        g.setColour(juce::Colour(0xFF00A0A0));
         g.setFont(juce::Font(9.5f));
         g.drawFittedText(c.description, inner, juce::Justification::topLeft, 3);
     }

@@ -2,8 +2,9 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../DSP/ObjectDatabase.h"
-#include "NeumorphicKnobLookAndFeel.h"
+#include "HardwareLookAndFeel.h"
 #include <memory>
+#include <functional>
 
 /**
  * ObjectSidebar: UI für Objekt-Verwaltung (Liste mit Solo/Mute).
@@ -60,7 +61,7 @@ private:
     std::vector<ObjectRow> rows;
     std::unique_ptr<juce::TextButton> autoDetectButton;
     std::unique_ptr<juce::TextButton> transformButton;
-    NeumorphicKnobLookAndFeel thresholdKnobLnF { juce::Colour(0xFFFF5252) };
+    HardwareLookAndFeel thresholdKnobLnF { juce::Colour(0xFF00A0A0) };
     std::unique_ptr<juce::FileChooser> transformFileChooser;
     std::unique_ptr<juce::Component> fxOverlay;
     uint64_t lastKnownRevision = 0;

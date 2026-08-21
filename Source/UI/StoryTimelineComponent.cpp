@@ -521,7 +521,7 @@ void StoryTimelineComponent::beginKeyframeValueEdit(int laneIndex,
     keyframeValueEditor = std::make_unique<juce::TextEditor>();
     keyframeValueEditor->setMultiLine(false);
     keyframeValueEditor->setSelectAllWhenFocused(true);
-    keyframeValueEditor->setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xFF09090B));
+    keyframeValueEditor->setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xFF002020));
     keyframeValueEditor->setColour(juce::TextEditor::textColourId, juce::Colour(0xFFF5F5F4));
     keyframeValueEditor->setColour(juce::TextEditor::outlineColourId, juce::Colour(0xFF52525B));
     keyframeValueEditor->setColour(juce::CaretComponent::caretColourId, juce::Colour(0xFFE0A96D));
@@ -931,7 +931,7 @@ void StoryTimelineComponent::mouseDoubleClick(const juce::MouseEvent& event)
 void StoryTimelineComponent::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds();
-    g.fillAll(juce::Colour(0xFF18181B));
+    g.fillAll(juce::Colour(0xFF004040));
     updateScrollBar();
 
     const int selectedObjectId = processor.getSelectedObjectId();
@@ -958,7 +958,7 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
     const int timelineRight = getTimelineRightX();
 
     auto ruler = bounds.removeFromTop(rulerHeight);
-    g.setColour(juce::Colour(0xFF27272A));
+    g.setColour(juce::Colour(0xFF003030));
     g.fillRect(ruler.withTrimmedRight(getWidth() - timelineRight));
 
     g.setColour(juce::Colour(0x88A8A29E));
@@ -975,10 +975,10 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
         const int y = rulerHeight + displayRow * laneHeight;
         const auto& lane = lanes[static_cast<size_t>(laneIndex)];
 
-        g.setColour((displayRow % 2 == 0) ? juce::Colour(0xFF18181B) : juce::Colour(0xFF27272A));
+        g.setColour((displayRow % 2 == 0) ? juce::Colour(0xFF004040) : juce::Colour(0xFF003030));
         g.fillRect(0, y, timelineRight, laneHeight);
 
-        g.setColour(juce::Colour(0xFF27272A));
+        g.setColour(juce::Colour(0xFF003030));
         g.fillRect(0, y, nameColumnWidth, laneHeight);
 
         g.setColour(juce::Colour(0x66FFFFFF));
@@ -996,9 +996,9 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
         {
             juce::Rectangle<int> tab(tabArea.getX() + p * tabW, tabArea.getY(), tabW - 2, tabArea.getHeight());
             const bool isSelected = (p == lane.selectedParameter);
-            g.setColour(isSelected ? accent : juce::Colour(0xFF3F3F46));
+            g.setColour(isSelected ? accent : juce::Colour(0xFF004953));
             g.fillRoundedRectangle(tab.toFloat(), 3.0f);
-            g.setColour(isSelected ? juce::Colour(0xFFF5F5F4) : juce::Colour(0xFFA1A1AA));
+            g.setColour(isSelected ? juce::Colour(0xFFF5F5F4) : juce::Colour(0xFF00A0A0));
             g.drawText(lane.parameterNames[p], tab, juce::Justification::centred, true);
         }
 
