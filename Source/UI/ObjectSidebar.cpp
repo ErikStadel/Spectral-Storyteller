@@ -197,7 +197,7 @@ ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
     autoDetectButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF333336));
     autoDetectButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFFFA333));
     autoDetectButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE4E4E7));
-    autoDetectButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF111111));
+    autoDetectButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
     autoDetectButton->setTooltip("Auto-detect for record-active objects");
     autoDetectButton->onClick = [this]()
     {
