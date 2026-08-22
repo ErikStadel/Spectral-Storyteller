@@ -236,24 +236,45 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             return juce::String(static_cast<int>(std::round(freqHz))) + "Hz";
         };
 
-        const std::string objName = ("Brush [" + formatFreq(minBin * binWidthHz) + " - "
-                                   + formatFreq(maxBin * binWidthHz) + "]").toStdString();
+        const int selectedId = db->getSelectedObjectId();
+        ObjectDatabase::ObjectMask selectedObj;
+        bool merged = false;
+        
+        if (selectedId >= 0 && db->getObjectCopyById(selectedId, selectedObj))
+        {
+            if (selectedObj.isBrush && selectedObj.recordEnabled)
+            {
+                db->setObjectTimeFrequencyMask(selectedId, frameTimesSec, frameMasks, combinedMask, true);
+                merged = true;
+                
+                // Recalibrate density anchor for merged object
+                ObjectDatabase::ObjectMask updated;
+                if (db->getObjectCopyById(selectedId, updated))
+                    processor.calibrateDensityAnchor(updated);
+            }
+        }
+        
+        if (!merged)
+        {
+            const std::string objName = ("Brush [" + formatFreq(minBin * binWidthHz) + " - "
+                                       + formatFreq(maxBin * binWidthHz) + "]").toStdString();
 
-        if (!db->addObject(objName))
-            return;
+            if (!db->addObject(objName, true, false))
+                return;
 
-        const int newIndex = db->getNumObjects() - 1;
-        const int newObjectId = db->getObjectIdAtIndex(newIndex);
-        if (newObjectId < 0)
-            return;
+            const int newIndex = db->getNumObjects() - 1;
+            const int newObjectId = db->getObjectIdAtIndex(newIndex);
+            if (newObjectId < 0)
+                return;
 
-        db->setObjectTimeFrequencyMask(newObjectId, frameTimesSec, frameMasks, combinedMask);
+            db->setObjectTimeFrequencyMask(newObjectId, frameTimesSec, frameMasks, combinedMask, false);
 
-        ObjectDatabase::ObjectMask created;
-        if (db->getObjectCopy(newIndex, created))
-            processor.calibrateDensityAnchor(created);
+            ObjectDatabase::ObjectMask created;
+            if (db->getObjectCopy(newIndex, created))
+                processor.calibrateDensityAnchor(created);
 
-        processor.setSelectedObjectId(newObjectId);
+            processor.setSelectedObjectId(newObjectId);
+        }
 
         if (objectSidebar)
             objectSidebar->refresh();

@@ -55,6 +55,8 @@ public:
         float densityAnchorDb = -60.0f;
         bool densityAnchorValid = false;
         bool hasTimeFrequencyMask = false;
+        bool isBrush = false;
+        bool isAutoDetected = false;
         std::vector<double> timeMaskFrameTimesSec;
         std::vector<std::array<bool, NUM_BINS>> timeMaskFrameMasks;
         std::vector<FXModule> fxChain;
@@ -68,7 +70,7 @@ public:
     /**
      * Add a new object mask with default empty state.
      */
-    bool addObject(const std::string& name);
+    bool addObject(const std::string& name, bool isBrush = false, bool isAutoDetected = false);
 
     /**
      * Remove an object by index.
@@ -145,7 +147,8 @@ public:
     bool setObjectTimeFrequencyMask(int objectId,
                                     const std::vector<double>& frameTimesSec,
                                     const std::vector<std::array<bool, NUM_BINS>>& frameMasks,
-                                    const std::array<bool, NUM_BINS>& combinedMask);
+                                    const std::array<bool, NUM_BINS>& combinedMask,
+                                    bool merge = false);
 
     void addAutomationKeyframe(int objectId,
                                const std::string& effectName,

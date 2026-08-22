@@ -673,7 +673,7 @@ void ObjectSidebar::rebuildRows()
         row.name = obj.name;
         const juce::String objectNameLower = juce::String(obj.name).toLowerCase();
         row.isTransient = objectNameLower.contains("transient");
-        row.allowRecord = objectNameLower.contains("tonal") || objectNameLower.contains("noise") || objectNameLower.contains("ambience");
+        row.allowRecord = obj.isBrush || obj.isAutoDetected;
 
         // Eng button
         row.engageButton = std::make_unique<juce::TextButton>("Eng");
@@ -698,7 +698,7 @@ void ObjectSidebar::rebuildRows()
         row.recordButton->setClickingTogglesState(true);
         row.recordButton->setToggleState(obj.recordEnabled, juce::dontSendNotification);
         row.recordButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF1E1E20));
-        row.recordButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF101012));
+        row.recordButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFEF4444));
         row.recordButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFCCCCCC));
         row.recordButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         row.recordButton->setTooltip("Objekt bei Auto-Detect neu berechnen");

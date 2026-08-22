@@ -315,7 +315,7 @@ ObjectDatabase::ObjectDatabase()
 {
 }
 
-bool ObjectDatabase::addObject(const std::string& name)
+bool ObjectDatabase::addObject(const std::string& name, bool isBrush, bool isAutoDetected)
 {
     juce::ScopedLock lock_(lock);
 
@@ -326,6 +326,11 @@ bool ObjectDatabase::addObject(const std::string& name)
     newObject.id = nextObjectId++;
     newObject.name = name.empty() ? ("Object_" + std::to_string(objects.size())) : name;
     newObject.mask.fill(false);
+    
+    newObject.isBrush = isBrush;
+    newObject.isAutoDetected = isAutoDetected;
+    newObject.recordEnabled = isBrush || isAutoDetected;
+    
     ensureBaseFx(newObject);
     for (auto& fx : newObject.fxChain)
         fx.enabled = false;
@@ -806,7 +811,8 @@ bool ObjectDatabase::setObjectDensityAnchor(int objectId, float anchorDb, bool v
 bool ObjectDatabase::setObjectTimeFrequencyMask(int objectId,
                                                 const std::vector<double>& frameTimesSec,
                                                 const std::vector<std::array<bool, NUM_BINS>>& frameMasks,
-                                                const std::array<bool, NUM_BINS>& combinedMask)
+                                                const std::array<bool, NUM_BINS>& combinedMask,
+                                                bool merge)
 {
     juce::ScopedLock lock_(lock);
 
@@ -818,10 +824,70 @@ bool ObjectDatabase::setObjectTimeFrequencyMask(int objectId,
         if (object.id != objectId)
             continue;
 
-        object.hasTimeFrequencyMask = !frameMasks.empty();
-        object.timeMaskFrameTimesSec = frameTimesSec;
-        object.timeMaskFrameMasks = frameMasks;
-        object.mask = combinedMask;
+        if (merge)
+        {
+            // Merge combined mask
+            for (int i = 0; i < NUM_BINS; ++i)
+                object.mask[i] = object.mask[i] || combinedMask[i];
+                
+            // Robust merging: evaluate both masks at all unique times and OR them
+            std::vector<double> mergedTimes;
+            for (double t : object.timeMaskFrameTimesSec) mergedTimes.push_back(t);
+            for (double t : frameTimesSec) mergedTimes.push_back(t);
+            
+            std::sort(mergedTimes.begin(), mergedTimes.end());
+            std::vector<double> uniqueTimes;
+            for (double t : mergedTimes)
+            {
+                if (uniqueTimes.empty() || t - uniqueTimes.back() > 0.001)
+                    uniqueTimes.push_back(t);
+            }
+            
+            auto getMaskAtTime = [](double t, const std::vector<double>& times, const std::vector<std::array<bool, NUM_BINS>>& masks)
+            {
+                std::array<bool, NUM_BINS> result{};
+                result.fill(false);
+                if (times.empty()) return result;
+                
+                auto lower = std::lower_bound(times.begin(), times.end(), t);
+                size_t idx = 0;
+                if (lower == times.end()) idx = times.size() - 1;
+                else if (lower == times.begin()) idx = 0;
+                else
+                {
+                    size_t hi = static_cast<size_t>(std::distance(times.begin(), lower));
+                    size_t lo = hi - 1;
+                    idx = (std::abs(times[hi] - t) < std::abs(t - times[lo])) ? hi : lo;
+                }
+                
+                if (std::abs(times[idx] - t) <= 0.05)
+                    return masks[idx];
+                return result;
+            };
+            
+            std::vector<std::array<bool, NUM_BINS>> mergedMasks;
+            for (double t : uniqueTimes)
+            {
+                auto oldM = getMaskAtTime(t, object.timeMaskFrameTimesSec, object.timeMaskFrameMasks);
+                auto newM = getMaskAtTime(t, frameTimesSec, frameMasks);
+                std::array<bool, NUM_BINS> combined{};
+                for (int k = 0; k < NUM_BINS; ++k)
+                    combined[k] = oldM[k] || newM[k];
+                mergedMasks.push_back(combined);
+            }
+            
+            object.timeMaskFrameTimesSec = uniqueTimes;
+            object.timeMaskFrameMasks = mergedMasks;
+            object.hasTimeFrequencyMask = !object.timeMaskFrameMasks.empty();
+        }
+        else
+        {
+            object.hasTimeFrequencyMask = !frameMasks.empty();
+            object.timeMaskFrameTimesSec = frameTimesSec;
+            object.timeMaskFrameMasks = frameMasks;
+            object.mask = combinedMask;
+        }
+        
         ensureBaseFx(object);
         ++revision;
         return true;
@@ -1324,6 +1390,8 @@ juce::ValueTree ObjectDatabase::toValueTree() const
         objNode.setProperty("densityAnchorDb", object.densityAnchorDb, nullptr);
         objNode.setProperty("densityAnchorValid", object.densityAnchorValid, nullptr);
         objNode.setProperty("hasTimeFrequencyMask", object.hasTimeFrequencyMask, nullptr);
+        objNode.setProperty("isBrush", object.isBrush, nullptr);
+        objNode.setProperty("isAutoDetected", object.isAutoDetected, nullptr);
 
         juce::String maskBits;
         maskBits.preallocateBytes(NUM_BINS + 1);
@@ -1418,6 +1486,8 @@ void ObjectDatabase::fromValueTree(const juce::ValueTree& tree)
         object.densityAnchorDb = static_cast<float>(objNode.getProperty("densityAnchorDb", -60.0f));
         object.densityAnchorValid = static_cast<bool>(objNode.getProperty("densityAnchorValid", false));
         object.hasTimeFrequencyMask = static_cast<bool>(objNode.getProperty("hasTimeFrequencyMask", false));
+        object.isBrush = static_cast<bool>(objNode.getProperty("isBrush", false));
+        object.isAutoDetected = static_cast<bool>(objNode.getProperty("isAutoDetected", false));
         object.mask.fill(false);
 
         const auto maskBits = objNode.getProperty("mask", juce::String()).toString();

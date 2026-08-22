@@ -462,14 +462,8 @@ void PluginProcessor::updateTargetBinGains()
             selectedIndex = (std::abs(item.timeMaskFrameTimesSec[hi] - nowSec) < std::abs(nowSec - item.timeMaskFrameTimesSec[lo])) ? hi : lo;
         }
 
-        double maxDistance = 0.03;
-        if (item.timeMaskFrameTimesSec.size() > 1)
-        {
-            if (selectedIndex > 0)
-                maxDistance = juce::jmax(maxDistance, 0.5 * (item.timeMaskFrameTimesSec[selectedIndex] - item.timeMaskFrameTimesSec[selectedIndex - 1]));
-            if (selectedIndex + 1 < item.timeMaskFrameTimesSec.size())
-                maxDistance = juce::jmax(maxDistance, 0.5 * (item.timeMaskFrameTimesSec[selectedIndex + 1] - item.timeMaskFrameTimesSec[selectedIndex]));
-        }
+        // Keep a strict small max distance to prevent strokes from bleeding across time gaps
+        const double maxDistance = 0.05;
 
         if (std::abs(item.timeMaskFrameTimesSec[selectedIndex] - nowSec) > maxDistance)
             return activeMask;
@@ -2455,7 +2449,7 @@ int PluginProcessor::createTransientObject()
     int idx = findObjectIndexByName("Transients");
     if (idx < 0)
     {
-        if (!objectDatabase->addObject("Transients"))
+        if (!objectDatabase->addObject("Transients", false, true))
             return -1;
 
         idx = objectDatabase->getNumObjects() - 1;
@@ -2806,8 +2800,33 @@ void PluginProcessor::analyseSegmentationFrame(const float *fftInterleaved, int6
 
     globalAttackSlope = attackBins > 0 ? totalAttackSlope / attackBins : 0.0f;
 
-    // Manual transient gate is broadband and binary.
-    transientMask.fill(isTransientFrame ? 1.0f : 0.0f);
+    // NEU: Transient-Maske aus spektralem Fluss, Attack-Slope und HPSS
+    for (int k = 0; k < numBins; ++k)
+    {
+        // Gleitendes Energiemittel für zeitliche Normalisierung
+        localMeanMag[static_cast<size_t>(k)] = 0.95f * localMeanMag[static_cast<size_t>(k)] + 0.05f * magLin[static_cast<size_t>(k)];
+        
+        const float flux  = broadbandFlux[static_cast<size_t>(k)];
+        const float slope = attackSlope[static_cast<size_t>(k)];
+        const float perc  = hpPercussiveMask[static_cast<size_t>(k)];
+        
+        // Relative Zunahme (für Crescendo-Unterdrückung)
+        const float relativeIncrease = magLin[static_cast<size_t>(k)] / (localMeanMag[static_cast<size_t>(k)] + eps) - 1.0f;
+        const float relScore = juce::jlimit(0.0f, 1.0f, relativeIncrease / 2.0f);
+
+        // Score-Kombination
+        const float transientScore = juce::jlimit(0.0f, 1.0f,
+            0.35f * (flux / 0.20f) +
+            0.30f * (slope / 0.15f) +
+            0.20f * perc +
+            0.15f * relScore);
+            
+        // Frequenz-Anpassung (tiefe Bins sind weniger transient)
+        const float kNorm = static_cast<float>(k) / static_cast<float>(numBins - 1);
+        const float lowFreqPenalty = juce::jlimit(0.10f, 1.0f, kNorm / 0.08f);
+
+        transientMask[static_cast<size_t>(k)] = transientScore * lowFreqPenalty;
+    }
 
     // Tonal persistence must not depend on the transient gate.
     for (auto &p : tonalPersistence)
@@ -3073,6 +3092,7 @@ void PluginProcessor::resetAutoDetectAccumulation()
     autoDetectNonTransientFrameCount = 0;
     tonalDetectionCount.fill(0.0f);
     tonalDetectionMagnitude.fill(0.0f);
+    localMeanMag.fill(0.0f);
 }
 
 void PluginProcessor::finalizeAutoDetectedObjects()
@@ -3388,15 +3408,61 @@ void PluginProcessor::finalizeAutoDetectedObjects()
         }
 
         // ================================================================
-        // SCHRITT 7: Masken aus Scores
-        // Tonal bleibt f├╝hrend auf tonal gepr├ñgten Bins.
-        // Ambient folgt eigener Noise-Wahrscheinlichkeit.
+        // SCHRITT 7: Transient-Score pro Bin
+        // ================================================================
+        std::array<float, numBins> transientScorePerBin{};
+        int transientBinCount = 0;
+        
+        for (int k = 0; k < numBins; ++k)
+        {
+            if (meanLin[static_cast<size_t>(k)] < energyFloorPerBin[static_cast<size_t>(k)])
+                continue;
+                
+            float peakMag = 0.0f;
+            float sumMag = 0.0f;
+            int gateFrameCount = 0;
+
+            for (int t = 0; t < numFrames; ++t)
+            {
+                const float m = recordedMagnitudeFrames[static_cast<size_t>(t)][static_cast<size_t>(k)];
+                peakMag = juce::jmax(peakMag, m);
+                sumMag += m;
+                if (t < (int)recordedGateFrames.size() && recordedGateFrames[static_cast<size_t>(t)])
+                    ++gateFrameCount;
+            }
+
+            const float meanMag = sumMag / static_cast<float>(numFrames);
+            const float peakToMean = meanMag > eps ? (peakMag / meanMag) : 1.0f;
+
+            const float peakScore = juce::jlimit(0.0f, 1.0f, (peakToMean - 1.5f) / 5.0f);
+            const float gateCoupling = numFrames > 0 ? static_cast<float>(gateFrameCount) / static_cast<float>(numFrames) : 0.0f;
+            const float stdDb = std::sqrt(varDb[static_cast<size_t>(k)] + eps);
+            const float varianceScore = juce::jlimit(0.0f, 1.0f, stdDb / 12.0f);
+
+            transientScorePerBin[static_cast<size_t>(k)] = juce::jlimit(0.0f, 1.0f,
+                0.45f * peakScore +
+                0.30f * varianceScore +
+                0.25f * gateCoupling);
+
+            const float kNorm = static_cast<float>(k) / static_cast<float>(numBins - 1);
+            const float lowFreqPenalty = juce::jlimit(0.10f, 1.0f, kNorm / 0.06f);
+            transientScorePerBin[static_cast<size_t>(k)] *= lowFreqPenalty;
+            
+            if (transientScorePerBin[static_cast<size_t>(k)] > 0.25f)
+                ++transientBinCount;
+        }
+
+        const float transientThreshold = transientBinCount < 20 ? 0.15f : 0.25f;
+
+        // ================================================================
+        // SCHRITT 8: Masken aus Scores
         // ================================================================
         for (int k = 0; k < numBins; ++k)
         {
             tonalMask[static_cast<size_t>(k)] = (tonalScoreFinal[static_cast<size_t>(k)] > 0.12f);
             noiseMask[static_cast<size_t>(k)] =
                 !tonalMask[static_cast<size_t>(k)] && (ambientScore[static_cast<size_t>(k)] > 0.30f) && (meanLin[static_cast<size_t>(k)] >= energyFloorPerBin[static_cast<size_t>(k)]);
+            transientMask[static_cast<size_t>(k)] = (transientScorePerBin[static_cast<size_t>(k)] > transientThreshold);
         }
     }
 
@@ -3425,7 +3491,7 @@ void PluginProcessor::finalizeAutoDetectedObjects()
         int idx = findObjectIndexByName(name);
         if (idx < 0)
         {
-            if (!objectDatabase->addObject(name.toStdString()))
+            if (!objectDatabase->addObject(name.toStdString(), false, true))
                 return;
 
             idx = objectDatabase->getNumObjects() - 1;

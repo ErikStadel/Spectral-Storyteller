@@ -243,6 +243,8 @@ private:
     // === Hybrid Segmentation + HPSS Pre-Pass (Step 2) ===
     std::array<float, SpectralFrameBuffer::NUM_BINS> hpHarmonicMask{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> hpPercussiveMask{};
+
+    std::array<float, SpectralFrameBuffer::NUM_BINS> localMeanMag{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> hpsScore{};
     std::array<float, SpectralFrameBuffer::NUM_BINS> broadbandFlux{};
 
