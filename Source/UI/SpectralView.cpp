@@ -1,4 +1,5 @@
 #include "SpectralView.h"
+#include "Typography.h"
 #include <algorithm>
 
 // =============================================================================
@@ -622,7 +623,7 @@ void SpectralView::drawGrid(juce::Graphics& g)
     const int height = getHeight();
     if (width < 2 || height < 2) return;
 
-    g.setFont(juce::Font(9.5f));
+    g.setFont(Typography::getLabelFont(false));
 
     for (int freq : kGridFreqs)
     {
@@ -652,7 +653,7 @@ void SpectralView::drawGrid(juce::Graphics& g)
     }
 
     // dB-Skala rechts
-    g.setFont(juce::Font(9.0f));
+    g.setFont(Typography::getValueFont());
     static constexpr int numDbMarks = 5;
     for (int i = 0; i <= numDbMarks; ++i)
     {
@@ -713,7 +714,7 @@ void SpectralView::drawCursorReadout(juce::Graphics& g)
     g.fillPath(dashed);
 
     // Readout-Chip
-    g.setFont(juce::Font(11.0f, juce::Font::bold));
+    g.setFont(Typography::getHeaderFont());
     const int labelW = 64;
     const int labelH = 16;
     const int labelY = juce::jlimit(0, height - labelH, cursorY - labelH / 2);

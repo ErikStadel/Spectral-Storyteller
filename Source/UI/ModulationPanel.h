@@ -77,7 +77,7 @@ private:
                 auto [x,y] = getXY();
                 const float px = r.getX() + x * r.getWidth();
                 const float py = r.getY() + (1.0f - y) * r.getHeight();
-                g.setColour(juce::Colour(0xFFE0A96D));
+                g.setColour(juce::Colour(0xFFE4E4E7));
                 g.fillEllipse(px - 7, py - 7, 14, 14);
                 g.setColour(juce::Colours::white.withAlpha(0.8f));
                 g.drawEllipse(px - 7, py - 7, 14, 14, 1.2f);

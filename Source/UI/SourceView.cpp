@@ -1,4 +1,5 @@
 #include "SourceView.h"
+#include "Typography.h"
 #include "../PluginProcessor.h"
 
 namespace
@@ -130,7 +131,7 @@ void SourceView::paint(juce::Graphics& g)
     g.drawRoundedRectangle(area.expanded(2.0f), 6.0f, 1.0f);
 
     g.setColour(juce::Colour(0xFFA1A1AA));
-    g.setFont(juce::Font(13.0f, juce::Font::bold));
+    g.setFont(Typography::getTitleFont());
     g.drawText(hasData ? (displayName.isNotEmpty() ? displayName : "Source") : "No Transform File Loaded",
                juce::Rectangle<int>(12, 8, getWidth() - 24, 18),
                juce::Justification::centredLeft,
@@ -138,7 +139,7 @@ void SourceView::paint(juce::Graphics& g)
 
     if (!hasData || waveformMin.empty())
     {
-        g.setFont(juce::Font(15.0f, juce::Font::plain));
+        g.setFont(Typography::getTitleFont().withHeight(15.0f));
         g.setColour(juce::Colour(0xFF71717A));
         g.drawFittedText("Load a Transform file to inspect its waveform and edit loop points.",
                          getLocalBounds().reduced(28),
@@ -186,7 +187,7 @@ void SourceView::paint(juce::Graphics& g)
     g.setColour(lastTransportPlaying ? juce::Colour(0xFFFFC400) : juce::Colour(0xFF9CA3AF));
     g.drawLine(playheadX, area.getY() - 4.0f, playheadX, area.getBottom() + 4.0f, lastTransportPlaying ? 2.5f : 1.5f);
 
-    g.setFont(juce::Font(11.0f));
+    g.setFont(Typography::getHeaderFont());
     g.setColour(juce::Colour(0xFFA1A1AA));
     g.drawText(juce::String(loopStartSeconds, 2) + "s", juce::Rectangle<int>(static_cast<int>(loopStartX) - 18, area.getBottom() + 4, 40, 14), juce::Justification::centred, false);
     g.drawText(juce::String(loopEndSeconds, 2) + "s", juce::Rectangle<int>(static_cast<int>(loopEndX) - 18, area.getBottom() + 4, 40, 14), juce::Justification::centred, false);

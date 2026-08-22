@@ -31,46 +31,7 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        auto r = getLocalBounds().toFloat();
-        g.setColour(juce::Colour(0xFF003838)); // Solid petrol background
-        g.fillRoundedRectangle(r, 4.0f);
-        g.setColour(juce::Colour(0xFF004953)); // Highlight petrol border
-        g.drawRoundedRectangle(r.reduced(0.5f), 4.0f, 1.0f);
-    }
-};
-
-/**
- * ToolbarButtonLookAndFeel: vereinheitlicht Font-Skala und Eckenradius der
- * Tool-Buttons (Rect/Brush/Source) mit dem Rest der Oberfläche (Labels
- * durchgängig 9-10pt bold, kleiner Radius wie bei den Label-Boxen im
- * Spektrogramm). Ersetzt JUCEs generisches Default-Button-Chrome, das
- * bisher stilistisch nicht zum neumorphen/dunklen Look passte.
- */
-class ToolbarButtonLookAndFeel : public juce::LookAndFeel_V4
-{
-public:
-    juce::Font getTextButtonFont(juce::TextButton&, int) override
-    {
-        return juce::Font(11.0f, juce::Font::bold);
-    }
-
-    void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour,
-                              bool /*shouldDrawButtonAsHighlighted*/, bool shouldDrawButtonAsDown) override
-    {
-        auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
-        constexpr float corner = 4.0f;
-
-        g.setColour(backgroundColour);
-        g.fillRoundedRectangle(bounds, corner);
-
-        g.setColour(juce::Colour(0xFF004953)); // Petrol highlight border
-        g.drawRoundedRectangle(bounds, corner, 1.0f);
-
-        if (shouldDrawButtonAsDown)
-        {
-            g.setColour(juce::Colours::black.withAlpha(0.25f));
-            g.fillRoundedRectangle(bounds, corner);
-        }
+        HardwareLookAndFeel::drawHardwarePanel(g, getLocalBounds().toFloat(), 4.0f);
     }
 };
 
@@ -83,8 +44,7 @@ public:
     void paint(juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat();
-        g.setColour(juce::Colour(0xFF0C0A09));
-        g.fillRoundedRectangle(r, 4.0f);
+        HardwareLookAndFeel::drawHardwareInset(g, r, 4.0f);
 
         const float minDb = -60.0f;
         const float maxDb = 6.0f;
@@ -155,7 +115,6 @@ private:
     juce::TextButton rectSelectButton { "Rect" };
     juce::TextButton lassoSelectButton { "Brush" };
     juce::TextButton viewModeButton { "Source" };
-    ToolbarButtonLookAndFeel toolbarButtonLookAndFeel;
     HudPanel toolGroupPanel;
     HudPanel viewModePanel;
     HudPanel viewGainPanel;

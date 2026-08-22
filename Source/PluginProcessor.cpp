@@ -1,4 +1,4 @@
-﻿#include "PluginProcessor.h"
+#include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <thread>
@@ -2366,9 +2366,12 @@ int PluginProcessor::createTransformObjectFromPreset(const juce::String &presetN
 
     objectDatabase->addOrEnableObjectFx(newObjectId, "Transform");
     objectDatabase->setObjectFxEnabled(newObjectId, "Transform", true);
-    objectDatabase->setObjectFxSourceObjectId(newObjectId, "Transform", -3);
     objectDatabase->addAutomationKeyframe(newObjectId, "Transform", "Amount", 0.0, 1.0f, 0.0f);
     objectDatabase->addAutomationKeyframe(newObjectId, "Transform", "Smooth", 0.0, 0.15f, 0.0f);
+    objectDatabase->setFxParameterFollowTimeline(newObjectId, "Transform", "Amount", false);
+    objectDatabase->setFxParameterFollowTimeline(newObjectId, "Transform", "Smooth", false);
+    objectDatabase->setFxStaticParameterValue(newObjectId, "Transform", "Amount", 1.0f);
+    objectDatabase->setFxStaticParameterValue(newObjectId, "Transform", "Smooth", 0.15f);
 
     const auto mags = buildTransformPresetSpectrum(cleanName);
     {
@@ -2415,6 +2418,10 @@ int PluginProcessor::createTransformObjectFromFile(const juce::File &file)
     objectDatabase->setObjectFxSourceObjectId(newObjectId, "Transform", ObjectDatabase::FILE_SOURCE_ID);
     objectDatabase->addAutomationKeyframe(newObjectId, "Transform", "Amount", 0.0, 1.0f, 0.0f);
     objectDatabase->addAutomationKeyframe(newObjectId, "Transform", "Smooth", 0.0, 0.15f, 0.0f);
+    objectDatabase->setFxParameterFollowTimeline(newObjectId, "Transform", "Amount", false);
+    objectDatabase->setFxParameterFollowTimeline(newObjectId, "Transform", "Smooth", false);
+    objectDatabase->setFxStaticParameterValue(newObjectId, "Transform", "Amount", 1.0f);
+    objectDatabase->setFxStaticParameterValue(newObjectId, "Transform", "Smooth", 0.15f);
 
     loadTransformFileAsync(newObjectId, file);
     setSelectedObjectId(newObjectId);

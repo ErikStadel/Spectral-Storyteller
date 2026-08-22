@@ -1,9 +1,12 @@
 #include "PluginEditor.h"
+#include "UI/Typography.h"
 #include "PluginProcessor.h"
 
 PluginEditor::PluginEditor(PluginProcessor& p)
     : AudioProcessorEditor(&p), processor(p), tooltipWindow(this, 450)
 {
+    juce::LookAndFeel::setDefaultLookAndFeel(&knobLookAndFeel);
+
     // Create spectrogram view
     spectralView = std::make_unique<SpectralView>(processor.getSpectralFrameBuffer());
     spectralView->setMagnitudeRange(-120.0f, 0.0f);
@@ -264,11 +267,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         button->setClickingTogglesState(true);
         button->setRadioGroupId(9001);
-        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF003030));
-        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF004953));
-        button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF00A0A0));
+        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF2C2C2F));
+        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF101012));
+        button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFCCCCCC));
         button->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
-        button->setLookAndFeel(&toolbarButtonLookAndFeel);
+        button->setLookAndFeel(&knobLookAndFeel);
         addAndMakeVisible(*button);
     }
 
@@ -292,11 +295,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     viewModeButton.setToggleState(false, juce::dontSendNotification);
     viewModeButton.setButtonText("Source");
     viewModeButton.setTooltip("Toggle between Spectral View and Source View");
-    viewModeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF003030));
-    viewModeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF004953));
-    viewModeButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF00A0A0));
+    viewModeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF2C2C2F));
+    viewModeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF101012));
+    viewModeButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFCCCCCC));
     viewModeButton.setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
-    viewModeButton.setLookAndFeel(&toolbarButtonLookAndFeel);
+    viewModeButton.setLookAndFeel(&knobLookAndFeel);
     viewModeButton.onClick = [this]()
     {
         updateViewMode();
@@ -432,8 +435,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     inputLabel.setText("In", juce::dontSendNotification);
     inputLabel.setJustificationType(juce::Justification::centred);
-    inputLabel.setFont(juce::Font(9.0f, juce::Font::bold));
-    inputLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF71717A));
+    inputLabel.setFont(Typography::getMicroFont(true));
+    inputLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFCCCCCC));
     addAndMakeVisible(inputLabel);
 
     inputMeter.setSource(&processor.getInputPeakDb());
@@ -451,8 +454,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     outputLabel.setText("Out", juce::dontSendNotification);
     outputLabel.setJustificationType(juce::Justification::centred);
-    outputLabel.setFont(juce::Font(9.0f, juce::Font::bold));
-    outputLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF71717A));
+    outputLabel.setFont(Typography::getMicroFont(true));
+    outputLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFCCCCCC));
     addAndMakeVisible(outputLabel);
 
     outputMeter.setSource(&processor.getOutputPeakDb());
@@ -464,12 +467,13 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     dryWetSlider.setRange(0.0, 1.0, 0.001);
     dryWetSlider.setValue(1.0);
     dryWetSlider.setTooltip("Dry/Wet Mix");
+    dryWetSlider.setLookAndFeel(&knobLookAndFeel);
     addAndMakeVisible(dryWetSlider);
 
     dryWetLabel.setText("D/W", juce::dontSendNotification);
     dryWetLabel.setJustificationType(juce::Justification::centred);
-    dryWetLabel.setFont(juce::Font(9.0f, juce::Font::bold));
-    dryWetLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF71717A));
+    dryWetLabel.setFont(Typography::getMicroFont(true));
+    dryWetLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFCCCCCC));
     addAndMakeVisible(dryWetLabel);
 
     // View gain lives in the same HUD row as the mode tools so it feels
@@ -479,9 +483,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     gateSlider.setRange(-180.0, 6.0, 1.0);
     gateSlider.setValue(-96.0);
     gateSlider.setTooltip("View Gain (dB)");
-    gateSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xFF00A0A0));
-    gateSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00A0A0));
-    gateSlider.setColour(juce::Slider::backgroundColourId, juce::Colour(0xFF002828));
+    gateSlider.setLookAndFeel(&knobLookAndFeel);
     gateSlider.onValueChange = [this]
     {
         if (spectralView)
@@ -491,8 +493,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     gateLabel.setText("View", juce::dontSendNotification);
     gateLabel.setJustificationType(juce::Justification::centred);
-    gateLabel.setFont(juce::Font(9.0f, juce::Font::bold));
-    gateLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF00A0A0));
+    gateLabel.setFont(Typography::getMicroFont(true));
+    gateLabel.setColour(juce::Label::textColourId, juce::Colour(0xFFCCCCCC));
     addAndMakeVisible(gateLabel);
 
     // Attachments for parameter binding
@@ -518,6 +520,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
 PluginEditor::~PluginEditor()
 {
+    juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
     inputGainSlider.setLookAndFeel(nullptr);
     outputGainSlider.setLookAndFeel(nullptr);
     rectSelectButton.setLookAndFeel(nullptr);
@@ -527,23 +530,19 @@ PluginEditor::~PluginEditor()
 
 void PluginEditor::paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area)
 {
-    g.setColour(juce::Colour(0xFF003030)); // Petrol header
-    g.fillRect(area.toFloat());
-
-    g.setColour(juce::Colour(0xFF004953)); // Highlight border
-    g.drawHorizontalLine(area.getBottom() - 1, static_cast<float>(area.getX()), static_cast<float>(area.getRight()));
+    HardwareLookAndFeel::drawHardwarePanel(g, area.toFloat(), 0.0f); // flat panel
 
     // Plugin name with gradient
-    g.setFont(juce::Font(13.0f, juce::Font::bold));
-    juce::ColourGradient nameGrad(juce::Colour(0xFFE4E4E7), static_cast<float>(area.getX() + 16), 0.0f,
-                                   juce::Colour(0xFFA1A1AA), static_cast<float>(area.getX() + 260), 0.0f, false);
+    g.setFont(Typography::getTitleFont());
+    juce::ColourGradient nameGrad(juce::Colour(0xFFFFFFFF), static_cast<float>(area.getX() + 16), 0.0f,
+                                   juce::Colour(0xFF888888), static_cast<float>(area.getX() + 260), 0.0f, false);
     g.setGradientFill(nameGrad);
     g.drawText("SPCTRL /\\ ARC", area.withTrimmedLeft(16).withTrimmedRight(area.getWidth() / 2),
                juce::Justification::centredLeft, false);
 
     // Right side status
-    g.setFont(juce::Font(10.0f));
-    g.setColour(juce::Colour(0xFFA1A1AA));
+    g.setFont(Typography::getLabelFont(false));
+    g.setColour(juce::Colour(0xFFCCCCCC));
     auto rightArea = area.withTrimmedLeft(area.getWidth() - 200).reduced(8, 0);
     g.drawText(processor.getBuildInfo(), rightArea, juce::Justification::centredRight, false);
 }
@@ -551,27 +550,28 @@ void PluginEditor::paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area)
 void PluginEditor::paintMeterStrip(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& label)
 {
     juce::ignoreUnused(label);
-    g.setColour(juce::Colour(0xFF002828)); // Darker petrol
-    g.fillRect(area.toFloat());
-    g.setColour(juce::Colour(0xFF004953)); // Highlight border
-    g.drawRect(area.toFloat(), 1.0f);
+    HardwareLookAndFeel::drawHardwareInset(g, area.toFloat(), 0.0f);
 }
 
 void PluginEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF004040)); // Main dark petrol background
+    g.fillAll(juce::Colour(0xFF18181A)); // Main dark hardware background
 
     // Header bar
     paintHeaderBar(g, getLocalBounds().removeFromTop(headerHeight));
 
     // Footer separator
     auto footerTop = getHeight() - footerHeight;
-    g.setColour(juce::Colour(0xFF004953)); // Highlight border
+    g.setColour(juce::Colour(0xFF333336)); // Highlight border
     g.drawHorizontalLine(footerTop, 0.0f, static_cast<float>(getWidth()));
+    g.setColour(juce::Colour(0xFF000000)); // Shadow
+    g.drawHorizontalLine(footerTop+1, 0.0f, static_cast<float>(getWidth()));
 
     // Sidebar border
-    g.setColour(juce::Colour(0xFF004953)); // Highlight border
+    g.setColour(juce::Colour(0xFF333336)); // Highlight border
     g.drawVerticalLine(sidebarWidth, static_cast<float>(headerHeight), static_cast<float>(getHeight()));
+    g.setColour(juce::Colour(0xFF000000)); // Shadow
+    g.drawVerticalLine(sidebarWidth+1, static_cast<float>(headerHeight), static_cast<float>(getHeight()));
 }
 
 void PluginEditor::updateViewMode()

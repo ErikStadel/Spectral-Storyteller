@@ -72,7 +72,7 @@ private:
 
     void timerCallback() override;
     void rebuildModules();
-    void showKnobContextMenu(const KnobView& knob, juce::Component* targetComponent);
+    void showKnobContextMenu(const KnobView& knob, juce::Point<int> screenPosition);
 
     std::vector<ModuleLayout> computeLayouts() const;
     bool isKnobSelected(const KnobView& knob) const;
@@ -89,8 +89,8 @@ private:
     void drawAddFxButton(juce::Graphics& g, juce::Rectangle<int> area) const;
     juce::Colour colourForFxName(const juce::String& fxName) const;
 
-    static constexpr int moduleWidthCore = 160;
-    static constexpr int moduleWidthFx = 160;
+    static constexpr int moduleWidthCore = 176;
+    static constexpr int moduleWidthFx = 176;
     static constexpr int addFxWidth = 90;
     static constexpr int moduleGap = 8;
     static constexpr int knobDiameter = 34;  // matches In/Out gain knob size

@@ -61,7 +61,7 @@ private:
     std::vector<ObjectRow> rows;
     std::unique_ptr<juce::TextButton> autoDetectButton;
     std::unique_ptr<juce::TextButton> transformButton;
-    HardwareLookAndFeel thresholdKnobLnF { juce::Colour(0xFF00A0A0) };
+    HardwareLookAndFeel thresholdKnobLnF;
     std::unique_ptr<juce::FileChooser> transformFileChooser;
     std::unique_ptr<juce::Component> fxOverlay;
     uint64_t lastKnownRevision = 0;
@@ -72,12 +72,12 @@ private:
     juce::ScrollBar rowScrollBar { false };
 
     static constexpr int HEADER_BUTTON_HEIGHT = 26;
-    static constexpr int ROW_HEIGHT = 68;
-    static constexpr int RIGHT_BUTTON_W = 20;
-    static constexpr int RIGHT_BUTTON_H = 13;
+    static constexpr int ROW_HEIGHT = 70;
+    static constexpr int RIGHT_BUTTON_W = 24;
+    static constexpr int RIGHT_BUTTON_H = 22;
     static constexpr int FX_BUTTON_W = RIGHT_BUTTON_W;
-    static constexpr int LEFT_TOGGLE_W = 38;
-    static constexpr int LEFT_TOGGLE_H = 18;
+    static constexpr int LEFT_TOGGLE_W = 44;
+    static constexpr int LEFT_TOGGLE_H = 22;
     static constexpr int PADDING = 4;
 
     void timerCallback() override;

@@ -4,6 +4,7 @@ C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralStoryteller_Standal
 C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralStoryteller_rc_lib.dir
 C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralStoryteller_VST3.dir
 C:/Users/helms/Spectral Storyteller/build/CMakeFiles/juce_vst3_helper.dir
+C:/Users/helms/Spectral Storyteller/build/CMakeFiles/FontsData.dir
 C:/Users/helms/Spectral Storyteller/build/CMakeFiles/INSTALL.dir
 C:/Users/helms/Spectral Storyteller/build/CMakeFiles/ALL_BUILD.dir
 C:/Users/helms/Spectral Storyteller/build/CMakeFiles/ZERO_CHECK.dir

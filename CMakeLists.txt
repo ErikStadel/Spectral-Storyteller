@@ -21,7 +21,7 @@ get_target_property(JUCE_INCLUDE_DIR juce_core INTERFACE_INCLUDE_DIRECTORIES)
 
 # Hier aktivieren wir die Standard-Audio-Formate für Windows
 juce_add_plugin(SpectralStoryteller
-    COMPANY_NAME "SignalFlow"
+    COMPANY_NAME "formFX"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
@@ -47,9 +47,20 @@ if(WIN32)
     )
 endif()
 
+juce_add_binary_data(FontsData
+    HEADER_NAME "Fonts.h"
+    NAMESPACE "Fonts"
+    SOURCES
+        "Resources/Fonts/Inter-Regular.ttf"
+        "Resources/Fonts/Inter-Medium.ttf"
+        "Resources/Fonts/Inter-SemiBold.ttf"
+        "Resources/Fonts/Inter-Bold.ttf"
+)
+
 # JUCE-Module verlinken
 target_link_libraries(SpectralStoryteller 
     PRIVATE
+        FontsData
         juce::juce_core
         juce::juce_data_structures
         juce::juce_events
@@ -140,5 +151,5 @@ target_sources(SpectralStoryteller PRIVATE
     Source/UI/FxRackPanel.h
     Source/UI/FxBrowserOverlay.cpp
     Source/UI/FxBrowserOverlay.h
-    Source/UI/NeumorphicKnobLookAndFeel.h
+    Source/UI/HardwareLookAndFeel.h
 )

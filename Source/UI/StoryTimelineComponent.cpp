@@ -1,4 +1,5 @@
 #include "StoryTimelineComponent.h"
+#include "Typography.h"
 #include "../PluginProcessor.h"
 #include "ModulationPanel.h"
 #include <array>
@@ -222,7 +223,7 @@ void StoryTimelineComponent::updateScrollBar()
 
 juce::Rectangle<int> StoryTimelineComponent::getLaneParameterTabArea(int rowTop, int laneHeight) const
 {
-    return juce::Rectangle<int>(8, rowTop + 26, nameColumnWidth - 16, juce::jmax(20, laneHeight - 30));
+    return juce::Rectangle<int>(8, rowTop + 24, nameColumnWidth - 16, 18);
 }
 
 juce::String StoryTimelineComponent::formatLaneValue(const juce::String& effectName,
@@ -521,10 +522,10 @@ void StoryTimelineComponent::beginKeyframeValueEdit(int laneIndex,
     keyframeValueEditor = std::make_unique<juce::TextEditor>();
     keyframeValueEditor->setMultiLine(false);
     keyframeValueEditor->setSelectAllWhenFocused(true);
-    keyframeValueEditor->setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xFF002020));
+    keyframeValueEditor->setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xFF0A0A0B));
     keyframeValueEditor->setColour(juce::TextEditor::textColourId, juce::Colour(0xFFF5F5F4));
     keyframeValueEditor->setColour(juce::TextEditor::outlineColourId, juce::Colour(0xFF52525B));
-    keyframeValueEditor->setColour(juce::CaretComponent::caretColourId, juce::Colour(0xFFE0A96D));
+    keyframeValueEditor->setColour(juce::CaretComponent::caretColourId, juce::Colour(0xFFE4E4E7));
 
     const auto& lane = lanes[static_cast<size_t>(laneIndex)];
     const int parameterIndex = juce::jlimit(0,
@@ -931,7 +932,7 @@ void StoryTimelineComponent::mouseDoubleClick(const juce::MouseEvent& event)
 void StoryTimelineComponent::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds();
-    g.fillAll(juce::Colour(0xFF004040));
+    g.fillAll(juce::Colour(0xFF18181A));
     updateScrollBar();
 
     const int selectedObjectId = processor.getSelectedObjectId();
@@ -958,7 +959,7 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
     const int timelineRight = getTimelineRightX();
 
     auto ruler = bounds.removeFromTop(rulerHeight);
-    g.setColour(juce::Colour(0xFF003030));
+    g.setColour(juce::Colour(0xFF1E1E20));
     g.fillRect(ruler.withTrimmedRight(getWidth() - timelineRight));
 
     g.setColour(juce::Colour(0x88A8A29E));
@@ -975,10 +976,10 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
         const int y = rulerHeight + displayRow * laneHeight;
         const auto& lane = lanes[static_cast<size_t>(laneIndex)];
 
-        g.setColour((displayRow % 2 == 0) ? juce::Colour(0xFF004040) : juce::Colour(0xFF003030));
+        g.setColour((displayRow % 2 == 0) ? juce::Colour(0xFF18181A) : juce::Colour(0xFF1E1E20));
         g.fillRect(0, y, timelineRight, laneHeight);
 
-        g.setColour(juce::Colour(0xFF003030));
+        g.setColour(juce::Colour(0xFF1E1E20));
         g.fillRect(0, y, nameColumnWidth, laneHeight);
 
         g.setColour(juce::Colour(0x66FFFFFF));
@@ -996,9 +997,25 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
         {
             juce::Rectangle<int> tab(tabArea.getX() + p * tabW, tabArea.getY(), tabW - 2, tabArea.getHeight());
             const bool isSelected = (p == lane.selectedParameter);
-            g.setColour(isSelected ? accent : juce::Colour(0xFF004953));
+            
+            // Background
+            g.setColour(isSelected ? juce::Colour(0xFF1E1E20) : juce::Colour(0xFF141416));
             g.fillRoundedRectangle(tab.toFloat(), 3.0f);
-            g.setColour(isSelected ? juce::Colour(0xFFF5F5F4) : juce::Colour(0xFF00A0A0));
+            
+            // Border
+            if (isSelected)
+            {
+                g.setColour(accent.withAlpha(0.6f));
+                g.drawRoundedRectangle(tab.toFloat(), 3.0f, 1.0f);
+            }
+            else
+            {
+                g.setColour(juce::Colour(0xFF000000));
+                g.drawRoundedRectangle(tab.toFloat().reduced(0.5f), 3.0f, 1.0f);
+            }
+            
+            g.setColour(isSelected ? juce::Colour(0xFFFFFFFF) : juce::Colour(0xFF999999));
+            g.setFont(Typography::getLabelFont(isSelected));
             g.drawText(lane.parameterNames[p], tab, juce::Justification::centred, true);
         }
 
@@ -1049,9 +1066,9 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
             const juce::Point<float> p(x, ky);
             const bool isHovered = (laneIndex == hoveredLaneIndex && std::abs(k.timeSec - hoveredKeyTime) < 1.0e-3);
 
-            g.setColour(isHovered ? juce::Colour(0xFFE0A96D) : juce::Colour(0xFFF5F5F4));
+            g.setColour(isHovered ? juce::Colour(0xFFE4E4E7) : juce::Colour(0xFFF5F5F4));
             g.fillEllipse(p.x - keyRadiusPx, p.y - keyRadiusPx, keyRadiusPx * 2.0f, keyRadiusPx * 2.0f);
-            g.setColour(isHovered ? juce::Colour(0xFFE0A96D) : accent.withAlpha(0.6f));
+            g.setColour(isHovered ? juce::Colour(0xFFE4E4E7) : accent.withAlpha(0.6f));
             g.drawEllipse(p.x - keyRadiusPx, p.y - keyRadiusPx, keyRadiusPx * 2.0f, keyRadiusPx * 2.0f, isHovered ? 2.0f : 1.0f);
 
             const int selectedParamIndex = juce::jlimit(0,
@@ -1063,7 +1080,7 @@ void StoryTimelineComponent::paint(juce::Graphics& g)
             juce::Rectangle<int> labelBounds(static_cast<int>(p.x) + 8, static_cast<int>(p.y) - 8, 54, 16);
             g.setColour(juce::Colour(0xAA0C0A09));
             g.fillRoundedRectangle(labelBounds.toFloat(), 3.0f);
-            g.setColour(isHovered ? juce::Colour(0xFFE0A96D) : juce::Colour(0xFFD6D3D1));
+            g.setColour(isHovered ? juce::Colour(0xFFE4E4E7) : juce::Colour(0xFFD6D3D1));
             g.drawText(label, labelBounds, juce::Justification::centredLeft, false);
         }
     }

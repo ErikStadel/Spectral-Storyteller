@@ -1,4 +1,5 @@
 #include "FxRackPanel.h"
+#include "Typography.h"
 #include "../PluginProcessor.h"
 #include <array>
 
@@ -49,7 +50,7 @@ void FxRackPanel::refresh()
     rebuildModules();
 }
 
-void FxRackPanel::showKnobContextMenu(const KnobView& knob, juce::Component* targetComponent)
+void FxRackPanel::showKnobContextMenu(const KnobView& knob, juce::Point<int> screenPosition)
 {
     const int objId = processor.getSelectedObjectId();
     if (objId <= 0)
@@ -62,7 +63,7 @@ void FxRackPanel::showKnobContextMenu(const KnobView& knob, juce::Component* tar
     menu.addItem(1, "Follow", true, followTimeline);
     menu.addItem(2, "Static", true, !followTimeline);
 
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(targetComponent != nullptr ? targetComponent : this),
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(juce::Rectangle<int>(screenPosition.x, screenPosition.y, 1, 1)),
                        [this, objId, fxName = knob.fxName, paramName = knob.paramName](int result)
                        {
                            if (result == 1)
@@ -224,8 +225,8 @@ void FxRackPanel::drawToggleButton(juce::Graphics& g,
                                    juce::Colour accent,
                                    bool isSelected) const
 {
-    const float labelH = 11.0f;
-    const float valueH = 10.0f;
+    const float labelH = 16.0f;
+    const float valueH = 14.0f;
     const float centreX = static_cast<float>(area.getCentreX());
     const float contentH = static_cast<float>(area.getHeight()) - labelH - valueH;
     const float side = juce::jmin(34.0f, juce::jmin(static_cast<float>(area.getWidth()) - 6.0f, contentH - 6.0f));
@@ -233,42 +234,47 @@ void FxRackPanel::drawToggleButton(juce::Graphics& g,
     const float y = static_cast<float>(area.getY()) + (contentH - side) * 0.5f;
     const bool isOn = knob.value >= 0.5f;
 
-    const juce::Rectangle<float> shadowRect(x - 3.0f, y - 3.0f, side + 6.0f, side + 6.0f);
-    g.setColour(juce::Colour(0xFF002020));
-    g.fillRoundedRectangle(shadowRect, 9.0f);
-
     const juce::Rectangle<float> buttonRect(x, y, side, side);
-    const juce::Colour edge = isOn ? accent.withAlpha(0.85f) : juce::Colour(0xFF52525B);
-    const juce::Colour inner = isOn ? accent.withAlpha(0.26f) : juce::Colour(0xFF003030);
-    const juce::Colour innerDark = isOn ? accent.darker(0.65f).withAlpha(0.92f) : juce::Colour(0xFF004040);
-    juce::ColourGradient grad(inner.brighter(0.18f), buttonRect.getCentreX(), buttonRect.getCentreY(),
-                              innerDark, buttonRect.getRight(), buttonRect.getBottom(), true);
-    g.setGradientFill(grad);
-    g.fillRoundedRectangle(buttonRect, 8.0f);
+    constexpr float corner = 4.0f;
 
     if (isOn)
     {
-        g.setColour(accent.withAlpha(0.18f));
-        g.fillEllipse(buttonRect.expanded(-4.0f));
-        g.setColour(accent.withAlpha(0.28f));
-        g.fillEllipse(buttonRect.expanded(-8.0f));
+        // Pressed / Toggled state: Inset
+        g.setColour(juce::Colour(0xFF101012));
+        g.fillRoundedRectangle(buttonRect, corner);
+        
+        g.setColour(juce::Colour(0xFF000000));
+        g.drawRoundedRectangle(buttonRect.reduced(0.5f), corner, 1.5f);
+        
+        // Subtle bright inner rim instead of a neon glow
+        g.setColour(juce::Colour(0x33FFFFFF));
+        g.drawRoundedRectangle(buttonRect.reduced(1.5f), corner - 1.0f, 1.0f);
+    }
+    else
+    {
+        // Raised hardware state
+        juce::ColourGradient bgGrad(juce::Colour(0xFF2C2C2F), buttonRect.getX(), buttonRect.getY(),
+                                    juce::Colour(0xFF1E1E20), buttonRect.getX(), buttonRect.getBottom(), false);
+        g.setGradientFill(bgGrad);
+        g.fillRoundedRectangle(buttonRect, corner);
+        
+        // Highlight top edge
+        g.setColour(juce::Colour(0xFF3F3F42));
+        g.drawRoundedRectangle(buttonRect.reduced(0.5f), corner, 1.0f);
+        
+        // Shadow bottom edge
+        g.setColour(juce::Colour(0xFF0A0A0B));
+        g.drawRoundedRectangle(buttonRect.translated(0.0f, 1.0f).reduced(0.5f), corner, 1.0f);
     }
 
     if (isSelected)
     {
         g.setColour(accent.withAlpha(0.35f));
-        g.drawRoundedRectangle(buttonRect.expanded(2.0f), 9.0f, 2.2f);
-        g.setColour(accent.withAlpha(0.80f));
-        g.drawRoundedRectangle(buttonRect.expanded(0.8f), 8.0f, 1.6f);
+        g.drawRoundedRectangle(buttonRect.expanded(2.0f), corner + 2.0f, 1.0f);
     }
-    else
-    {
-        g.setColour(edge.withAlpha(0.90f));
-        g.drawRoundedRectangle(buttonRect, 8.0f, 1.2f);
-    }
-
+    
     g.setColour(isOn ? accent.brighter(0.30f) : juce::Colour(0xFFB4B4B8));
-    g.setFont(juce::Font(8.5f, isSelected ? juce::Font::bold : juce::Font::plain));
+    g.setFont(Typography::getLabelFont(isSelected));
     g.drawText(knob.label,
                juce::Rectangle<float>(static_cast<float>(area.getX()),
                                       static_cast<float>(area.getBottom()) - labelH - valueH,
@@ -277,8 +283,8 @@ void FxRackPanel::drawToggleButton(juce::Graphics& g,
                juce::Justification::centredTop,
                false);
 
-    g.setColour(isOn ? accent : juce::Colour(0xFF008080));
-    g.setFont(juce::Font(7.8f, juce::Font::plain));
+    g.setColour(isOn ? accent : juce::Colour(0xFFAAAAAA));
+    g.setFont(Typography::getValueFont());
     g.drawText(isOn ? "On" : "Off",
                juce::Rectangle<float>(static_cast<float>(area.getX()),
                                       static_cast<float>(area.getBottom()) - valueH,
@@ -486,8 +492,8 @@ std::vector<FxRackPanel::ModuleLayout> FxRackPanel::computeLayouts() const
 void FxRackPanel::drawKnob(juce::Graphics& g, juce::Rectangle<int> area, const KnobView& knob,
                            juce::Colour accent, bool isSelected) const
 {
-    const float labelH = 11.0f;
-    const float valueH = 10.0f;
+    const float labelH = 16.0f;
+    const float valueH = 14.0f;
     const float centreX = static_cast<float>(area.getCentreX());
     const float knobBlockH = static_cast<float>(area.getHeight()) - labelH - valueH;
     const float diameter = juce::jmin(static_cast<float>(knobDiameter),
@@ -503,49 +509,59 @@ void FxRackPanel::drawKnob(juce::Graphics& g, juce::Rectangle<int> area, const K
 
     const juce::Rectangle<float> slotRect(centreX - radius - 2.0f, centreY - radius - 2.0f,
                                           diameter + 4.0f, diameter + 4.0f);
-    g.setColour(juce::Colour(0xFF002020));
+    
+    // 1. Drop shadow
+    g.setColour(juce::Colour(0x99000000));
+    g.fillEllipse(slotRect.translated(0.0f, 2.0f));
+
+    // 2. Base metallic ring (outer rim)
+    juce::ColourGradient rimGrad(juce::Colour(0xFF333336), slotRect.getCentreX(), slotRect.getY(),
+                                 juce::Colour(0xFF0A0A0B), slotRect.getCentreX(), slotRect.getBottom(), false);
+    g.setGradientFill(rimGrad);
     g.fillEllipse(slotRect);
 
-    const juce::Rectangle<float> knobRect(centreX - radius, centreY - radius, diameter, diameter);
-    juce::ColourGradient grad(juce::Colour(0xFF52525B), knobRect.getX(), knobRect.getY(),
-                              juce::Colour(0xFF003030), knobRect.getRight(), knobRect.getBottom(), true);
-    g.setGradientFill(grad);
-    g.fillEllipse(knobRect);
+    // 3. Inner knob body (conical or radial gradient)
+    auto innerR = slotRect.reduced(2.0f);
+    juce::ColourGradient bodyGrad(juce::Colour(0xFF262629), innerR.getCentreX(), innerR.getY(),
+                                  juce::Colour(0xFF141416), innerR.getCentreX(), innerR.getBottom(), false);
+    g.setGradientFill(bodyGrad);
+    g.fillEllipse(innerR);
 
+    // 4. Subtle top highlight on the knob face
+    g.setColour(juce::Colour(0x33FFFFFF));
+    g.drawEllipse(innerR.reduced(1.0f), 1.0f);
+
+    // Only the selected knob gets a glowing accent ring
     if (isSelected)
     {
-        g.setColour(accent.withAlpha(0.30f));
-        g.drawEllipse(knobRect.expanded(2.4f), 3.0f);
         g.setColour(accent.withAlpha(0.55f));
-        g.drawEllipse(knobRect.expanded(1.0f), 1.8f);
+        g.drawEllipse(slotRect, 1.0f);
     }
 
-    // Only the selected knob gets a glowing accent ring; all others stay neutral.
-    g.setColour(isSelected ? accent : juce::Colour(0xFF52525B));
-    g.drawEllipse(knobRect, isSelected ? 1.6f : 1.0f);
-
-    // Center-detent mapping: 0 -> -135deg, 0.5 -> 0deg (straight up), 1 -> +135deg.
+    // Pointer
     const float clamped = juce::jlimit(0.0f, 1.0f, knob.value);
     const float angle = (clamped - 0.5f) * (juce::MathConstants<float>::pi * 1.5f);
-    const float innerR = radius - 3.0f - radius * 0.5f;
-    const float outerR = radius - 3.0f;
-    const float ix = centreX + std::sin(angle) * innerR;
-    const float iy = centreY - std::cos(angle) * innerR;
-    const float ix2 = centreX + std::sin(angle) * outerR;
-    const float iy2 = centreY - std::cos(angle) * outerR;
+    const float len = radius * 0.6f;
+    const float ix = centreX + std::sin(angle) * (radius - len);
+    const float iy = centreY - std::cos(angle) * (radius - len);
+    const float ix2 = centreX + std::sin(angle) * (radius - 2.5f);
+    const float iy2 = centreY - std::cos(angle) * (radius - 2.5f);
 
-    g.setColour(isSelected ? accent.brighter(0.3f) : juce::Colour(0xFFD4D4D8));
+    g.setColour(juce::Colour(0xFF000000));
+    g.drawLine(ix, iy+1.0f, ix2, iy2+1.0f, 3.0f);
+
+    g.setColour(juce::Colour(0xFFFFFFFF));
     g.drawLine(ix, iy, ix2, iy2, 2.0f);
 
-    g.setColour(isSelected ? accent : juce::Colour(0xFF00A0A0));
-    g.setFont(juce::Font(8.5f, isSelected ? juce::Font::bold : juce::Font::plain));
+    g.setColour(isSelected ? accent : juce::Colour(0xFFCCCCCC));
+    g.setFont(Typography::getLabelFont(isSelected));
     g.drawText(knob.label, juce::Rectangle<float>(static_cast<float>(area.getX()),
                                              static_cast<float>(area.getBottom()) - labelH - valueH,
                                              static_cast<float>(area.getWidth()), labelH),
                juce::Justification::centredTop, false);
 
-    g.setColour(juce::Colour(0xFF008080));
-    g.setFont(juce::Font(7.8f, juce::Font::plain));
+    g.setColour(juce::Colour(0xFFAAAAAA));
+    g.setFont(Typography::getValueFont());
     g.drawText(formatKnobValue(knob), juce::Rectangle<float>(static_cast<float>(area.getX()),
                                                              static_cast<float>(area.getBottom()) - valueH,
                                                              static_cast<float>(area.getWidth()), valueH),
@@ -556,24 +572,17 @@ void FxRackPanel::drawModuleCard(juce::Graphics& g, const ModuleLayout& layout, 
 {
     auto area = layout.cardBounds;
 
-    g.setColour(juce::Colour(0xCC27272A));
+    g.setColour(juce::Colour(0xFF141416));
     g.fillRoundedRectangle(area.toFloat(), 6.0f);
-    g.setColour(juce::Colour(0xFF004953));
+    g.setColour(juce::Colour(0xFF333336));
     g.drawRoundedRectangle(area.toFloat(), 6.0f, 1.0f);
 
-    if (!mod.isCore)
-    {
-        g.setColour(mod.accentColour);
-        g.fillRect(juce::Rectangle<float>(static_cast<float>(area.getX()), static_cast<float>(area.getY()),
-                                           2.0f, static_cast<float>(area.getHeight())));
-    }
-
     auto headerArea = area.removeFromTop(22);
-    g.setColour(mod.isCore ? juce::Colour(0xE53F3F46) : mod.accentColour.withAlpha(0.15f));
+    g.setColour(juce::Colour(0xFF1E1E20)); // Monochrome header
     g.fillRoundedRectangle(headerArea.toFloat().withTrimmedBottom(-3.0f), 6.0f);
     g.fillRect(headerArea.toFloat().withTrimmedTop(3.0f));
 
-    g.setColour(juce::Colour(0xFF004953).withAlpha(0.5f));
+    g.setColour(juce::Colour(0xFF333336).withAlpha(0.5f));
     g.drawHorizontalLine(headerArea.getBottom(), static_cast<float>(headerArea.getX()), static_cast<float>(headerArea.getRight()));
 
     const float dotX = static_cast<float>(headerArea.getX()) + 8.0f;
@@ -581,21 +590,22 @@ void FxRackPanel::drawModuleCard(juce::Graphics& g, const ModuleLayout& layout, 
     g.setColour(mod.accentColour);
     g.fillEllipse(dotX - 2.5f, dotY - 2.5f, 5.0f, 5.0f);
 
-    g.setColour(mod.isCore ? juce::Colour(0xFFE4E4E7) : mod.accentColour);
-    g.setFont(juce::Font(10.0f, juce::Font::bold));
+    // Make text white/silver instead of accent color
+    g.setColour(juce::Colour(0xFFE4E4E7));
+    g.setFont(Typography::getHeaderFont());
     g.drawText(getModuleDisplayName(mod).toUpperCase(), headerArea.withTrimmedLeft(18).withTrimmedRight(20),
                juce::Justification::centredLeft, true);
 
     if (mod.isCore)
     {
-        g.setColour(juce::Colour(0xFF008080));
-        g.setFont(juce::Font(8.0f));
+        g.setColour(juce::Colour(0xFFAAAAAA));
+        g.setFont(Typography::getMicroFont(false));
         g.drawText("CORE", headerArea.withTrimmedRight(6), juce::Justification::centredRight, false);
     }
     else
     {
-        g.setColour(juce::Colour(0xFF008080));
-        g.setFont(juce::Font(11.0f, juce::Font::bold));
+        g.setColour(juce::Colour(0xFFAAAAAA));
+        g.setFont(Typography::getHeaderFont());
         g.drawText("x", layout.closeButtonBounds, juce::Justification::centred, false);
     }
 
@@ -612,20 +622,20 @@ void FxRackPanel::drawAddFxButton(juce::Graphics& g, juce::Rectangle<int> area) 
     g.fillRoundedRectangle(area.toFloat(), 6.0f);
 
     auto dashed = area.toFloat().reduced(4.0f);
-    g.setColour(juce::Colour(0xFF004953));
+    g.setColour(juce::Colour(0xFF333336));
     g.drawRoundedRectangle(dashed, 6.0f, 1.0f);
 
-    g.setColour(juce::Colour(0xFF008080));
-    g.setFont(juce::Font(22.0f));
+    g.setColour(juce::Colour(0xFFAAAAAA));
+    g.setFont(Typography::getTitleFont().withHeight(22.0f));
     g.drawText("+", area.withTrimmedBottom(16), juce::Justification::centredBottom, false);
 
-    g.setFont(juce::Font(9.0f, juce::Font::bold));
+    g.setFont(Typography::getMicroFont(true));
     g.drawText("ADD FX", area.withTrimmedTop(area.getHeight() / 2 + 4), juce::Justification::centredTop, false);
 }
 
 void FxRackPanel::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF004040));
+    g.fillAll(juce::Colour(0xFF18181A));
 
     const auto layouts = computeLayouts();
     for (const auto& layout : layouts)
@@ -693,7 +703,7 @@ void FxRackPanel::mouseDown(const juce::MouseEvent& event)
 
             if (event.mods.isRightButtonDown())
             {
-                showKnobContextMenu(knob, event.eventComponent);
+                showKnobContextMenu(knob, event.getScreenPosition());
                 return;
             }
 

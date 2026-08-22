@@ -1,4 +1,5 @@
 #include "ObjectSidebar.h"
+#include "Typography.h"
 
 namespace
 {
@@ -10,16 +11,16 @@ public:
     void paintButton(juce::Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override
     {
         auto bounds = getLocalBounds().toFloat();
-        const auto base = shouldDrawButtonAsDown ? juce::Colour(0xFFE0A96D).withAlpha(0.4f)
-                         : shouldDrawButtonAsHighlighted ? juce::Colour(0xFFE0A96D).withAlpha(0.2f)
-                         : juce::Colour(0xFF003030);
+        const auto base = shouldDrawButtonAsDown ? juce::Colour(0xFFE4E4E7).withAlpha(0.4f)
+                         : shouldDrawButtonAsHighlighted ? juce::Colour(0xFFE4E4E7).withAlpha(0.2f)
+                         : juce::Colour(0xFF1E1E20);
 
         g.setColour(base);
         g.fillRoundedRectangle(bounds, 3.0f);
-        g.setColour(juce::Colour(0xFF004953));
+        g.setColour(juce::Colour(0xFF333336));
         g.drawRoundedRectangle(bounds, 3.0f, 1.0f);
-        g.setColour(juce::Colour(0xFFE0A96D));
-        g.setFont(juce::Font(9.0f, juce::Font::bold));
+        g.setColour(juce::Colour(0xFFE4E4E7));
+        g.setFont(Typography::getMicroFont(true));
         g.drawFittedText("FX", getLocalBounds(), juce::Justification::centred, 1);
     }
 };
@@ -55,7 +56,7 @@ public:
         filterButton.setClickingTogglesState(true);
 
         transientThresholdLabel.setText("Threshold", juce::dontSendNotification);
-        transientThresholdLabel.setJustificationType(juce::Justification::centredLeft);
+        transientThresholdLabel.setJustificationType(juce::Justification::centred);
         transientThresholdSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         transientThresholdSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 56, 18);
         transientThresholdSlider.setRange(-60.0, 0.0, 0.1);
@@ -89,8 +90,8 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(juce::Colour(0xFF004040));
-        g.setColour(juce::Colour(0xAAE0A96D));
+        g.fillAll(juce::Colour(0xFF18181A));
+        g.setColour(juce::Colour(0xAAE4E4E7));
         g.drawRect(getLocalBounds(), 1);
     }
 
@@ -193,7 +194,7 @@ ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
 
     autoDetectButton = std::make_unique<juce::TextButton>("Auto-Detect");
     autoDetectButton->setClickingTogglesState(true);
-    autoDetectButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF004953));
+    autoDetectButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF333336));
     autoDetectButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFFFA333));
     autoDetectButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE4E4E7));
     autoDetectButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF111111));
@@ -206,7 +207,7 @@ ObjectSidebar::ObjectSidebar(ObjectDatabase& db,
     addAndMakeVisible(*autoDetectButton);
 
     transformButton = std::make_unique<juce::TextButton>("+");
-    transformButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF004953));
+    transformButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF333336));
     transformButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF4A76B7));
     transformButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFE4E4E7));
     transformButton->setTooltip("Object-Menu (Transform / Transient)");
@@ -235,20 +236,20 @@ ObjectSidebar::~ObjectSidebar()
 
 void ObjectSidebar::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF003030));
+    g.fillAll(juce::Colour(0xFF1E1E20));
 
     // Header area
     auto headerArea = getLocalBounds().removeFromTop(HEADER_BUTTON_HEIGHT + PADDING * 2);
-    g.setColour(juce::Colour(0xFF003030));
+    g.setColour(juce::Colour(0xFF1E1E20));
     g.fillRect(headerArea);
 
-    g.setColour(juce::Colour(0xFF004953));
+    g.setColour(juce::Colour(0xFF333336));
     g.drawHorizontalLine(headerArea.getBottom() - 1,
                           static_cast<float>(headerArea.getX()),
                           static_cast<float>(headerArea.getRight()));
 
-    g.setColour(juce::Colour(0xFF00A0A0));
-    g.setFont(juce::Font(10.0f, juce::Font::bold));
+    g.setColour(juce::Colour(0xFFCCCCCC));
+    g.setFont(Typography::getLabelFont(true));
     g.drawText("OBJECT DATABASE", 10, PADDING, getWidth() - 20, HEADER_BUTTON_HEIGHT,
                juce::Justification::centredLeft, false);
 
@@ -269,50 +270,47 @@ void ObjectSidebar::paint(juce::Graphics& g)
         {
             g.setColour(juce::Colour(0xFF303036));
             g.fillRoundedRectangle(cardArea.toFloat(), 6.0f);
-            g.setColour(juce::Colour(0xFFD6A472));
+            g.setColour(juce::Colour(0xFFE4E4E7));
             g.drawRoundedRectangle(cardArea.toFloat(), 6.0f, 1.3f);
-            g.setColour(juce::Colour(0x22D6A472));
+            g.setColour(juce::Colour(0x33E4E4E7));
             g.drawRoundedRectangle(cardArea.toFloat().expanded(1.0f), 6.8f, 1.0f);
         }
         else
         {
-            g.setColour(juce::Colour(0xFF2E2E33));
+            g.setColour(juce::Colour(0xFF1E1E20)); // match other panels
             g.fillRoundedRectangle(cardArea.toFloat(), 6.0f);
-            g.setColour(juce::Colour(0xCC3F3F46));
-            g.drawRoundedRectangle(cardArea.toFloat(), 6.0f, 1.0f);
-
-            g.setColour(juce::Colour(0x2209090B));
-            g.fillRoundedRectangle(cardArea.toFloat(), 6.0f);
-            g.setColour(juce::Colour(0x1A000000));
-            g.drawRoundedRectangle(cardArea.toFloat().translated(0.0f, 1.0f), 6.0f, 1.0f);
+            g.setColour(juce::Colour(0xFF333336)); // top border highlight
+            g.drawRoundedRectangle(cardArea.toFloat().reduced(0.5f), 6.0f, 1.0f);
+            g.setColour(juce::Colour(0xFF000000)); // bottom border shadow
+            g.drawRoundedRectangle(cardArea.toFloat().translated(0.0f, 1.0f).reduced(0.5f), 6.0f, 1.0f);
         }
 
-        // Status dot
         juce::Colour dotColour;
         const juce::String nameLower = row.name.toLowerCase();
-        if (nameLower.contains("transient"))
-            dotColour = juce::Colour(0xFFFF5252);
+        if (row.isTransient)
+            dotColour = juce::Colour(0xFFEF4444);
         else if (nameLower.contains("tonal"))
             dotColour = juce::Colour(0xFF4AA3FF);
         else if (nameLower.contains("noise"))
-            dotColour = juce::Colour(0xFF4FD16A);
+            dotColour = juce::Colour(0xFF10B981);
         else
-            dotColour = juce::Colour(0xFF00A0A0);
+            dotColour = juce::Colour(0xFFCCCCCC);
 
         const float dotX = static_cast<float>(cardArea.getX()) + 10.0f;
-        const float dotY = static_cast<float>(cardArea.getY()) + 12.0f;
+        const float dotY = static_cast<float>(cardArea.getY()) + 14.0f;
         g.setColour(dotColour);
         g.fillEllipse(dotX - 3.0f, dotY - 3.0f, 6.0f, 6.0f);
 
-        // Object ID
-        g.setColour(juce::Colour(0xFF008080));
-        g.setFont(juce::Font(9.0f));
+        // Object ID (aligned with object name)
+        auto idArea = cardArea.reduced(8, 4).removeFromTop(20);
+        g.setColour(juce::Colour(0xFFAAAAAA));
+        g.setFont(Typography::getValueFont());
         g.drawText("ID: #" + juce::String(row.objectId).paddedLeft('0', 2),
-                   cardArea.withTrimmedRight(6), juce::Justification::topRight, false);
+                   idArea, juce::Justification::centredRight, false);
 
         if (i == dragHoverRow && i != selectedRow)
         {
-            g.setColour(juce::Colour(0x88FFA333));
+            g.setColour(juce::Colour(0x88E4E4E7));
             g.drawRoundedRectangle(cardArea.toFloat().reduced(1, -1), 5.0f, 1.0f);
         }
 
@@ -493,7 +491,7 @@ void ObjectSidebar::resized()
                      rowIndex == selectedRow ? juce::Colour(0xFFF5F5F4) : juce::Colour(0xFFB5B5BE));
 
         // Top line: dot space + name
-        auto topLine = rowArea.removeFromTop(16);
+        auto topLine = rowArea.removeFromTop(20);
         topLine.removeFromLeft(18);
         row.nameLabel->setBounds(topLine);
 
@@ -509,9 +507,9 @@ void ObjectSidebar::resized()
                 controls.removeFromLeft(3);
             }
 
-            row.muteButton->setBounds(controls.removeFromRight(RIGHT_BUTTON_W + 2).removeFromTop(RIGHT_BUTTON_H));
+            row.muteButton->setBounds(controls.removeFromRight(RIGHT_BUTTON_W + 2).removeFromBottom(RIGHT_BUTTON_H));
             controls.removeFromRight(3);
-            row.soloButton->setBounds(controls.removeFromRight(RIGHT_BUTTON_W + 2).removeFromTop(RIGHT_BUTTON_H));
+            row.soloButton->setBounds(controls.removeFromRight(RIGHT_BUTTON_W + 2).removeFromBottom(RIGHT_BUTTON_H));
         }
 
         // Transient: centered neumorphic threshold knob between name and controls
@@ -681,10 +679,10 @@ void ObjectSidebar::rebuildRows()
         row.engageButton = std::make_unique<juce::TextButton>("Eng");
         row.engageButton->setClickingTogglesState(true);
         row.engageButton->setToggleState(obj.engaged, juce::dontSendNotification);
-        row.engageButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF003030));
-        row.engageButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0x6622D3EE));
-        row.engageButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF00A0A0));
-        row.engageButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF22D3EE));
+        row.engageButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF1E1E20));
+        row.engageButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF101012));
+        row.engageButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFCCCCCC));
+        row.engageButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         row.engageButton->setTooltip("Objekt auf den Sound anwenden");
         row.engageButton->onClick = [this, objectId = obj.id, button = row.engageButton.get()]()
         {
@@ -699,9 +697,9 @@ void ObjectSidebar::rebuildRows()
         row.recordButton = std::make_unique<juce::TextButton>("Rec");
         row.recordButton->setClickingTogglesState(true);
         row.recordButton->setToggleState(obj.recordEnabled, juce::dontSendNotification);
-        row.recordButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF003030));
-        row.recordButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFDD5555));
-        row.recordButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF00A0A0));
+        row.recordButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF1E1E20));
+        row.recordButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF101012));
+        row.recordButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFCCCCCC));
         row.recordButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         row.recordButton->setTooltip("Objekt bei Auto-Detect neu berechnen");
         row.recordButton->onClick = [this, objectId = obj.id, button = row.recordButton.get()]()
@@ -718,7 +716,7 @@ void ObjectSidebar::rebuildRows()
         row.nameLabel->setJustificationType(juce::Justification::centredLeft);
         row.nameLabel->setEditable(false, true, false);
         row.nameLabel->setColour(juce::Label::textColourId, juce::Colour(0xFFF5F5F4));
-        row.nameLabel->setFont(juce::Font(row.isTransient ? 11.5f : 10.5f, juce::Font::bold));
+        row.nameLabel->setFont(Typography::getHeaderFont());
         row.nameLabel->setTooltip(row.name);
         row.nameLabel->onTextChange = [this, objectId = obj.id, label = row.nameLabel.get()]
         {
@@ -738,9 +736,9 @@ void ObjectSidebar::rebuildRows()
         {
             row.thresholdLabel = std::make_unique<juce::Label>();
             row.thresholdLabel->setText("Threshold", juce::dontSendNotification);
-            row.thresholdLabel->setJustificationType(juce::Justification::centredLeft);
-            row.thresholdLabel->setFont(juce::Font(8.0f));
-            row.thresholdLabel->setColour(juce::Label::textColourId, juce::Colour(0xFF00A0A0));
+            row.thresholdLabel->setJustificationType(juce::Justification::centred);
+            row.thresholdLabel->setFont(Typography::getMicroFont(false));
+            row.thresholdLabel->setColour(juce::Label::textColourId, juce::Colour(0xFFCCCCCC));
             addAndMakeVisible(*row.thresholdLabel);
 
             row.thresholdKnob = std::make_unique<juce::Slider>();
@@ -765,9 +763,9 @@ void ObjectSidebar::rebuildRows()
         row.soloButton->setButtonText("S");
         row.soloButton->setClickingTogglesState(true);
         row.soloButton->setToggleState(obj.solo, juce::dontSendNotification);
-        row.soloButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF002828));
-        row.soloButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF4AA3FF));
-        row.soloButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF00A0A0));
+        row.soloButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF1E1E20));
+        row.soloButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF101012));
+        row.soloButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFCCCCCC));
         row.soloButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         row.soloButton->setTooltip("Solo");
         row.soloButton->onClick = [this, objectId = obj.id, button = row.soloButton.get()]()
@@ -784,9 +782,9 @@ void ObjectSidebar::rebuildRows()
         row.muteButton->setButtonText("M");
         row.muteButton->setClickingTogglesState(true);
         row.muteButton->setToggleState(obj.mute, juce::dontSendNotification);
-        row.muteButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF002828));
-        row.muteButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFFFF5252));
-        row.muteButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF00A0A0));
+        row.muteButton->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF1E1E20));
+        row.muteButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF101012));
+        row.muteButton->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFCCCCCC));
         row.muteButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFFFFFFFF));
         row.muteButton->setTooltip("Mute");
         row.muteButton->onClick = [this, objectId = obj.id, button = row.muteButton.get()]()

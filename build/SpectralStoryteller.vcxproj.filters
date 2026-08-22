@@ -171,7 +171,7 @@
     <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\FxBrowserOverlay.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\NeumorphicKnobLookAndFeel.h">
+    <ClInclude Include="C:\Users\helms\Spectral Storyteller\Source\UI\HardwareLookAndFeel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
