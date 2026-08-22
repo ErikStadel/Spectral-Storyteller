@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 # Projektname und Sprache definieren
-project(SpectralStoryteller VERSION 0.1.0 LANGUAGES CXX)
+project(SpectralArc VERSION 0.1.0 LANGUAGES CXX)
 
 # C++ Standard auf C++17 setzen
 set(CMAKE_CXX_STANDARD 17)
@@ -20,8 +20,9 @@ FetchContent_MakeAvailable(JUCE)
 get_target_property(JUCE_INCLUDE_DIR juce_core INTERFACE_INCLUDE_DIRECTORIES)
 
 # Hier aktivieren wir die Standard-Audio-Formate für Windows
-juce_add_plugin(SpectralStoryteller
+juce_add_plugin(SpectralArc
     COMPANY_NAME "formFX"
+    PRODUCT_NAME "SpectralArc"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
@@ -34,13 +35,13 @@ juce_add_plugin(SpectralStoryteller
 
 # Add post-build command to copy VST3 to custom location (Windows only)
 if(WIN32)
-    add_custom_command(TARGET SpectralStoryteller POST_BUILD
+    add_custom_command(TARGET SpectralArc_VST3 POST_BUILD
         COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
             "& {"
-            "$src='${CMAKE_CURRENT_BINARY_DIR}/SpectralStoryteller_artefacts/Release/VST3';"
+            "$src='${CMAKE_CURRENT_BINARY_DIR}/SpectralArc_artefacts/$<CONFIG>/VST3/SpectralArc.vst3';"
             "$dst='D:/VST/VST/VST3';"
             "New-Item -ItemType Directory -Force -Path $dst | Out-Null;"
-            "if (Test-Path $src) { Copy-Item -Path (Join-Path $src '*') -Destination $dst -Recurse -Force -ErrorAction Continue }"
+            "if (Test-Path $src) { Copy-Item -Path $src -Destination (Join-Path $dst 'SpectralArc.vst3') -Recurse -Force -ErrorAction Continue }"
             "exit 0"
             "}"
         COMMENT "Copying VST3 plugin to D:/VST/VST/VST3 (non-fatal on copy errors)"
@@ -65,7 +66,7 @@ juce_add_binary_data(AssetsData
 )
 
 # JUCE-Module verlinken
-target_link_libraries(SpectralStoryteller 
+target_link_libraries(SpectralArc 
     PRIVATE
         FontsData
         AssetsData
@@ -84,13 +85,13 @@ target_link_libraries(SpectralStoryteller
 )
 
 # Explizite Include-Verzeichnisse für JUCE
-target_include_directories(SpectralStoryteller PRIVATE
+target_include_directories(SpectralArc PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Source
     ${JUCE_SOURCE_DIR}/modules
 )
 
 # Disable VST2 compatibility code in JUCE VST3 client
-target_compile_definitions(SpectralStoryteller PRIVATE
+target_compile_definitions(SpectralArc PRIVATE
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
@@ -100,23 +101,23 @@ if(UNIX AND NOT APPLE)
     if(PKG_CONFIG_FOUND)
         pkg_check_modules(GTK3 gtk+-3.0)
         if(GTK3_FOUND)
-            target_include_directories(SpectralStoryteller PRIVATE ${GTK3_INCLUDE_DIRS})
-            target_link_libraries(SpectralStoryteller PRIVATE ${GTK3_LIBRARIES})
+            target_include_directories(SpectralArc PRIVATE ${GTK3_INCLUDE_DIRS})
+            target_link_libraries(SpectralArc PRIVATE ${GTK3_LIBRARIES})
         endif()
         pkg_check_modules(WEBKIT webkit2gtk-4.0)
         if(WEBKIT_FOUND)
-            target_include_directories(SpectralStoryteller PRIVATE ${WEBKIT_INCLUDE_DIRS})
-            target_link_libraries(SpectralStoryteller PRIVATE ${WEBKIT_LIBRARIES})
+            target_include_directories(SpectralArc PRIVATE ${WEBKIT_INCLUDE_DIRS})
+            target_link_libraries(SpectralArc PRIVATE ${WEBKIT_LIBRARIES})
         endif()
         pkg_check_modules(CURL libcurl)
         if(CURL_FOUND)
-            target_link_libraries(SpectralStoryteller PRIVATE ${CURL_LIBRARIES})
+            target_link_libraries(SpectralArc PRIVATE ${CURL_LIBRARIES})
         endif()
     endif()
 endif()
 
 # Die Quellcodedateien (C++ Quelltexte und Header)
-target_sources(SpectralStoryteller PRIVATE
+target_sources(SpectralArc PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginProcessor.h
     Source/PluginEditor.cpp

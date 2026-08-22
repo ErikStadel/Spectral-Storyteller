@@ -120,7 +120,7 @@ CMAKE_PROJECT_DESCRIPTION:STATIC=
 CMAKE_PROJECT_HOMEPAGE_URL:STATIC=
 
 //Value Computed by CMake
-CMAKE_PROJECT_NAME:STATIC=SpectralStoryteller
+CMAKE_PROJECT_NAME:STATIC=SpectralArc
 
 //Value Computed by CMake
 CMAKE_PROJECT_SPDX_LICENSE:STATIC=
@@ -266,6 +266,15 @@ JUCE_SOURCE_DIR:STATIC=C:/Users/helms/Spectral Storyteller/build/_deps/juce-src
 //The location, relative to the install prefix, where juceaide
 // will be installed
 JUCE_TOOL_INSTALL_DIR:STRING=bin/JUCE-7.0.12
+
+//Value Computed by CMake
+SpectralArc_BINARY_DIR:STATIC=C:/Users/helms/Spectral Storyteller/build
+
+//Value Computed by CMake
+SpectralArc_IS_TOP_LEVEL:STATIC=ON
+
+//Value Computed by CMake
+SpectralArc_SOURCE_DIR:STATIC=C:/Users/helms/Spectral Storyteller
 
 //Value Computed by CMake
 SpectralStoryteller_BINARY_DIR:STATIC=C:/Users/helms/Spectral Storyteller/build

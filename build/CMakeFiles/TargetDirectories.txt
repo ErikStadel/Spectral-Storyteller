@@ -1,8 +1,8 @@
-C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralStoryteller.dir
-C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralStoryteller_All.dir
-C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralStoryteller_Standalone.dir
-C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralStoryteller_rc_lib.dir
-C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralStoryteller_VST3.dir
+C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralArc.dir
+C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralArc_All.dir
+C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralArc_Standalone.dir
+C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralArc_rc_lib.dir
+C:/Users/helms/Spectral Storyteller/build/CMakeFiles/SpectralArc_VST3.dir
 C:/Users/helms/Spectral Storyteller/build/CMakeFiles/juce_vst3_helper.dir
 C:/Users/helms/Spectral Storyteller/build/CMakeFiles/FontsData.dir
 C:/Users/helms/Spectral Storyteller/build/CMakeFiles/AssetsData.dir

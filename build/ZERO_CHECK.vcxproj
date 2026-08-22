@@ -166,7 +166,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Checking Build System</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
-"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller" "-BC:/Users/helms/Spectral Storyteller/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/SpectralStoryteller.slnx"
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller" "-BC:/Users/helms/Spectral Storyteller/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/SpectralArc.slnx"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -180,7 +180,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Checking Build System</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
-"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller" "-BC:/Users/helms/Spectral Storyteller/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/SpectralStoryteller.slnx"
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller" "-BC:/Users/helms/Spectral Storyteller/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/SpectralArc.slnx"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -194,7 +194,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</BuildInParallel>
       <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Checking Build System</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
-"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller" "-BC:/Users/helms/Spectral Storyteller/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/SpectralStoryteller.slnx"
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller" "-BC:/Users/helms/Spectral Storyteller/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/SpectralArc.slnx"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -208,7 +208,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</BuildInParallel>
       <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Checking Build System</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
-"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller" "-BC:/Users/helms/Spectral Storyteller/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/SpectralStoryteller.slnx"
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/helms/Spectral Storyteller" "-BC:/Users/helms/Spectral Storyteller/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/helms/Spectral Storyteller/build/SpectralArc.slnx"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone

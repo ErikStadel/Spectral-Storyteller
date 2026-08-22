@@ -182,23 +182,23 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{6E2BC1B6-E4D9-3157-A2E2-7CB04EF1F2FB}</Project>
       <Name>FontsData</Name>
     </ProjectReference>
-    <ProjectReference Include="C:\Users\helms\Spectral Storyteller\build\SpectralStoryteller.vcxproj">
-      <Project>{499E1114-2E8C-3873-BFAA-59B3F4DBD6EF}</Project>
-      <Name>SpectralStoryteller</Name>
+    <ProjectReference Include="C:\Users\helms\Spectral Storyteller\build\SpectralArc.vcxproj">
+      <Project>{C42E7AF3-8D2A-35C3-B7FD-00BBCA15787C}</Project>
+      <Name>SpectralArc</Name>
     </ProjectReference>
-    <ProjectReference Include="C:\Users\helms\Spectral Storyteller\build\SpectralStoryteller_Standalone.vcxproj">
-      <Project>{18360074-C6AE-3AE7-A375-3E6D72F56F9E}</Project>
-      <Name>SpectralStoryteller_Standalone</Name>
+    <ProjectReference Include="C:\Users\helms\Spectral Storyteller\build\SpectralArc_Standalone.vcxproj">
+      <Project>{B7E0F2B6-B832-3321-ADC5-402F7DCE9B6B}</Project>
+      <Name>SpectralArc_Standalone</Name>
     </ProjectReference>
-    <ProjectReference Include="C:\Users\helms\Spectral Storyteller\build\SpectralStoryteller_VST3.vcxproj">
-      <Project>{AB227D27-D2D6-393A-9082-A7086D0FDCA3}</Project>
-      <Name>SpectralStoryteller_VST3</Name>
+    <ProjectReference Include="C:\Users\helms\Spectral Storyteller\build\SpectralArc_VST3.vcxproj">
+      <Project>{25BF7E33-4174-3295-AE18-F2FA36AD9CBC}</Project>
+      <Name>SpectralArc_VST3</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </ProjectReference>
-    <ProjectReference Include="C:\Users\helms\Spectral Storyteller\build\SpectralStoryteller_rc_lib.vcxproj">
-      <Project>{8171E04B-E93B-38DA-A9AE-085ECA07F326}</Project>
-      <Name>SpectralStoryteller_rc_lib</Name>
+    <ProjectReference Include="C:\Users\helms\Spectral Storyteller\build\SpectralArc_rc_lib.vcxproj">
+      <Project>{ED83F77F-FBA1-34C6-97EF-85254EC56929}</Project>
+      <Name>SpectralArc_rc_lib</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </ProjectReference>
