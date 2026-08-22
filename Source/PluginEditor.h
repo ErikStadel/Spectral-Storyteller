@@ -144,6 +144,7 @@ private:
     juce::Label versionLabel;
     juce::TooltipWindow tooltipWindow;
     HardwareLookAndFeel knobLookAndFeel;
+    juce::Image logoImage;
 
     void paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area);
     void paintMeterStrip(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& label);

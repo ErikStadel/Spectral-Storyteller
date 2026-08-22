@@ -1,10 +1,12 @@
 #include "PluginEditor.h"
 #include "UI/Typography.h"
+#include "Assets.h"
 #include "PluginProcessor.h"
 
 PluginEditor::PluginEditor(PluginProcessor& p)
     : AudioProcessorEditor(&p), processor(p), tooltipWindow(this, 450)
 {
+    logoImage = juce::ImageCache::getFromMemory(Assets::SpectralArcLogo_png, Assets::SpectralArcLogo_pngSize);
     juce::LookAndFeel::setDefaultLookAndFeel(&knobLookAndFeel);
 
     // Create spectrogram view
@@ -532,13 +534,22 @@ void PluginEditor::paintHeaderBar(juce::Graphics& g, juce::Rectangle<int> area)
 {
     HardwareLookAndFeel::drawHardwarePanel(g, area.toFloat(), 0.0f); // flat panel
 
-    // Plugin name with gradient
-    g.setFont(Typography::getTitleFont());
-    juce::ColourGradient nameGrad(juce::Colour(0xFFFFFFFF), static_cast<float>(area.getX() + 16), 0.0f,
-                                   juce::Colour(0xFF888888), static_cast<float>(area.getX() + 260), 0.0f, false);
-    g.setGradientFill(nameGrad);
-    g.drawText("SPCTRL /\\ ARC", area.withTrimmedLeft(16).withTrimmedRight(area.getWidth() / 2),
-               juce::Justification::centredLeft, false);
+    if (logoImage.isValid())
+    {
+        auto logoArea = area.removeFromLeft(220).reduced(16, 8);
+        g.drawImage(logoImage, logoArea.toFloat(),
+                    juce::RectanglePlacement(juce::RectanglePlacement::xLeft | juce::RectanglePlacement::yMid | juce::RectanglePlacement::onlyReduceInSize));
+    }
+    else
+    {
+        // Fallback plugin name with gradient
+        g.setFont(Typography::getTitleFont());
+        juce::ColourGradient nameGrad(juce::Colour(0xFFFFFFFF), static_cast<float>(area.getX() + 16), 0.0f,
+                                       juce::Colour(0xFF888888), static_cast<float>(area.getX() + 260), 0.0f, false);
+        g.setGradientFill(nameGrad);
+        g.drawText("SPCTRL /\\ ARC", area.withTrimmedLeft(16).withTrimmedRight(area.getWidth() / 2),
+                   juce::Justification::centredLeft, false);
+    }
 
     // Right side status
     g.setFont(Typography::getLabelFont(false));

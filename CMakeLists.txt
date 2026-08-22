@@ -57,10 +57,18 @@ juce_add_binary_data(FontsData
         "Resources/Fonts/Inter-Bold.ttf"
 )
 
+juce_add_binary_data(AssetsData
+    HEADER_NAME "Assets.h"
+    NAMESPACE "Assets"
+    SOURCES
+        "Resources/Images/SpectralArcLogo.png"
+)
+
 # JUCE-Module verlinken
 target_link_libraries(SpectralStoryteller 
     PRIVATE
         FontsData
+        AssetsData
         juce::juce_core
         juce::juce_data_structures
         juce::juce_events
