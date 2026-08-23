@@ -20,8 +20,8 @@
 
 // Version tracking
 constexpr int VERSION_MAJOR = 0;
-constexpr int VERSION_MINOR = 10;
-constexpr int VERSION_BUILD = 10;
+constexpr int VERSION_MINOR = 11;
+constexpr int VERSION_BUILD = 0;
 
 class PluginProcessor : public juce::AudioProcessor,
                         public juce::ChangeBroadcaster
@@ -346,30 +346,108 @@ private:
         float brightnessCompensation = 1.0f;
     };
 
-    std::unordered_map<int, TransformSettings> transformSettingsByObject;
-    std::unordered_map<int, SpectralFxSettings> spectralFxByObject;
-    std::unordered_map<int, shade_contour::Settings> filterFxByObject;
-    std::unordered_map<int, mass_forge::Settings> compressorFxByObject;
-    std::unordered_map<int, mass_forge::State> compressorStateByObject;
-    std::unordered_map<int, mass_forge::FrameParams> compressorParamsByObject;
-    std::unordered_map<int, heat_glow::Settings> heatGlowFxByObject;
-    std::array<std::unordered_map<int, heat_glow::State>, 2> heatGlowStateByChannel;
-    std::unordered_map<int, grit_edge::Settings> gritEdgeFxByObject;
-    std::array<std::unordered_map<int, grit_edge::State>, 2> gritEdgeStateByChannel;
-    std::unordered_map<int, stasis_cloud::Settings> stasisCloudFxByObject;
-    std::unordered_map<int, echo_bleed::Settings> delayFxByObject;
-    std::array<std::unordered_map<int, echo_bleed::State>, 2> echoBleedStateByChannel;
+    template<typename T, int MaxCapacity = ObjectDatabase::MAX_OBJECTS>
+    class FixedFlatMap {
+    public:
+        struct Entry {
+            int id = -1;
+            T value;
+            bool active = false;
+        };
+        std::array<Entry, MaxCapacity> entries;
+
+        void clear() {
+            for (auto& e : entries) e.active = false;
+        }
+
+        T* find(int id) {
+            for (auto& e : entries) {
+                if (e.active && e.id == id) return &e.value;
+            }
+            return nullptr;
+        }
+        
+        const T* find(int id) const {
+            for (const auto& e : entries) {
+                if (e.active && e.id == id) return &e.value;
+            }
+            return nullptr;
+        }
+
+        // Like unordered_map::operator[], activates a slot if not found and returns a reference.
+        // For settings (cleared every frame), we want to reset the value.
+        T& operator[](int id) {
+            for (auto& e : entries) {
+                if (e.active && e.id == id) return e.value;
+            }
+            for (auto& e : entries) {
+                if (!e.active) {
+                    e.id = id;
+                    e.active = true;
+                    e.value = T{}; // reset for settings
+                    return e.value;
+                }
+            }
+            // Fallback (should not happen if MAX_OBJECTS matches)
+            entries[0].id = id;
+            entries[0].active = true;
+            entries[0].value = T{};
+            return entries[0].value;
+        }
+
+        // For states (preserved across frames), we want to get or create WITHOUT resetting existing state
+        T& getOrCreateState(int id) {
+            for (auto& e : entries) {
+                if (e.active && e.id == id) return e.value;
+            }
+            for (auto& e : entries) {
+                if (!e.active) {
+                    e.id = id;
+                    e.active = true;
+                    // DO NOT reset T{}, keep whatever pre-allocated state is there
+                    return e.value;
+                }
+            }
+            return entries[0].value;
+        }
+
+        // Return a proxy to support range-based for loops over active elements
+        struct Iterator {
+            Entry* ptr;
+            Entry* end;
+            void advance() { while (ptr < end && !ptr->active) ++ptr; }
+            Iterator& operator++() { ++ptr; advance(); return *this; }
+            bool operator!=(const Iterator& other) const { return ptr != other.ptr; }
+            std::pair<int, T&> operator*() { return {ptr->id, ptr->value}; }
+        };
+        Iterator begin() { Iterator it{entries.data(), entries.data() + MaxCapacity}; it.advance(); return it; }
+        Iterator end() { return {entries.data() + MaxCapacity, entries.data() + MaxCapacity}; }
+    };
+
+    FixedFlatMap<TransformSettings> transformSettingsByObject;
+    FixedFlatMap<SpectralFxSettings> spectralFxByObject;
+    FixedFlatMap<shade_contour::Settings> filterFxByObject;
+    FixedFlatMap<mass_forge::Settings> compressorFxByObject;
+    FixedFlatMap<mass_forge::State> compressorStateByObject;
+    FixedFlatMap<mass_forge::FrameParams> compressorParamsByObject;
+    FixedFlatMap<heat_glow::Settings> heatGlowFxByObject;
+    std::array<FixedFlatMap<heat_glow::State>, 2> heatGlowStateByChannel;
+    FixedFlatMap<grit_edge::Settings> gritEdgeFxByObject;
+    std::array<FixedFlatMap<grit_edge::State>, 2> gritEdgeStateByChannel;
+    FixedFlatMap<stasis_cloud::Settings> stasisCloudFxByObject;
+    FixedFlatMap<echo_bleed::Settings> delayFxByObject;
+    std::array<FixedFlatMap<echo_bleed::State>, 2> echoBleedStateByChannel;
     std::array<std::array<int, ObjectDatabase::NUM_BINS>, 2> delayTailOwnerByChannel{};
-    std::unordered_map<int, space_blur::Settings> spaceBlurFxByObject;
-    std::array<std::unordered_map<int, stasis_cloud::State>, 2> stasisCloudStateByChannel;
+    FixedFlatMap<space_blur::Settings> spaceBlurFxByObject;
+    std::array<FixedFlatMap<stasis_cloud::State>, 2> stasisCloudStateByChannel;
     // Bin-lock during freeze: once a bin is captured by a frozen object it keeps
     // ownership of that bin (per channel) until the object's freeze is released,
     // even if the per-frame dominant-object assignment flickers. Prevents the
     // frozen spectrum from jumping between unrelated states every frame.
     std::array<std::array<int, ObjectDatabase::NUM_BINS>, 2> stasisFreezeOwnerByChannel{};
-    std::array<std::unordered_map<int, space_blur::State>, 2> spaceBlurStateByChannel;
+    std::array<FixedFlatMap<space_blur::State>, 2> spaceBlurStateByChannel;
+    std::array<FixedFlatMap<TransformSmoothState>, 2> transformSmoothStates;
     std::array<std::array<int, ObjectDatabase::NUM_BINS>, 2> spaceBlurTailOwnerByChannel{};
-    std::array<std::unordered_map<int, TransformSmoothState>, 2> transformSmoothStates;
     mutable juce::CriticalSection transformFileLock;
     std::unordered_map<int, TransformFileData> transformFileBuffer;
     std::array<float, ObjectDatabase::NUM_BINS> currentAnalysisMagnitudes{};

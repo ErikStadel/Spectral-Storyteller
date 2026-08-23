@@ -1,4 +1,4 @@
-﻿#include "SpaceBlur.h"
+#include "SpaceBlur.h"
 #include <juce_core/juce_core.h>
 #include <cmath>
 
@@ -6,7 +6,6 @@ namespace space_blur
 {
 namespace
 {
-    // Schroeder all-pass filter
     inline float apf(float x, float g, std::vector<float>& line, int& wp, int delaySamples)
     {
         const int sz = static_cast<int>(line.size());
@@ -18,26 +17,19 @@ namespace
         return delayed - g * w;
     }
 
-    // Feedback comb with LP damping and fractional delay (for modulation)
-    inline float combFrac(float x, float g, float dampFactor, float& dampState,
-                          std::vector<float>& line, int& wp, float delaySamplesF)
+    inline float fracDelay(std::vector<float>& line, int wp, float delaySamplesF)
     {
         const int sz = static_cast<int>(line.size());
         float readF = static_cast<float>(wp) - delaySamplesF;
-        readF = std::fmod(readF, static_cast<float>(sz));
-        if (readF < 0.0f) readF += static_cast<float>(sz);
+        while (readF < 0.0f) readF += static_cast<float>(sz);
+        while (readF >= static_cast<float>(sz)) readF -= static_cast<float>(sz);
         
-        const int r0 = static_cast<int>(readF) % sz;
+        const int r0 = static_cast<int>(readF);
         const int r1 = (r0 + 1) % sz;
-        const float frac = readF - std::floor(readF);
+        const float frac = readF - static_cast<float>(r0);
         
-        const float out = line[static_cast<size_t>(r0)] * (1.0f - frac)
-                        + line[static_cast<size_t>(r1)] * frac;
-                        
-        dampState = dampFactor * out + (1.0f - dampFactor) * dampState;
-        line[static_cast<size_t>(wp)] = x + dampState * g;
-        wp = (wp + 1) % sz;
-        return out;
+        return line[static_cast<size_t>(r0)] * (1.0f - frac)
+             + line[static_cast<size_t>(r1)] * frac;
     }
 }
 
@@ -47,30 +39,20 @@ void ensureState(State& state, double sampleRate)
     if (state.initialized && std::abs(state.cachedSampleRate - safeSr) < 1.0)
         return;
 
-    const int maxPreSamp  = static_cast<int>(safeSr * 0.150) + 128; // 150ms max
-    const int maxDispSamp = static_cast<int>(safeSr * 0.015) + 64;  // 15ms max
-    const int maxCombSamp = static_cast<int>(safeSr * 0.350) + 256; 
-    const int maxAPFSamp  = static_cast<int>(safeSr * 0.095) + 128; // 95ms max für breiteren Wash
+    const int maxAPF = static_cast<int>(safeSr * 0.05) + 64;   // 50ms max for input diffusion
+    const int maxTank = static_cast<int>(safeSr * 0.25) + 256; // 250ms max per tank line
 
-    state.preDelayLine.assign(static_cast<size_t>(maxPreSamp), 0.0f);
-    state.preWrite = 0;
+    for (int i = 0; i < 4; ++i)
+    {
+        state.inAPFLines[i].assign(static_cast<size_t>(maxAPF), 0.0f);
+        state.inAPFWrite[i] = 0;
 
-    for (int i = 0; i < 3; ++i) {
-        state.dispLines[i].assign(static_cast<size_t>(maxDispSamp), 0.0f);
-        state.dispWrite[i] = 0;
-    }
-    for (int i = 0; i < 8; ++i) {
-        state.combLines[i].assign(static_cast<size_t>(maxCombSamp), 0.0f);
-        state.combWrite[i] = 0;
-        state.combDamp[i] = 0.0f;
-    }
-    for (int i = 0; i < 4; ++i) {
-        state.outAPFLines[i].assign(static_cast<size_t>(maxAPFSamp), 0.0f);
-        state.outAPFWrite[i] = 0;
+        state.tankLines[i].assign(static_cast<size_t>(maxTank), 0.0f);
+        state.tankWrite[i] = 0;
+        state.tankDamp[i] = 0.0f;
+        state.lfoPhases[i] = 0.0f;
     }
 
-    state.lfoPhase1 = 0.0f;
-    state.lfoPhase2 = 0.0f;
     state.cachedSampleRate = safeSr;
     state.initialized = true;
 }
@@ -79,7 +61,7 @@ void processBlock(const Settings& settings, State& state, double sampleRate, int
 {
     ensureState(state, sampleRate);
 
-    const float size  = juce::jlimit(0.0f, 1.0f, settings.size);
+    const float shape = juce::jlimit(0.0f, 1.0f, settings.shape);
     const float decay = juce::jlimit(0.0f, 1.0f, settings.decay);
     const float blur  = juce::jlimit(0.0f, 1.0f, settings.blur);
     const float mix   = juce::jlimit(0.0f, 1.0f, settings.mix);
@@ -89,163 +71,116 @@ void processBlock(const Settings& settings, State& state, double sampleRate, int
     const float sr = static_cast<float>(juce::jmax(1.0, sampleRate));
     const float msToSamp = sr * 0.001f;
 
-    // === 1. Morphing Delay Times (Spring -> Plate -> Hall) =================
-    // 8 Combs für hohe Echo-Dichte (verhindert "Boxiness").
-    // Spring (blur=0): geclustert -> metallische Resonanzen
-    // Hall (blur=1): weit & teilerfremd -> offener, weicher Decay
-    static constexpr float springCombMs[8] = { 21.3f, 25.7f, 29.1f, 33.8f, 38.2f, 42.5f, 47.9f, 53.1f };
-    static constexpr float hallCombMs[8]   = { 75.1f, 91.8f, 119.2f, 148.7f, 177.4f, 208.9f, 249.1f, 292.5f };
-    
-    const float stereoOff = (channel == 0) ? 0.0f : (2.5f + 8.5f * blur); // 2.5ms bei Spring, 11ms bei Hall
-    const float sizeScale = 0.5f + 1.5f * size; 
-    
-    const int maxCombSamp = static_cast<int>(state.combLines[0].size());
-    const int maxPreSamp  = static_cast<int>(state.preDelayLine.size());
-    const int maxDispSamp = static_cast<int>(state.dispLines[0].size());
-    const int maxAPFSamp  = static_cast<int>(state.outAPFLines[0].size());
+    // --- 1. APF Input Diffusion ---
+    const float apfG = 0.3f + 0.45f * blur; 
+    const int apfD[4] = {
+        static_cast<int>(4.7f * msToSamp),
+        static_cast<int>(8.3f * msToSamp),
+        static_cast<int>(13.1f * msToSamp),
+        static_cast<int>(21.7f * msToSamp)
+    };
 
-    float combSampF[8];
-    float avgCombDelaySec = 0.0f;
-    for (int i = 0; i < 8; ++i)
+    // --- 2. FDN Tank Times & Modulation ---
+    float plateTimesMs[4] = { 11.3f, 17.1f, 23.3f, 31.7f };
+    float hallTimesMs[4]  = { 43.1f, 59.9f, 83.1f, 107.3f };
+    
+    const float s = shape;
+    float tankDelayF[4];
+    float avgDelayMs = 0.0f;
+    
+    const float stereoOff = (channel == 0) ? 1.0f : 1.13f;
+
+    for (int i = 0; i < 4; ++i)
     {
-        const float msBase = springCombMs[i] + (hallCombMs[i] - springCombMs[i]) * blur;
-        combSampF[i] = juce::jlimit(2.0f, static_cast<float>(maxCombSamp - 4), (msBase + stereoOff) * sizeScale * msToSamp);
-        avgCombDelaySec += combSampF[i] / sr;
+        float t = plateTimesMs[i] * (1.0f - s) + hallTimesMs[i] * s;
+        t *= stereoOff;
+        tankDelayF[i] = t * msToSamp;
+        avgDelayMs += t;
     }
-    avgCombDelaySec /= 8.0f;
+    avgDelayMs *= 0.25f;
 
-    // === 2. Dispersion Network (Der Spring "Drip") ========================
-    // 3 kurze APFs in Serie. Erzeugt Phasendispersion (der "Plink"-Sound).
-    // Aktiv bei blur=0, faded sanft aus Richtung Plate/Hall.
-    const int dispD[3] = {
-        juce::jlimit(1, maxDispSamp - 2, static_cast<int>(2.1f * msToSamp)),
-        juce::jlimit(1, maxDispSamp - 2, static_cast<int>(3.4f * msToSamp)),
-        juce::jlimit(1, maxDispSamp - 2, static_cast<int>(5.7f * msToSamp))
-    };
-    const float dispGain = 0.75f * (1.0f - blur); 
-
-
-    // === 4. HF Damping (Air Absorption) ===================================
-    // Spring: hell/metallisch (hohe Grenzfrequenz). Hall: warm/offen (tiefe GF).
-    const float lpCutoff = 18000.0f * std::pow(9000.0f / 18000.0f, blur * 0.6f); 
-    const float lpAlpha = juce::jlimit(0.0f, 0.9999f,
-        1.0f - std::exp(-juce::MathConstants<float>::twoPi * lpCutoff / sr));
-
-    // === 5. RT60 Feedback Gain ============================================
-    const float rt60Sec = 0.3f + 5.7f * decay; // 0.3s bis exakt 6.0s Nachhallzeit
-    const float feedbackGain = juce::jlimit(0.10f, 0.98f,
-        std::pow(10.0f, -3.0f * avgCombDelaySec / rt60Sec));
-
-    // === 6. LFO Modulation ================================================
-   const float lfoDepth = (1.0f - blur * 0.2f) * size * (4.0f + 8.0f * blur); 
-    const float lfoInc1 = juce::MathConstants<float>::twoPi * (0.4f + 0.8f * blur) / sr;
-    const float lfoInc2 = juce::MathConstants<float>::twoPi * (0.55f + 0.9f * blur) / sr;
-
-        // === 7. Early Reflections (Breiter Stereo-Spread) ====================
-    const int preDelaySamples = juce::jlimit(0, maxPreSamp - 2, static_cast<int>((10.0f + 45.0f * size) * msToSamp + 0.5f));
-    const float erMix = blur * 0.45f; // Bis zu 45% ER-Anteil für den Open Hall
-
-    // Stereo Spread: Linker und rechter Kanal bekommen leicht asymmetrische Taps
-    const float erStereoSpread = (channel == 0) ? 1.0f : 1.13f; 
-    const int erTaps[4] = { 
-        static_cast<int>(preDelaySamples * erStereoSpread), 
-        static_cast<int>(preDelaySamples * 0.73f * erStereoSpread), 
-        static_cast<int>(preDelaySamples * 0.41f * (2.0f - erStereoSpread)), 
-        static_cast<int>(preDelaySamples * 0.17f * (2.0f - erStereoSpread)) 
+    const float modDepthMs = 0.1f + 1.9f * s; // 0.1ms to 2.0ms depth
+    const float modDepthSamp = modDepthMs * msToSamp;
+    
+    const float lfoRates[4] = {
+        0.47f * (1.0f + s),
+        0.61f * (1.0f + s),
+        0.79f * (1.0f + s),
+        1.03f * (1.0f + s)
     };
 
-    // === 8. Output Diffusion (Längere APFs für breiteren Wash) ==========
-    const int outAPFD[4] = {
-        juce::jlimit(1, maxAPFSamp - 2, static_cast<int>((11.3f + 18.0f * blur) * msToSamp)),
-        juce::jlimit(1, maxAPFSamp - 2, static_cast<int>((15.8f + 26.0f * blur) * msToSamp)),
-        juce::jlimit(1, maxAPFSamp - 2, static_cast<int>((21.2f + 38.0f * blur) * msToSamp)),
-        juce::jlimit(1, maxAPFSamp - 2, static_cast<int>((28.7f + 52.0f * blur) * msToSamp)) // ~80ms Diffusion
-    };
-    const float outAPFG = 0.55f + 0.20f * blur; // Stärkere Diffusion bei Hall
+    // --- 3. Damping and Feedback ---
+    const float rt60Sec = 0.2f + 24.8f * (decay * decay); 
+    const float avgDelaySec = avgDelayMs * 0.001f;
+    const float fbGain = std::pow(10.0f, -3.0f * avgDelaySec / rt60Sec);
+    const float maxFb = 0.999f;
+    const float g = juce::jlimit(0.01f, maxFb, fbGain);
 
-    // Mix Gains
+    const float dampCutoff = 4000.0f + 10000.0f * s - 2000.0f * blur;
+    const float dampCutoffClipped = juce::jlimit(1000.0f, 20000.0f, dampCutoff);
+    const float dampAlpha = juce::jlimit(0.0f, 0.999f, 1.0f - std::exp(-juce::MathConstants<float>::twoPi * dampCutoffClipped / sr));
+
     const float dryGain = std::cos(mix * juce::MathConstants<float>::halfPi);
-    const float wetGain = std::sin(mix * juce::MathConstants<float>::halfPi) * 0.65f
-                        * juce::jlimit(0.05f, 0.6f, (1.0f - feedbackGain) * 2.5f);
+    const float wetGain = std::sin(mix * juce::MathConstants<float>::halfPi) * juce::jlimit(0.1f, 0.8f, 1.0f - g * 0.5f);
 
-    // === Per-Sample Processing ============================================
+    const float h = 0.5f;
+    const int maxTankSamp = static_cast<int>(state.tankLines[0].size());
+
+    // --- Process Loop ---
     for (int i = 0; i < numSamples; ++i)
     {
         const float dry = buffer[i];
         float x = dry;
 
-        // Pre-Delay
-        if (preDelaySamples > 0)
+        // 1. Input Diffusion
+        if (apfG > 0.05f)
         {
-            const int readPos = ((state.preWrite - preDelaySamples) % maxPreSamp + maxPreSamp) % maxPreSamp;
-            const float preDel = state.preDelayLine[static_cast<size_t>(readPos)];
-            state.preDelayLine[static_cast<size_t>(state.preWrite)] = x;
-            state.preWrite = (state.preWrite + 1) % maxPreSamp;
-            x = preDel;
+            x = apf(x, apfG, state.inAPFLines[0], state.inAPFWrite[0], apfD[0]);
+            x = apf(x, apfG, state.inAPFLines[1], state.inAPFWrite[1], apfD[1]);
+            x = apf(x, apfG, state.inAPFLines[2], state.inAPFWrite[2], apfD[2]);
+            x = apf(x, apfG, state.inAPFLines[3], state.inAPFWrite[3], apfD[3]);
         }
-
-        // Early Reflections (4-Tap Pseudo-Raum, skaliert mit der Size!)
-        float erSignal = 0.0f;
-        if (erMix > 0.01f && preDelaySamples > 10)
-        {
-            const int erTaps[4] = { 
-                preDelaySamples, 
-                static_cast<int>(preDelaySamples * 0.73f), 
-                static_cast<int>(preDelaySamples * 0.41f), 
-                static_cast<int>(preDelaySamples * 0.17f) 
-            };
-            for(int t=0; t<4; ++t) {
-                const int rPos = ((state.preWrite - erTaps[t]) % maxPreSamp + maxPreSamp) % maxPreSamp;
-                erSignal += state.preDelayLine[static_cast<size_t>(rPos)];
-            }
-            erSignal *= 0.25f;
-        }
-
-        // Dispersion Network (Spring "Drip")
-        float dispX = x;
-        if (dispGain > 0.05f)
-        {
-            dispX = apf(dispX, dispGain, state.dispLines[0], state.dispWrite[0], dispD[0]);
-            dispX = apf(dispX, dispGain, state.dispLines[1], state.dispWrite[1], dispD[1]);
-            dispX = apf(dispX, dispGain, state.dispLines[2], state.dispWrite[2], dispD[2]);
-        }
-
-        // LFO Update
-        state.lfoPhase1 += lfoInc1;
-        if (state.lfoPhase1 > juce::MathConstants<float>::twoPi) state.lfoPhase1 -= juce::MathConstants<float>::twoPi;
-        state.lfoPhase2 += lfoInc2;
-        if (state.lfoPhase2 > juce::MathConstants<float>::twoPi) state.lfoPhase2 -= juce::MathConstants<float>::twoPi;
-
-        const float mod1 = std::sin(state.lfoPhase1) * lfoDepth;
-        const float mod2 = std::sin(state.lfoPhase2) * lfoDepth * 0.8f;
-
-        // 8 Parallel Comb Filters
-        float combSum = 0.0f;
-        combSum += combFrac(dispX, feedbackGain, lpAlpha, state.combDamp[0], state.combLines[0], state.combWrite[0], combSampF[0] + mod1);
-        combSum += combFrac(dispX, feedbackGain, lpAlpha, state.combDamp[1], state.combLines[1], state.combWrite[1], combSampF[1] - mod2);
-        combSum += combFrac(dispX, feedbackGain, lpAlpha, state.combDamp[2], state.combLines[2], state.combWrite[2], combSampF[2] + mod2 * 0.7f);
-        combSum += combFrac(dispX, feedbackGain, lpAlpha, state.combDamp[3], state.combLines[3], state.combWrite[3], combSampF[3] - mod1 * 0.6f);
-        combSum += combFrac(dispX, feedbackGain, lpAlpha, state.combDamp[4], state.combLines[4], state.combWrite[4], combSampF[4] + mod1 * 0.9f);
-        combSum += combFrac(dispX, feedbackGain, lpAlpha, state.combDamp[5], state.combLines[5], state.combWrite[5], combSampF[5] - mod2 * 0.5f);
-        combSum += combFrac(dispX, feedbackGain, lpAlpha, state.combDamp[6], state.combLines[6], state.combWrite[6], combSampF[6] + mod2 * 0.8f);
-        combSum += combFrac(dispX, feedbackGain, lpAlpha, state.combDamp[7], state.combLines[7], state.combWrite[7], combSampF[7] - mod1 * 0.4f);
         
-        float y = combSum * 0.125f; // Normalize 8 combs
+        const float inInject = x * 0.5f;
 
-        // Output Diffusion
-        y = apf(y, outAPFG, state.outAPFLines[0], state.outAPFWrite[0], outAPFD[0]);
-        y = apf(y, outAPFG, state.outAPFLines[1], state.outAPFWrite[1], outAPFD[1]);
-        y = apf(y, outAPFG, state.outAPFLines[2], state.outAPFWrite[2], outAPFD[2]);
-        y = apf(y, outAPFG, state.outAPFLines[3], state.outAPFWrite[3], outAPFD[3]);
-
-        // Mix Early Reflections with Late Reverb
-        y = y * (1.0f - erMix) + erSignal * erMix;
-
-        // Soft Limiter (fängt Peaks ab, ohne hart zu clippen)
-        y = std::tanh(y * 1.2f) * (1.0f / 1.2f);
-
-        buffer[i] = dry * dryGain + y * wetGain;
+        // 2. Read from tank (with LFO)
+        float d[4];
+        for (int k = 0; k < 4; ++k)
+        {
+            state.lfoPhases[k] += juce::MathConstants<float>::twoPi * lfoRates[k] / sr;
+            if (state.lfoPhases[k] > juce::MathConstants<float>::twoPi)
+                state.lfoPhases[k] -= juce::MathConstants<float>::twoPi;
+                
+            float mod = std::sin(state.lfoPhases[k]) * modDepthSamp;
+            float readPos = tankDelayF[k] + mod;
+            readPos = juce::jlimit(2.0f, static_cast<float>(maxTankSamp - 4), readPos);
+            
+            float raw = fracDelay(state.tankLines[k], state.tankWrite[k], readPos);
+            
+            state.tankDamp[k] = dampAlpha * raw + (1.0f - dampAlpha) * state.tankDamp[k];
+            d[k] = state.tankDamp[k] * g;
+        }
+        
+        // 3. Hadamard Matrix
+        float v0 = h * ( d[0] + d[1] + d[2] + d[3]);
+        float v1 = h * ( d[0] - d[1] + d[2] - d[3]);
+        float v2 = h * ( d[0] + d[1] - d[2] - d[3]);
+        float v3 = h * ( d[0] - d[1] - d[2] + d[3]);
+        
+        state.tankLines[0][static_cast<size_t>(state.tankWrite[0])] = v0 + inInject;
+        state.tankLines[1][static_cast<size_t>(state.tankWrite[1])] = v1 + inInject;
+        state.tankLines[2][static_cast<size_t>(state.tankWrite[2])] = v2 + inInject;
+        state.tankLines[3][static_cast<size_t>(state.tankWrite[3])] = v3 + inInject;
+        
+        for (int k = 0; k < 4; ++k)
+            state.tankWrite[k] = (state.tankWrite[k] + 1) % maxTankSamp;
+            
+        float out = (channel == 0) ? (d[0] + d[2] - d[1] - d[3]) * 0.5f
+                                   : (d[0] + d[1] - d[2] - d[3]) * 0.5f;
+                                   
+        out = std::tanh(out * 1.2f) * (1.0f / 1.2f);
+                                   
+        buffer[i] = dry * dryGain + out * wetGain;
     }
 }
-
-} // namespace space_blur
+}

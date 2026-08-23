@@ -726,13 +726,13 @@ void PluginProcessor::updateTargetBinGains()
 
             if (isFxEnabled("Spaceblur") || isFxEnabled("SpaceBlur"))
             {
-                const float sizeNorm = getModulatedNorm(item.id, "Spaceblur", "Size", 0.50f);
+                const float shapeNorm = getModulatedNorm(item.id, "Spaceblur", "Shape", 0.50f);
                 const float decayNorm = getModulatedNorm(item.id, "Spaceblur", "Decay", 0.55f);
                 const float blurNorm = getModulatedNorm(item.id, "Spaceblur", "Blur", 0.50f);
                 const float mixNorm = getModulatedNorm(item.id, "Spaceblur", "Mix", 0.30f);
 
                 space_blur::Settings reverbSettings;
-                reverbSettings.size = juce::jlimit(0.0f, 1.0f, sizeNorm);
+                reverbSettings.shape = juce::jlimit(0.0f, 1.0f, shapeNorm);
                 reverbSettings.decay = juce::jlimit(0.0f, 1.0f, decayNorm);
                 reverbSettings.blur = juce::jlimit(0.0f, 1.0f, blurNorm);
                 reverbSettings.mix = juce::jlimit(0.0f, 1.0f, mixNorm);
@@ -869,8 +869,8 @@ void PluginProcessor::updateTargetBinGains()
                     raw[static_cast<size_t>(bin)] = juce::jmax(raw[static_cast<size_t>(bin)], objectGain);
                     pitchSum[static_cast<size_t>(bin)] += objectSemitones;
                     pitchWeight[static_cast<size_t>(bin)] += 1.0f;
-                    const auto tIt = transformSettingsByObject.find(item.id);
-                    const bool transformActive = (tIt != transformSettingsByObject.end() && tIt->second.amount > 1.0e-4f);
+                    const auto* tIt = transformSettingsByObject.find(item.id);
+                    const bool transformActive = (tIt != nullptr && tIt->amount > 1.0e-4f);
                     const float effectiveStrength = objectGain + (transformActive ? 4.0f : 0.0f);
                     if (effectiveStrength > dominantStrength[static_cast<size_t>(bin)])
                     {
@@ -911,8 +911,8 @@ void PluginProcessor::updateTargetBinGains()
                     raw[static_cast<size_t>(bin)] *= objectGain;
                     pitchSum[static_cast<size_t>(bin)] += objectSemitones;
                     pitchWeight[static_cast<size_t>(bin)] += 1.0f;
-                    const auto tIt = transformSettingsByObject.find(item.id);
-                    const bool transformActive = (tIt != transformSettingsByObject.end() && tIt->second.amount > 1.0e-4f);
+                    const auto* tIt = transformSettingsByObject.find(item.id);
+                    const bool transformActive = (tIt != nullptr && tIt->amount > 1.0e-4f);
                     const float effectiveStrength = objectGain + (transformActive ? 4.0f : 0.0f);
                     if (effectiveStrength > dominantStrength[static_cast<size_t>(bin)])
                     {
@@ -1191,10 +1191,10 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
         float spectralFactor = 1.0f;
         float filterFactor = 1.0f;
         const int objectId = targetBinDominantObjectIds[static_cast<size_t>(bin)];
-        const auto fxIt = spectralFxByObject.find(objectId);
-        if (fxIt != spectralFxByObject.end())
+        const auto* fxIt = spectralFxByObject.find(objectId);
+        if (fxIt != nullptr)
         {
-            const auto& spectral = fxIt->second;
+            const auto& spectral = *fxIt;
             const float mag = currentAnalysisMagnitudes[static_cast<size_t>(bin)];
 
             if (mag < spectral.thresholdLin)
@@ -1209,9 +1209,9 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
             }
         }
 
-        const auto filterIt = filterFxByObject.find(objectId);
-        if (filterIt != filterFxByObject.end())
-            filterFactor = shade_contour::computeBinGain(bin, currentSampleRate, fftSize, filterIt->second);
+        const auto* filterIt = filterFxByObject.find(objectId);
+        if (filterIt != nullptr)
+            filterFactor = shade_contour::computeBinGain(bin, currentSampleRate, fftSize, *filterIt);
 
         const float appliedGain = smoothGain * spectralFactor * filterFactor;
         const int reIdx = 2 * bin;
@@ -1219,15 +1219,15 @@ void PluginProcessor::processStftFrame(int channel, int64_t currentSampleIndex)
         float outRe = fftData[reIdx] * appliedGain;
         float outIm = fftData[imIdx] * appliedGain;
 
-        const auto compParamsIt = compressorParamsByObject.find(objectId);
+        const auto* compParamsIt = compressorParamsByObject.find(objectId);
         // MassForge (Compressor) is now handled post-ISTFT in applyPostIstftChain.
         juce::ignoreUnused(compParamsIt);
 
-        const auto heatIt = heatGlowFxByObject.find(objectId);
+        const auto* heatIt = heatGlowFxByObject.find(objectId);
         // HeatGlow is now handled post-ISTFT in applyPostIstftChain (time domain).
         juce::ignoreUnused(heatIt);
 
-        const auto gritIt = gritEdgeFxByObject.find(objectId);
+        const auto* gritIt = gritEdgeFxByObject.find(objectId);
         // GritEdge is now handled post-ISTFT in applyPostIstftChain (time domain).
         juce::ignoreUnused(gritIt);
 
@@ -1295,7 +1295,7 @@ void PluginProcessor::reconstructAndOverlapAdd(int channel, int64_t currentSampl
         if (std::find(owners.begin(), owners.end(), id) == owners.end())
             owners.push_back(id);
     }
-        for (const auto& fxPair : spaceBlurFxByObject)
+    for (const auto& fxPair : spaceBlurFxByObject)
     {
         const int id = fxPair.first;
         if (std::find(owners.begin(), owners.end(), id) == owners.end())
@@ -1393,58 +1393,56 @@ void PluginProcessor::applyPostIstftChain(int channel, int objectId, float* time
                            / static_cast<float>(juce::jmax(1.0, currentSampleRate));
 
     // StasisCloud (Freeze) ÔÇö granular freeze, first so it can act as a source.
-    // When freeze is ON, it replaces the per-object audio with looped frozen grains.
-    // When OFF, it continuously captures incoming audio and passes through.
-    const auto freezeIt = stasisCloudFxByObject.find(objectId);
-    if (freezeIt != stasisCloudFxByObject.end())
+    const auto* freezeIt = stasisCloudFxByObject.find(objectId);
+    if (freezeIt != nullptr)
     {
-        auto& state = stasisCloudStateByChannel[channel][objectId];
-        stasis_cloud::processBlock(freezeIt->second, state, channel, timeFrame, numSamples);
+        auto& state = stasisCloudStateByChannel[channel].getOrCreateState(objectId);
+        stasis_cloud::processBlock(*freezeIt, state, channel, timeFrame, numSamples);
     }
 
     // HeatGlow (Saturation) ÔÇö waveshaper.
-    const auto heatIt = heatGlowFxByObject.find(objectId);
-    if (heatIt != heatGlowFxByObject.end())
+    const auto* heatIt = heatGlowFxByObject.find(objectId);
+    if (heatIt != nullptr)
     {
-        auto& state = heatGlowStateByChannel[channel][objectId];
-        heat_glow::processBlock(heatIt->second, state, timeFrame, numSamples);
+        auto& state = heatGlowStateByChannel[channel].getOrCreateState(objectId);
+        heat_glow::processBlock(*heatIt, state, timeFrame, numSamples);
     }
 
     // MassForge (Compressor) ÔÇö apply per-frame envelope params computed from
     // spectral analysis in updateTargetBinGains. No new per-sample state needed:
     // processSample is stateless given the pre-computed FrameParams.
-    const auto compParamsIt = compressorParamsByObject.find(objectId);
-    if (compParamsIt != compressorParamsByObject.end())
+    const auto* compParamsIt = compressorParamsByObject.find(objectId);
+    if (compParamsIt != nullptr)
     {
-        const auto& params = compParamsIt->second;
+        const auto& params = *compParamsIt;
         for (int i = 0; i < numSamples; ++i)
             timeFrame[i] = mass_forge::processSample(timeFrame[i], params);
     }
 
     // GritEdge (Distortion) ÔÇö time-domain waveshaper + biquad 4kHz Edge EQ.
-    const auto gritIt = gritEdgeFxByObject.find(objectId);
-    if (gritIt != gritEdgeFxByObject.end())
+    const auto* gritIt = gritEdgeFxByObject.find(objectId);
+    if (gritIt != nullptr)
     {
-        auto& state = gritEdgeStateByChannel[channel][objectId];
-        grit_edge::processBlock(gritIt->second, state, currentSampleRate, timeFrame, numSamples);
+        auto& state = gritEdgeStateByChannel[channel].getOrCreateState(objectId);
+        grit_edge::processBlock(*gritIt, state, currentSampleRate, timeFrame, numSamples);
     }
 
     // EchoBleed (Delay) ÔÇö frame-domain delay line with tape/digital character.
-    const auto delayIt = delayFxByObject.find(objectId);
-    if (delayIt != delayFxByObject.end())
+    const auto* delayIt = delayFxByObject.find(objectId);
+    if (delayIt != nullptr)
     {
-        auto& state = echoBleedStateByChannel[channel][objectId];
-        echo_bleed::processBlock(delayIt->second, state,
+        auto& state = echoBleedStateByChannel[channel].getOrCreateState(objectId);
+        echo_bleed::processBlock(*delayIt, state,
                                  currentSampleRate, hopSeconds,
                                  timeFrame, numSamples);
     }
 
     // SpaceBlur (Reverb) ÔÇö time-domain reverb, last in the post chain.
-    const auto reverbIt = spaceBlurFxByObject.find(objectId);
-    if (reverbIt != spaceBlurFxByObject.end())
+    const auto* reverbIt = spaceBlurFxByObject.find(objectId);
+    if (reverbIt != nullptr)
     {
-        auto& state = spaceBlurStateByChannel[channel][objectId];
-        space_blur::processBlock(reverbIt->second, state,
+        auto& state = spaceBlurStateByChannel[channel].getOrCreateState(objectId);
+        space_blur::processBlock(*reverbIt, state,
                                  currentSampleRate, channel,
                                  timeFrame, numSamples);
     }
@@ -1477,11 +1475,11 @@ void PluginProcessor::applyTransformCrossSynthesis(int channel)
         const float currentAnalysisRms = static_cast<float>(
             std::sqrt(carrierEnergy / juce::jmax(1, nyquistBin + 1)));
 
-        const auto settingsIt = transformSettingsByObject.find(carrierObjectId);
-        if (settingsIt == transformSettingsByObject.end())
+        const auto* settingsIt = transformSettingsByObject.find(carrierObjectId);
+        if (settingsIt == nullptr)
             continue;
 
-        const auto &settings = settingsIt->second;
+        const auto &settings = *settingsIt;
         if (settings.amount <= 1.0e-4f)
             continue;
 

@@ -99,7 +99,7 @@ ObjectDatabase::FXModule ObjectDatabase::makeFxModule(const std::string& effectN
     }
     else if (fx.name == "Spaceblur")
     {
-        fx.parameters.push_back({ "Size", {} });
+        fx.parameters.push_back({ "Shape", {} });
         fx.parameters.push_back({ "Decay", {} });
         fx.parameters.push_back({ "Blur", {} });
         fx.parameters.push_back({ "Mix", {} });
